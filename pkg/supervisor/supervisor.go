@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fly-apps/postgres-standalone/pkg/flycheck"
 	"github.com/google/shlex"
 	"golang.org/x/sync/errgroup"
 )
@@ -123,6 +124,10 @@ func (h *Supervisor) waitForExit(ctx context.Context) {
 	for _, proc := range h.procs {
 		go proc.Kill()
 	}
+}
+
+func (h *Supervisor) StartHttpListener() {
+	go flycheck.StartCheckListener()
 }
 
 func (h *Supervisor) Run() error {

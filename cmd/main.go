@@ -7,10 +7,10 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
+	"syscall"
 	"time"
 
-	"github.com/fly-examples/fly-postgres/pkg/flypg"
-	"github.com/fly-examples/fly-postgres/pkg/supervisor"
+	"github.com/fly-apps/postgres-standalone/pkg/supervisor"
 )
 
 func main() {
@@ -25,20 +25,15 @@ func main() {
 		PanicHandler(err)
 	}
 
-	consulClient, err := flypg.NewConsulClient()
-	if err != nil {
-		PanicHandler(err)
-	}
-
-	if err := consulClient.Register(); err != nil {
-		PanicHandler(err)
-	}
-
 	svisor := supervisor.New("flypg", 5*time.Minute)
 	svisor.AddProcess("flypg", "gosu postgres postgres -D /data/postgres/")
-	err = svisor.Run()
-	if err != nil {
-		consulClient.ReleaseSession()
+
+	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
+	svisor.StartHttpListener()
+
+	if err := svisor.Run(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 }
