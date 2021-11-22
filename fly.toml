@@ -1,0 +1,17 @@
+# fly.toml file generated for fly-postgres-machine on 2021-10-24T17:27:10-05:00
+
+app = "fly-postgres-machine"
+
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[env]
+
+[experimental]
+  allowed_public_ports = []
+  auto_rollback = false
+
+[[mounts]]
+  destination = "/data"
+  source = "pg_data"
