@@ -1,10 +1,39 @@
-# fly.toml file generated for fly-postgres-machine on 2021-10-24T17:27:10-05:00
+# fly.toml file generated for shaun-pg-standalone on 2021-11-22T11:08:24-06:00
 
-app = "fly-postgres-machine"
+app = "shaun-pg-standalone"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
 processes = []
+
+[checks]
+
+  [checks.pg]
+    grace_period = "30s"
+    interval = "15s"
+    method = "get"
+    path = "/flycheck/pg"
+    port = 5500
+    timeout = "10s"
+    type = "http"
+
+  [checks.role]
+    grace_period = "30s"
+    interval = "15s"
+    method = "get"
+    path = "/flycheck/role"
+    port = 5500
+    timeout = "10s"
+    type = "http"
+
+  [checks.vm]
+    grace_period = "1s"
+    interval = "1m"
+    method = "get"
+    path = "/flycheck/vm"
+    port = 5500
+    timeout = "10s"
+    type = "http"
 
 [env]
 

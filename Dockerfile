@@ -9,7 +9,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd
 
 
 FROM postgres:${PG_VERSION}
-ENV POSTGRES_PASSWORD=testpassword
 ENV PGDATA=/data/pg_data
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
