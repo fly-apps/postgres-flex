@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	chk "github.com/fly-apps/postgres-standalone/pkg/check"
+	chk "github.com/fly-apps/postgres-standalone/pkg/checks"
 	"github.com/fly-apps/postgres-standalone/pkg/flypg"
-	"github.com/pkg/errors"
-
 	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 )
 
 // CheckPostgreSQL health, replication, etc

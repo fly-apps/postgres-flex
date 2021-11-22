@@ -3,7 +3,7 @@ package flycheck
 import (
 	"context"
 
-	chk "github.com/fly-apps/postgres-standalone/pkg/check"
+	chk "github.com/fly-apps/postgres-standalone/pkg/checks"
 )
 
 // PostgreSQLRole outputs current role

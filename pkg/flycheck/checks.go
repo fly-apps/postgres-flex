@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	su "github.com/fly-apps/postgres-standalone/pkg/checks"
 )
 
 const Port = 5500
@@ -22,7 +24,7 @@ func StartCheckListener() {
 func runVMChecks(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), (5 * time.Second))
 	defer cancel()
-	suite := &suite.CheckSuite{Name: "VM"}
+	suite := &su.CheckSuite{Name: "VM"}
 	suite = CheckVM(suite)
 
 	go func(ctx context.Context) {
@@ -39,7 +41,7 @@ func runVMChecks(w http.ResponseWriter, r *http.Request) {
 func runPGChecks(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), (5 * time.Second))
 	defer cancel()
-	suite := &suite.CheckSuite{Name: "PG"}
+	suite := &su.CheckSuite{Name: "PG"}
 	suite, err := CheckPostgreSQL(ctx, suite)
 	if err != nil {
 		suite.ErrOnSetup = err
@@ -61,7 +63,7 @@ func runRoleCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), (time.Second * 5))
 	defer cancel()
 
-	suite := &suite.CheckSuite{Name: "Role"}
+	suite := &su.CheckSuite{Name: "Role"}
 	suite, err := PostgreSQLRole(ctx, suite)
 	if err != nil {
 		suite.ErrOnSetup = err
@@ -79,7 +81,7 @@ func runRoleCheck(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleCheckResponse(w http.ResponseWriter, suite *suite.CheckSuite, raw bool) {
+func handleCheckResponse(w http.ResponseWriter, suite *su.CheckSuite, raw bool) {
 	if suite.ErrOnSetup != nil {
 		handleError(w, suite.ErrOnSetup)
 		return

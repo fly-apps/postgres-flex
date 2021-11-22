@@ -10,8 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-apps/postgres-standalone/pkg/check"
-	chk "github.com/fly-apps/postgres-standalone/pkg/check"
+	chk "github.com/fly-apps/postgres-standalone/pkg/checks"
 )
 
 // CheckVM for system / disk checks
@@ -66,18 +65,18 @@ func checkPressure(name string) (string, error) {
 
 	// Trigger failure if pressure exceeds 10 percent.
 	if avg10 > 10 {
-		return "", fmt.Errorf("system spent %s of the last 10 seconds waiting on %s", check.RoundDuration(avg10Dur, 2), name)
+		return "", fmt.Errorf("system spent %s of the last 10 seconds waiting on %s", chk.RoundDuration(avg10Dur, 2), name)
 	}
 
 	if avg60 > 10 {
-		return "", fmt.Errorf("system spent %s of the last 60 seconds waiting on %s", check.RoundDuration(avg60Dur, 2), name)
+		return "", fmt.Errorf("system spent %s of the last 60 seconds waiting on %s", chk.RoundDuration(avg60Dur, 2), name)
 	}
 
 	if avg300 > 10 {
-		return "", fmt.Errorf("system spent %s of the last 300 seconds waiting on %s", check.RoundDuration(avg300Dur, 2), name)
+		return "", fmt.Errorf("system spent %s of the last 300 seconds waiting on %s", chk.RoundDuration(avg300Dur, 2), name)
 	}
 
-	return fmt.Sprintf("system spent %s of the last 60s waiting on %s", check.RoundDuration(avg60Dur, 2), name), nil
+	return fmt.Sprintf("system spent %s of the last 60s waiting on %s", chk.RoundDuration(avg60Dur, 2), name), nil
 }
 
 func checkLoad() (string, error) {
