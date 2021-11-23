@@ -1,6 +1,6 @@
-# fly.toml file generated for shaun-pg-standalone on 2021-11-22T11:08:24-06:00
+# fly.toml file generated for shaun-standalone-3 on 2021-11-22T17:59:45-06:00
 
-app = "shaun-pg-standalone"
+app = "shaun-standalone-3"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
@@ -36,6 +36,7 @@ processes = []
     type = "http"
 
 [env]
+  private_network = true
 
 [experimental]
   allowed_public_ports = []

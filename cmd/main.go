@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,7 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fly-apps/postgres-standalone/pkg/flypg"
+	"github.com/fly-apps/postgres-standalone/pkg/flypg/admin"
 	"github.com/fly-apps/postgres-standalone/pkg/supervisor"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -24,6 +28,23 @@ func main() {
 	if err := setDefaultHBA(); err != nil {
 		PanicHandler(err)
 	}
+
+	go func() {
+		t := time.NewTicker(1 * time.Second)
+		defer t.Stop()
+		fmt.Println("Configuring users")
+
+		for range t.C {
+			if err := createRequiredUsers(); err != nil {
+				fmt.Println("Failed to create require users... retrying...")
+				continue
+			}
+
+			fmt.Println("Successfully created users")
+
+			return
+		}
+	}()
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 	svisor.AddProcess("flypg", "gosu postgres postgres -D /data/postgres/")
@@ -41,7 +62,7 @@ func main() {
 func initializePostgres() {
 	fmt.Println("Initializing Postgres")
 
-	if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("PGPASSWORD")), 0644); err != nil {
+	if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("OPERATOR_PASSWORD")), 0644); err != nil {
 		PanicHandler(err)
 	}
 
@@ -135,6 +156,59 @@ func setDefaultHBA() error {
 	}
 
 	return nil
+}
+
+func createRequiredUsers() error {
+	fmt.Println("Creating required users")
+
+	node, err := flypg.NewNode()
+	if err != nil {
+		return err
+	}
+
+	conn, err := node.NewLocalConnection(context.TODO())
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Connection: %+v\n", conn)
+
+	curUsers, err := admin.ListUsers(context.TODO(), conn)
+	if err != nil {
+		return errors.Wrap(err, "failed to list current users")
+	}
+
+	credMap := map[string]string{
+		"flypgadmin": os.Getenv("SU_PASSWORD"),
+	}
+
+	for user, pass := range credMap {
+		exists := false
+		for _, curUser := range curUsers {
+			if user == curUser.Username {
+				exists = true
+			}
+		}
+		var sql string
+
+		if exists {
+			sql = fmt.Sprintf("ALTER USER %s WITH PASSWORD '%s'", user, pass)
+		} else {
+			// create user
+			switch user {
+			case "flypgadmin":
+				fmt.Println("Creating flypgadmin")
+				sql = fmt.Sprintf(`CREATE USER %s WITH SUPERUSER LOGIN PASSWORD '%s'`, user, pass)
+			}
+
+			_, err := conn.Exec(context.Background(), sql)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+
 }
 
 func PanicHandler(err error) {
