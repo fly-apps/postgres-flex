@@ -36,11 +36,12 @@ processes = []
     type = "http"
 
 [env]
-  private_network = true
+
 
 [experimental]
   allowed_public_ports = []
   auto_rollback = false
+  private_network = true
 
 [[mounts]]
   destination = "/data"
