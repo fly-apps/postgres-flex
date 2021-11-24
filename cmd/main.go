@@ -18,6 +18,13 @@ import (
 )
 
 func main() {
+	requiredPasswords := []string{"SU_PASSWORD", "OPERATOR_PASSWORD"}
+	for _, str := range requiredPasswords {
+		if _, exists := os.LookupEnv(str); !exists {
+			panic(fmt.Errorf("%s is required", str))
+		}
+	}
+
 	if _, err := os.Stat("/data/postgres"); os.IsNotExist(err) {
 		setDirOwnership()
 		initializePostgres()
@@ -159,8 +166,6 @@ func setDefaultHBA() error {
 }
 
 func createRequiredUsers() error {
-	fmt.Println("Creating required users")
-
 	node, err := flypg.NewNode()
 	if err != nil {
 		return err
@@ -170,8 +175,6 @@ func createRequiredUsers() error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("Connection: %+v\n", conn)
 
 	curUsers, err := admin.ListUsers(context.TODO(), conn)
 	if err != nil {
@@ -207,8 +210,8 @@ func createRequiredUsers() error {
 			}
 		}
 	}
-	return nil
 
+	return nil
 }
 
 func PanicHandler(err error) {
