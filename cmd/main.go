@@ -15,6 +15,7 @@ import (
 	"github.com/fly-apps/postgres-standalone/pkg/flypg/admin"
 	"github.com/fly-apps/postgres-standalone/pkg/supervisor"
 	"github.com/pkg/errors"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 func main() {
@@ -25,9 +26,13 @@ func main() {
 		}
 	}
 
+	// Ensure PG files have correct ownership.
+	setDirOwnership()
+
 	if _, err := os.Stat("/data/postgres"); os.IsNotExist(err) {
-		setDirOwnership()
-		initializePostgres()
+		if err := initializePostgres(); err != nil {
+			PanicHandler(err)
+		}
 	}
 
 	// TODO - This is just for dev'ing and will need to change.  Additional users will be added by users
@@ -43,7 +48,7 @@ func main() {
 
 		for range t.C {
 			if err := createRequiredUsers(); err != nil {
-				fmt.Println("Failed to create require users... retrying...")
+				fmt.Printf("Failed to create required users: %s\n", err.Error())
 				continue
 			}
 
@@ -66,19 +71,20 @@ func main() {
 
 }
 
-func initializePostgres() {
+func initializePostgres() error {
 	fmt.Println("Initializing Postgres")
 
 	if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("OPERATOR_PASSWORD")), 0644); err != nil {
-		PanicHandler(err)
+		return err
 	}
 
 	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", "/data/postgres", "--pwfile=/data/.default_password")
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		PanicHandler(err)
+		return err
 	}
 
+	return nil
 }
 
 func setDirOwnership() {
@@ -94,10 +100,50 @@ func setDirOwnership() {
 	if err != nil {
 		PanicHandler(err)
 	}
-	if err := os.Chown("/data", pgUID, pgGID); err != nil {
+
+	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
+	cmd := exec.Command("sh", "-c", cmdStr)
+	_, err = cmd.Output()
+	if err != nil {
 		PanicHandler(err)
 	}
 }
+
+// func setDefaultConfiguration() error {
+
+// 	mem, err := memTotal()
+// 	if err != nil {
+// 		return errors.Wrap(err, "error fetching total system memory")
+// 	}
+
+// 	workMem := max(4, (mem / 64))
+// 	maintenanceWorkMem := max(64, (mem / 20))
+
+// 	pgConfig := map[string]string{
+// 		"listen_addresses":           "fdaa:0:2e26:a7b:ab8:0:5fd4:2",
+// 		"max_connections":            "100",
+// 		"port":                       "5432",
+// 		"shared_buffers":             fmt.Sprintf("%dMB", mem/4),
+// 		"effective_cache_size":       fmt.Sprintf("%dMB", 3*mem/4),
+// 		"maintenance_work_mem":       fmt.Sprintf("%dMB", maintenanceWorkMem),
+// 		"work_mem":                   fmt.Sprintf("%dMB", workMem),
+// 		"dynamic_shared_memory_type": "posix",
+// 		"max_wal_size":               "1GB",
+// 		"min_wal_size":               "80MB",
+// 	}
+
+// 	file, err := os.OpenFile("/data/postgres/postgresql.conf", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer file.Close()
+// 	for key, value := range pgConfig {
+// 		str := fmt.Sprintf("%s = '%s'\n", key, value)
+// 		file.WriteString(str)
+// 	}
+
+// 	return nil
+// }
 
 type HBAEntry struct {
 	Type     string
@@ -203,15 +249,42 @@ func createRequiredUsers() error {
 				fmt.Println("Creating flypgadmin")
 				sql = fmt.Sprintf(`CREATE USER %s WITH SUPERUSER LOGIN PASSWORD '%s'`, user, pass)
 			}
-
 			_, err := conn.Exec(context.Background(), sql)
 			if err != nil {
 				return err
 			}
 		}
 	}
-
 	return nil
+}
+
+func memTotal() (memoryMb int64, err error) {
+	if raw := os.Getenv("FLY_VM_MEMORY_MB"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		memoryMb = parsed
+	}
+
+	if memoryMb == 0 {
+		v, err := mem.VirtualMemory()
+		if err != nil {
+			return 0, err
+		}
+		memoryMb = int64(v.Total / 1024 / 1024)
+	}
+
+	return
+}
+
+func max(n ...int64) (max int64) {
+	for _, num := range n {
+		if num > max {
+			max = num
+		}
+	}
+	return
 }
 
 func PanicHandler(err error) {
