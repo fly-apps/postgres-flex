@@ -25,3 +25,32 @@ fly volumes create pg_data --region <region> --size <volume-size-in-gb>
 ```
 fly deploy .
 ```
+
+## Connecting
+
+Fly apps within the same organization can connect to your Postgres using the following URI:
+
+```
+postgres://<user>:<password>@<postgres-app-name>.internal:5432/<database-name>
+```
+
+### Connecting to Postgres from your local machine
+
+1. Setup WireGuard Tunnel ( If you haven’t already )
+Follow the steps provided here: https://fly.io/docs/reference/privatenetwork/#private-network-vpn
+
+2. Postgres needs to be installed on your local machine.
+
+3. Use psql to connect to your Postgres instance.
+```
+psql postgres://postgres:<password>@<postgres-app-name>.internal:5432
+```
+
+
+## Having trouble?
+
+Create an issue or ask a question here: https://community.fly.io/
+
+
+## Contributing
+If you're looking to get involved, fork the project and send pull requests.
