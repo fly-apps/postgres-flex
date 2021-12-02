@@ -1,6 +1,3 @@
-# fly.toml file generated for shaun-standalone-3 on 2021-11-22T17:59:45-06:00
-
-app = "shaun-standalone-3"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
@@ -34,9 +31,6 @@ processes = []
     port = 5500
     timeout = "10s"
     type = "http"
-
-[env]
-
 
 [experimental]
   allowed_public_ports = []
