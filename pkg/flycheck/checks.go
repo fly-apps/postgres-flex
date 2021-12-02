@@ -15,7 +15,6 @@ const Port = 5500
 func StartCheckListener() {
 	http.HandleFunc("/flycheck/vm", runVMChecks)
 	http.HandleFunc("/flycheck/pg", runPGChecks)
-	http.HandleFunc("/flycheck/role", runRoleCheck)
 
 	fmt.Printf("Listening on port %d", Port)
 	http.ListenAndServe(fmt.Sprintf(":%d", Port), nil)
@@ -56,28 +55,6 @@ func runPGChecks(w http.ResponseWriter, r *http.Request) {
 	select {
 	case <-ctx.Done():
 		handleCheckResponse(w, suite, false)
-	}
-}
-
-func runRoleCheck(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), (time.Second * 5))
-	defer cancel()
-
-	suite := &su.CheckSuite{Name: "Role"}
-	suite, err := PostgreSQLRole(ctx, suite)
-	if err != nil {
-		suite.ErrOnSetup = err
-		cancel()
-	}
-
-	go func() {
-		suite.Process(ctx)
-		cancel()
-	}()
-
-	select {
-	case <-ctx.Done():
-		handleCheckResponse(w, suite, true)
 	}
 }
 
