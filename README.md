@@ -4,7 +4,7 @@ Single node Postgres on Fly
 
 ## Getting started
 
-1. Clone this repository
+1. Fork/Clone this repository.
 
 2. Prepare your app
 ```
