@@ -21,7 +21,6 @@ type Credentials struct {
 type Node struct {
 	AppName             string
 	PrivateIP           net.IP
-	Region              string
 	DataDir             string
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -32,12 +31,7 @@ func NewNode() (*Node, error) {
 	node := &Node{
 		AppName: "local",
 		PGPort:  5432,
-		Region:  "local",
 		DataDir: "/data",
-	}
-
-	if region := os.Getenv("FLY_REGION"); region != "" {
-		node.Region = region
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
