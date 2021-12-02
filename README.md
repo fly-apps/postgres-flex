@@ -1,5 +1,5 @@
-# postgres-standalone
-Standalone Postgres on Fly
+# Standalone Postgres
+Single node Postgres on Fly
 
 
 ## Getting started
