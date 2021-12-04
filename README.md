@@ -37,7 +37,7 @@ postgres://<user>:<password>@<postgres-app-name>.internal:5432/<database-name>
 ### Connecting to Postgres from your local machine
 
 1. Setup WireGuard Tunnel ( If you haven’t already )
-Follow the steps provided here: https://fly.io/docs/reference/privatenetwork/#private-network-vpn
+Follow the steps provided here: https://fly.io/docs/reference/private-networking/#step-by-step
 
 2. Postgres needs to be installed on your local machine.
 
