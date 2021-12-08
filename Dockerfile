@@ -6,7 +6,8 @@ FROM golang:1.16 as flyutil
 WORKDIR /go/src/github.com/fly-examples/fly-postgres
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/flyadmin ./cmd/flyadmin
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
 
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/pg_data
