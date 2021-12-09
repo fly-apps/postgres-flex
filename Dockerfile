@@ -8,6 +8,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/flyadmin ./cmd/flyadmin
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
+COPY ./bin/* /fly/bin/
 
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/pg_data
