@@ -56,8 +56,25 @@ func main() {
 		}
 	}()
 
+	node, err := flypg.NewNode()
+	if err != nil {
+		PanicHandler(err)
+	}
+
 	svisor := supervisor.New("flypg", 5*time.Minute)
 	svisor.AddProcess("flypg", "gosu postgres postgres -D /data/postgres/")
+
+	exporterEnv := map[string]string{
+		"DATA_SOURCE_URI":                      fmt.Sprintf("[%s]:%d/postgres?sslmode=disable", node.PrivateIP, node.PGPort),
+		"DATA_SOURCE_USER":                     node.SUCredentials.Username,
+		"DATA_SOURCE_PASS":                     node.SUCredentials.Password,
+		"PG_EXPORTER_EXCLUDE_DATABASE":         "template0,template1",
+		"PG_EXPORTER_DISABLE_SETTINGS_METRICS": "true",
+		"PG_EXPORTER_AUTO_DISCOVER_DATABASES":  "true",
+		"PG_EXPORTER_EXTEND_QUERY_PATH":        "/fly/queries.yaml",
+	}
+
+	svisor.AddProcess("exporter", "postgres_exporter", supervisor.WithEnv(exporterEnv), supervisor.WithRestart(0, 1*time.Second))
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 	svisor.StartHttpListener()

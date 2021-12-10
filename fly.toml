@@ -31,3 +31,7 @@ processes = []
 [[mounts]]
   destination = "/data"
   source = "pg_data"
+
+[metrics]
+  path = "/metrics"
+  port = 9187
