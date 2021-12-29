@@ -14,6 +14,7 @@ FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/pg_data
 ARG VERSION 
+ARG POSTGIS_MAJOR=3
 
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
@@ -21,6 +22,8 @@ LABEL fly.pg-version=${PG_VERSION}
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     ca-certificates iproute2 consul curl bash dnsutils vim procps jq \
+    postgresql-$PG_MAJOR-postgis-$POSTGIS_MAJOR \
+    postgresql-$PG_MAJOR-postgis-$POSTGIS_MAJOR-scripts \
     && apt autoremove -y
 
 COPY --from=postgres_exporter /postgres_exporter /usr/local/bin/
