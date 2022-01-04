@@ -2,9 +2,7 @@ package admin
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
-	"strings"
 
 	"github.com/jackc/pgx/v4"
 )
@@ -72,19 +70,9 @@ func ListDatabases(ctx context.Context, pg *pgx.Conn) ([]DbInfo, error) {
 }
 
 type UserInfo struct {
-	Username     string   `json:"username"`
-	SuperUser    bool     `json:"superuser"`
-	Databases    []string `json:"databases"`
-	PasswordHash string   `json:"-"`
-}
-
-func (ui UserInfo) IsPassword(password string) bool {
-	if !strings.HasPrefix(ui.PasswordHash, "md5") {
-		return false
-	}
-
-	encoded := fmt.Sprintf("md5%x", md5.Sum([]byte(password+ui.Username)))
-	return encoded == ui.PasswordHash
+	Username  string   `json:"username"`
+	SuperUser bool     `json:"superuser"`
+	Databases []string `json:"databases"`
 }
 
 type DbInfo struct {
@@ -96,7 +84,6 @@ func ListUsers(ctx context.Context, pg *pgx.Conn) ([]UserInfo, error) {
 	sql := `
 		select u.usename,
 			usesuper as superuser,
-			a.rolpassword as passwordhash,
       (select array_agg(d.datname::text order by d.datname)
 				from pg_database d
 				WHERE datistemplate = false
@@ -117,7 +104,7 @@ func ListUsers(ctx context.Context, pg *pgx.Conn) ([]UserInfo, error) {
 
 	for rows.Next() {
 		ui := UserInfo{}
-		if err := rows.Scan(&ui.Username, &ui.SuperUser, &ui.PasswordHash, &ui.Databases); err != nil {
+		if err := rows.Scan(&ui.Username, &ui.SuperUser, &ui.Databases); err != nil {
 			return nil, err
 		}
 		values = append(values, ui)
