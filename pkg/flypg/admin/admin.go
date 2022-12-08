@@ -40,6 +40,34 @@ func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string
 	return nil
 }
 
+func CreateDatabase(pg *pgx.Conn, name, owner string) (interface{}, error) {
+	databases, err := ListDatabases(context.TODO(), pg)
+	if err != nil {
+		return false, err
+	}
+
+	for _, db := range databases {
+		if db.Name == name {
+			return true, nil
+		}
+	}
+
+	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, owner)
+
+	_, err = pg.Exec(context.Background(), sql)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func EnableExtension(pg *pgx.Conn, extension string) error {
+	sql := fmt.Sprintf("CREATE EXTENSION %s;", extension)
+	_, err := pg.Exec(context.Background(), sql)
+	return err
+}
+
 func ListDatabases(ctx context.Context, pg *pgx.Conn) ([]DbInfo, error) {
 	sql := `
 		SELECT d.datname,

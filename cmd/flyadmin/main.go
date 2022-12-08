@@ -172,6 +172,17 @@ func deleteUser(pg *pgx.Conn, input map[string]interface{}) (interface{}, error)
 	return true, nil
 }
 
+func createReplDatabase(pg *pgx.Conn, input map[string]interface{}) (interface{}, error) {
+	sql := fmt.Sprintf("CREATE DATABASE replmgr OWNER replmgr;", input["name"])
+
+	_, err := pg.Exec(context.Background(), sql)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 func createDatabase(pg *pgx.Conn, input map[string]interface{}) (interface{}, error) {
 	sql := fmt.Sprintf("CREATE DATABASE %s;", input["name"])
 
