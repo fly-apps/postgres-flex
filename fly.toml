@@ -23,11 +23,6 @@ processes = []
     timeout = "10s"
     type = "http"
 
-[experimental]
-  allowed_public_ports = []
-  auto_rollback = false
-  private_network = true
-
 [[mounts]]
   destination = "/data"
   source = "pg_data"
