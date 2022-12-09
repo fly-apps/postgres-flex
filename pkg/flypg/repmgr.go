@@ -1,11 +1,8 @@
 package flypg
 
 import (
-	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"os"
-	"strings"
 )
 
 func InitializeManager(node Node) error {
@@ -37,22 +34,21 @@ func registerPrimary(node Node) error {
 	return nil
 }
 
-func cloneFromPrimary(node Node, ipStr string) error {
-	cmdStr := fmt.Sprintf("mkdir -p %s", node.DataDir)
+func unregisterPrimary(node Node) error {
+	cmdStr := fmt.Sprintf("repmgr -f %s primary unregister",
+		node.ManagerConfigPath,
+	)
 	if err := runCommand(cmdStr); err != nil {
 		return err
 	}
 
-	fmt.Println("Cloning from primary")
-	cmdStr = fmt.Sprintf("repmgr -h %s -d %s -U %s -f %s standby clone -F",
-		ipStr,
-		node.ManagerDatabaseName,
-		node.ManagerCredentials.Username,
-		node.ManagerConfigPath)
+	return nil
+}
 
-	fmt.Println(cmdStr)
+func standbyFollow(node Node) error {
+	cmdStr := fmt.Sprintf("repmgr -f %s standby follow", node.ManagerConfigPath)
 	if err := runCommand(cmdStr); err != nil {
-		return err
+		fmt.Printf("failed to register standby: %s", err)
 	}
 
 	return nil
@@ -67,12 +63,27 @@ func registerStandby(node Node) error {
 	return nil
 }
 
-func writeManagerConf(node Node) error {
-	_, err := os.Stat(node.ManagerConfigPath)
-	if !os.IsNotExist(err) {
-		return nil
+func cloneFromPrimary(node Node, ipStr string) error {
+	cmdStr := fmt.Sprintf("mkdir -p %s", node.DataDir)
+	if err := runCommand(cmdStr); err != nil {
+		return err
 	}
 
+	cmdStr = fmt.Sprintf("repmgr -h %s -d %s -U %s -f %s standby clone -F",
+		ipStr,
+		node.ManagerDatabaseName,
+		node.ManagerCredentials.Username,
+		node.ManagerConfigPath)
+
+	fmt.Println(cmdStr)
+	if err := runCommand(cmdStr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeManagerConf(node Node) error {
 	file, err := os.OpenFile(node.ManagerConfigPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -80,18 +91,16 @@ func writeManagerConf(node Node) error {
 
 	nodeName := node.PrivateIP.String()
 
-	// This is kinda dumb, but should work.
-	ipArr := strings.Split(nodeName, ":")
-	lastHalf := strings.Join(ipArr[4:], "")
-	seed := binary.LittleEndian.Uint32([]byte(lastHalf))
-	rand.Seed(int64(seed))
-	nodeID := rand.Int31()
-
 	conf := map[string]interface{}{
-		"node_id":        fmt.Sprint(nodeID),
-		"node_name":      fmt.Sprintf("'%s'", nodeName),
-		"conninfo":       fmt.Sprintf("'host=%s user=%s dbname=%s connect_timeout=10'", nodeName, node.ManagerCredentials.Username, node.ManagerDatabaseName),
-		"data_directory": fmt.Sprintf("'%s'", node.DataDir),
+		"node_id":                    fmt.Sprint(node.ID),
+		"node_name":                  fmt.Sprintf("'%s'", nodeName),
+		"conninfo":                   fmt.Sprintf("'host=%s user=%s dbname=%s connect_timeout=10'", nodeName, node.ManagerCredentials.Username, node.ManagerDatabaseName),
+		"data_directory":             fmt.Sprintf("'%s'", node.DataDir),
+		"failover":                   "'automatic'",
+		"promote_command":            fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", node.ManagerConfigPath),
+		"follow_command":             fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", node.ManagerConfigPath),
+		"event_notification_command": fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\"'"),
+		"event_notifications":        "'repmgrd_failover_promote,standby_promote'",
 	}
 
 	for key, value := range conf {

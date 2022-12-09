@@ -2,13 +2,16 @@ package flypg
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,6 +28,7 @@ type Credentials struct {
 }
 
 type Node struct {
+	ID        int32
 	AppName   string
 	PrivateIP net.IP
 	DataDir   string
@@ -55,8 +59,15 @@ func NewNode() (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed getting private ip: %s", err)
 	}
-
 	node.PrivateIP = ipv6
+
+	// There is probably a better way to do this.
+	ipArr := strings.Split(ipv6.String(), ":")
+	lastHalf := strings.Join(ipArr[4:], "")
+	seed := binary.LittleEndian.Uint32([]byte(lastHalf))
+	rand.Seed(int64(seed))
+
+	node.ID = rand.Int31()
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.PGPort = port
@@ -96,12 +107,13 @@ func (n *Node) Init() error {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	if leaderIP == n.PrivateIP.String() {
-		return nil
-	}
-
+	// Ensures that repmgr is updated with the latest configuration.
 	if err := InitializeManager(*n); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
+	}
+
+	if leaderIP == n.PrivateIP.String() {
+		return nil
 	}
 
 	if leaderIP == "" {
@@ -163,14 +175,20 @@ func (n *Node) PostInit() error {
 		}
 
 		fmt.Println("Registering Primary")
-
 		if err := registerPrimary(*n); err != nil {
 			fmt.Printf("failed to register primary: %s", err)
 		}
 
+		fmt.Println("Registering Primary with Consul")
 		if err := client.RegisterPrimary(n.PrivateIP.String()); err != nil {
 			return fmt.Errorf("failed to register primary with consul: %s", err)
 		}
+
+		fmt.Println("Registering Node with Consul")
+		if err := client.RegisterNode(n.ID, n.PrivateIP.String()); err != nil {
+			return fmt.Errorf("failed to register member with consul: %s", err)
+		}
+
 	case n.PrivateIP.String():
 		if err := registerPrimary(*n); err != nil {
 			fmt.Printf("failed to register primary: %s", err)
@@ -178,10 +196,25 @@ func (n *Node) PostInit() error {
 
 		fmt.Println("Nothing to do here")
 	default:
+		fmt.Println("Unregistering primary")
+		if err := unregisterPrimary(*n); err != nil {
+			fmt.Printf("failed to unregister primary ( ignore ): %s\n", err)
+		}
+
 		// TODO - We need to track registered standbys to we don't re-register outselves.
 		fmt.Println("Registering standby")
 		if err := registerStandby(*n); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
+		}
+
+		fmt.Println("Follow the leader")
+		if err := standbyFollow(*n); err != nil {
+			fmt.Printf("failed to register standby: %s\n", err)
+		}
+
+		fmt.Println("Registering Node with Consul")
+		if err := client.RegisterNode(n.ID, n.PrivateIP.String()); err != nil {
+			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
 

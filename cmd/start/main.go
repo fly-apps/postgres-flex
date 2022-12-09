@@ -49,7 +49,7 @@ func main() {
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 	svisor.AddProcess("flypg", "gosu postgres postgres -D /data/postgresql/")
-	svisor.AddProcess("repmgrd", "gosu postgres repmgrd -f /data/repmgr.conf --daemonize=false -v", supervisor.WithEnv(env), supervisor.WithRestart(0, 5*time.Second))
+	svisor.AddProcess("repmgrd", "gosu postgres repmgrd -f /data/repmgr.conf --daemonize=false", supervisor.WithEnv(env), supervisor.WithRestart(0, 5*time.Second))
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
 	if err := svisor.Run(); err != nil {

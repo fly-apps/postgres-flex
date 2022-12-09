@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -48,9 +49,62 @@ func (c *consulClient) CurrentPrimary() (string, error) {
 	return "", nil
 }
 
-func (c *consulClient) RegisterPrimary(ip string) error {
-	kv := &api.KVPair{Key: c.targetKey("PRIMARY_NODE"), Value: []byte(ip)}
+func (c *consulClient) RegisterPrimary(hostname string) error {
+	kv := &api.KVPair{Key: c.targetKey("PRIMARY_NODE"), Value: []byte(hostname)}
 	_, err := c.client.KV().Put(kv, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *consulClient) Node(id int32) (*api.KVPair, error) {
+	idBytes, err := json.Marshal(id)
+	if err != nil {
+		return nil, err
+	}
+
+	key := c.targetKey(string(idBytes))
+	result, _, err := c.client.KV().Get(key, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (c *consulClient) RegisterNode(id int32, hostname string) error {
+	node, err := c.Node(id)
+	if err != nil {
+		return err
+	}
+
+	if node != nil {
+		return nil
+	}
+
+	idBytes, err := json.Marshal(id)
+	if err != nil {
+		return err
+	}
+
+	kv := &api.KVPair{Key: c.targetKey(string(idBytes)), Value: []byte(hostname)}
+	_, err = c.client.KV().Put(kv, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *consulClient) DeleteNode(id int32) error {
+	idBytes, err := json.Marshal(id)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.client.KV().Delete(string(idBytes), nil)
 	if err != nil {
 		return err
 	}
