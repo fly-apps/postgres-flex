@@ -13,7 +13,6 @@ import (
 
 func main() {
 	uri := flag.String("uri", "", "PG cluster connection string")
-	read := flag.Bool("read", false, "Only perform reads")
 	totalWrites := flag.Int("total-writes", 0, "Total writes")
 
 	flag.Parse()
@@ -37,26 +36,19 @@ func main() {
 		panic(conn)
 	}
 
+	seed := generateSeed()
 
-	if !read 
-
-		seed := generateSeed()
-
-		for i := 0; i < *totalWrites; i++ {
-			val := fmt.Sprintf("%s-%d", seed, i)
-			sql := fmt.Sprintf("INSERT INTO bench (val) VALUES ('%s');", val)
-			_, err = conn.Exec(context.Background(), sql)
-			if err != nil {
-				fmt.Printf("(%d of %d) - Failed\n", i, *totalWrites-1)
-				time.Sleep(2)
-			}
-
-			fmt.Printf("(%d of %d) - Success\n", i, *totalWrites-1)
+	for i := 0; i < *totalWrites; i++ {
+		val := fmt.Sprintf("%s-%d", seed, i)
+		sql := fmt.Sprintf("INSERT INTO bench (val) VALUES ('%s');", val)
+		_, err = conn.Exec(context.Background(), sql)
+		if err != nil {
+			fmt.Printf("(%d of %d) - Failed\n", i, *totalWrites-1)
+			time.Sleep(2)
 		}
+
+		fmt.Printf("(%d of %d) - Success\n", i, *totalWrites-1)
 	}
-
-
-
 
 }
 
