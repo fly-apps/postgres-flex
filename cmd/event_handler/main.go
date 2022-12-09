@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/fly-apps/postgres-standalone/pkg/flypg/state"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 )
 
 func main() {

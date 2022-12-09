@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-apps/postgres-standalone/pkg/flypg/admin"
-	"github.com/fly-apps/postgres-standalone/pkg/flypg/state"
-	"github.com/fly-apps/postgres-standalone/pkg/privnet"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
+	"github.com/fly-apps/postgres-flex/pkg/privnet"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
@@ -45,7 +45,7 @@ type Node struct {
 func NewNode() (*Node, error) {
 	node := &Node{
 		AppName:             "local",
-		PGPort:              5432,
+		PGPort:              5433,
 		DataDir:             "/data/postgresql",
 		ManagerDatabaseName: "repmgr",
 		ManagerConfigPath:   "/data/repmgr.conf",

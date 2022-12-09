@@ -6,8 +6,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-apps/postgres-standalone/pkg/flypg"
-	"github.com/fly-apps/postgres-standalone/pkg/supervisor"
+	"github.com/fly-apps/postgres-flex/pkg/flypg"
+	"github.com/fly-apps/postgres-flex/pkg/supervisor"
 )
 
 func main() {
@@ -41,16 +41,26 @@ func main() {
 		}
 	}()
 
+	svisor := supervisor.New("flypg", 5*time.Minute)
+
+	proxyEnv := map[string]string{
+		"FLY_APP_NAME":      os.Getenv("FLY_APP_NAME"),
+		"PRIMARY_REGION":    os.Getenv("PRIMARY_REGION"),
+		"PG_LISTEN_ADDRESS": node.PrivateIP.String(),
+	}
+	svisor.AddProcess("proxy", "/usr/sbin/haproxy -W -db -f /fly/haproxy.cfg", supervisor.WithEnv(proxyEnv), supervisor.WithRestart(0, 1*time.Second))
+
 	env := map[string]string{
 		"PGDATA":     os.Getenv("PGDATA"),
 		"PGPASSFILE": os.Getenv("PGPASSFILE"),
 		"PATH":       os.Getenv("PATH"),
 	}
 
-	svisor := supervisor.New("flypg", 5*time.Minute)
-	svisor.AddProcess("flypg", "gosu postgres postgres -D /data/postgresql/")
+	svisor.AddProcess("flypg", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.PGPort))
 	svisor.AddProcess("repmgrd", "gosu postgres repmgrd -f /data/repmgr.conf --daemonize=false", supervisor.WithEnv(env), supervisor.WithRestart(0, 5*time.Second))
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
+
+	svisor.StartHttpListener()
 
 	if err := svisor.Run(); err != nil {
 		fmt.Println(err)

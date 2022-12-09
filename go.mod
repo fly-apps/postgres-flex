@@ -1,8 +1,9 @@
-module github.com/fly-apps/postgres-standalone
+module github.com/fly-apps/postgres-flex
 
 go 1.16
 
 require (
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul/api v1.18.0
 	github.com/jackc/pgx/v4 v4.13.0

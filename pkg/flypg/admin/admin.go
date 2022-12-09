@@ -62,6 +62,19 @@ func CreateDatabase(pg *pgx.Conn, name, owner string) (interface{}, error) {
 	return true, nil
 }
 
+func ResolveRole(ctx context.Context, pg *pgx.Conn) (string, error) {
+	var readonly string
+	err := pg.QueryRow(ctx, "SHOW transaction_read_only").Scan(&readonly)
+	if err != nil {
+		return "offline", err
+	}
+
+	if readonly == "on" {
+		return "replica", nil
+	}
+	return "leader", nil
+}
+
 func EnableExtension(pg *pgx.Conn, extension string) error {
 	sql := fmt.Sprintf("CREATE EXTENSION %s;", extension)
 	_, err := pg.Exec(context.Background(), sql)

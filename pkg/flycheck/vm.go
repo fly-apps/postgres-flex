@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	chk "github.com/fly-apps/postgres-standalone/pkg/checks"
+	chk "github.com/fly-apps/postgres-flex/pkg/check"
 )
 
 // CheckVM for system / disk checks
@@ -130,6 +130,21 @@ func checkDisk(dir string) (string, error) {
 	}
 
 	return msg, nil
+}
+
+func diskUsage(dir string) (size uint64, available uint64, err error) {
+	var stat syscall.Statfs_t
+
+	err = syscall.Statfs(dir, &stat)
+
+	if err != nil {
+		return 0, 0, fmt.Errorf("%s: %s", dir, err)
+	}
+
+	size = stat.Blocks * uint64(stat.Bsize)
+	available = stat.Bavail * uint64(stat.Bsize)
+	return size, available, nil
+
 }
 
 func round(val float64, roundOn float64, places int) (newVal float64) {

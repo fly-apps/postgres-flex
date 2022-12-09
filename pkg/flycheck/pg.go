@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	chk "github.com/fly-apps/postgres-standalone/pkg/checks"
-	"github.com/fly-apps/postgres-standalone/pkg/flypg"
+	chk "github.com/fly-apps/postgres-flex/pkg/check"
+	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
