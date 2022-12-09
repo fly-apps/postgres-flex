@@ -30,7 +30,7 @@ type Credentials struct {
 type Node struct {
 	ID        int32
 	AppName   string
-	PrivateIP net.IP
+	PrivateIP string
 	DataDir   string
 	PGPort    int
 
@@ -59,30 +59,35 @@ func NewNode() (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed getting private ip: %s", err)
 	}
-	node.PrivateIP = ipv6
+	node.PrivateIP = ipv6.String()
 
-	// There is probably a better way to do this.
-	ipArr := strings.Split(ipv6.String(), ":")
+	// This is a little weird, but the ip needs to be a unique and a
+	// signed int32. It also needs to be reconstructable, so we
+	// take the latter half of the ipv6 address and use it to construct
+	// a seed, which can then be used to generate a reconstructable id.
+	ipArr := strings.Split(node.PrivateIP, ":")
 	lastHalf := strings.Join(ipArr[4:], "")
 	seed := binary.LittleEndian.Uint32([]byte(lastHalf))
 	rand.Seed(int64(seed))
-
 	node.ID = rand.Int31()
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.PGPort = port
 	}
 
+	// Internal user
 	node.SUCredentials = Credentials{
 		Username: "flypgadmin",
 		Password: os.Getenv("SU_PASSWORD"),
 	}
 
+	// Superuser
 	node.OperatorCredentials = Credentials{
 		Username: "postgres",
 		Password: os.Getenv("OPERATOR_PASSWORD"),
 	}
 
+	// Replication manager user
 	node.ManagerCredentials = Credentials{
 		Username: "repmgr",
 		Password: "supersecret",
@@ -102,21 +107,23 @@ func (n *Node) Init() error {
 	}
 
 	// Check to see if there's already a registered primary.
-	leaderIP, err := client.CurrentPrimary()
+	primaryIP, err := client.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	// Ensures that repmgr is updated with the latest configuration.
+	// Writes or updates the replication manager configuration.
 	if err := InitializeManager(*n); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 
-	if leaderIP == n.PrivateIP.String() {
+	// We are done here if we are the primary.
+	if primaryIP == n.PrivateIP {
 		return nil
 	}
 
-	if leaderIP == "" {
+	// If there's no primary then we should initialize ourself as the primary.
+	if primaryIP == "" {
 		fmt.Println("Initializing postgres")
 		if err := n.initializePostgres(); err != nil {
 			return fmt.Errorf("failed to initialize postgres %s", err)
@@ -127,8 +134,14 @@ func (n *Node) Init() error {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
 	} else {
+		// TODO If the Postgresql directory exists, then we know that we have already been initialized.
+		// If we have already been intialized we are either a current standby, or a demoted
+		// primary that's coming back online.
+
+		// TODO - It may be necessary to flag the Primary node within Consul to let
+		// us know what we need to actually do here.
 		fmt.Println("Cloning from primary")
-		if err := cloneFromPrimary(*n, leaderIP); err != nil {
+		if err := cloneFromPrimary(*n, primaryIP); err != nil {
 			return fmt.Errorf("failed to clone primary: %s", err)
 		}
 	}
@@ -141,20 +154,21 @@ func (n *Node) Init() error {
 	return nil
 }
 
+// PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit() error {
 	client, err := state.NewConsulClient()
 	if err != nil {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
 	}
 
-	// Check to see if there's already a registered primary.
-	leaderIP, err := client.CurrentPrimary()
+	primaryIP, err := client.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	switch leaderIP {
+	switch primaryIP {
 	case "":
+		// Initialize ourselves as the primary.
 		conn, err := n.NewLocalConnection(context.TODO())
 		if err != nil {
 			return err
@@ -164,56 +178,58 @@ func (n *Node) PostInit() error {
 			return fmt.Errorf("failed to create required users: %s", err)
 		}
 
-		fmt.Println("Creating metadata db")
+		// Creates the replication manager database.
 		if _, err := admin.CreateDatabase(conn, n.ManagerDatabaseName, n.ManagerCredentials.Username); err != nil {
 			return err
 		}
 
-		fmt.Println("Enabling extensions")
 		if err := admin.EnableExtension(conn, "repmgr"); err != nil {
 			return err
 		}
 
-		fmt.Println("Registering Primary")
 		if err := registerPrimary(*n); err != nil {
 			fmt.Printf("failed to register primary: %s", err)
 		}
 
-		fmt.Println("Registering Primary with Consul")
-		if err := client.RegisterPrimary(n.PrivateIP.String()); err != nil {
+		// Register ourselves with Consul
+		if err := client.RegisterPrimary(n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register primary with consul: %s", err)
 		}
 
-		fmt.Println("Registering Node with Consul")
-		if err := client.RegisterNode(n.ID, n.PrivateIP.String()); err != nil {
+		if err := client.RegisterNode(n.ID, n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
-
-	case n.PrivateIP.String():
-		if err := registerPrimary(*n); err != nil {
-			fmt.Printf("failed to register primary: %s", err)
-		}
-
-		fmt.Println("Nothing to do here")
+	case n.PrivateIP:
+	// We are an already initialized primary.
 	default:
+		// If we are here, we are a standby or a demoted primary who needs
+		// to be reconfigured as a standby.
+
+		// TODO - This should probably be a bit more calculated with this call.
+		// We don't care if this fails against a standby, but do care if this
+		// fails against a demoted primary.
 		fmt.Println("Unregistering primary")
 		if err := unregisterPrimary(*n); err != nil {
 			fmt.Printf("failed to unregister primary ( ignore ): %s\n", err)
 		}
 
-		// TODO - We need to track registered standbys to we don't re-register outselves.
+		// TODO - Verify if there are any issues with attempting to re-register
+		// an already registered standby.  I don't think so, but need to verify.
 		fmt.Println("Registering standby")
 		if err := registerStandby(*n); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
-		fmt.Println("Follow the leader")
+		// TODO - Verify if there are any issues with re-following a primary we are
+		// already following.  I don't think so, but need to verify.
+		fmt.Println("Follow the primary")
 		if err := standbyFollow(*n); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
+		// This will noop if the Node has already been registered.
 		fmt.Println("Registering Node with Consul")
-		if err := client.RegisterNode(n.ID, n.PrivateIP.String()); err != nil {
+		if err := client.RegisterNode(n.ID, n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
@@ -222,7 +238,7 @@ func (n *Node) PostInit() error {
 }
 
 func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP.String(), strconv.Itoa(n.PGPort))
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGPort))
 	return openConnection(ctx, host, n.OperatorCredentials)
 }
 
@@ -268,7 +284,6 @@ func (n *Node) initializePostgres() error {
 		if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("OPERATOR_PASSWORD")), 0644); err != nil {
 			return err
 		}
-
 		cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
 		_, err := cmd.CombinedOutput()
 		if err != nil {
@@ -283,7 +298,6 @@ func (n *Node) initializePostgres() error {
 
 func (n *Node) configurePostgres() error {
 	cmdStr := fmt.Sprintf("sed -i \"s/#shared_preload_libraries.*/shared_preload_libraries = 'repmgr'/\" /data/postgresql/postgresql.conf")
-
 	return runCommand(cmdStr)
 }
 
@@ -296,9 +310,7 @@ type HBAEntry struct {
 }
 
 func (n *Node) setDefaultHBA() error {
-	var entries []HBAEntry
-
-	entries = []HBAEntry{
+	entries := []HBAEntry{
 		{
 			Type:     "local",
 			Database: "all",

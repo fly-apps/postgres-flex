@@ -46,7 +46,7 @@ func main() {
 	proxyEnv := map[string]string{
 		"FLY_APP_NAME":      os.Getenv("FLY_APP_NAME"),
 		"PRIMARY_REGION":    os.Getenv("PRIMARY_REGION"),
-		"PG_LISTEN_ADDRESS": node.PrivateIP.String(),
+		"PG_LISTEN_ADDRESS": node.PrivateIP,
 	}
 	svisor.AddProcess("proxy", "/usr/sbin/haproxy -W -db -f /fly/haproxy.cfg", supervisor.WithEnv(proxyEnv), supervisor.WithRestart(0, 1*time.Second))
 

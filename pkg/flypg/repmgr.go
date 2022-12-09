@@ -89,12 +89,10 @@ func writeManagerConf(node Node) error {
 		return err
 	}
 
-	nodeName := node.PrivateIP.String()
-
 	conf := map[string]interface{}{
 		"node_id":                    fmt.Sprint(node.ID),
-		"node_name":                  fmt.Sprintf("'%s'", nodeName),
-		"conninfo":                   fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", nodeName, node.PGPort, node.ManagerCredentials.Username, node.ManagerDatabaseName),
+		"node_name":                  fmt.Sprintf("'%s'", node.PrivateIP),
+		"conninfo":                   fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", node.PrivateIP, node.PGPort, node.ManagerCredentials.Username, node.ManagerDatabaseName),
 		"data_directory":             fmt.Sprintf("'%s'", node.DataDir),
 		"failover":                   "'automatic'",
 		"promote_command":            fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", node.ManagerConfigPath),
