@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -61,13 +60,9 @@ func NewNode() (*Node, error) {
 	}
 	node.PrivateIP = ipv6.String()
 
-	// This is a little weird, but the ip needs to be a unique and a
-	// signed int32. It also needs to be reconstructable, so we
-	// take the latter half of the ipv6 address and use it to construct
-	// a seed, which can then be used to generate a reconstructable id.
-	ipArr := strings.Split(node.PrivateIP, ":")
-	lastHalf := strings.Join(ipArr[4:], "")
-	seed := binary.LittleEndian.Uint32([]byte(lastHalf))
+	machineID := os.Getenv("FLY_ALLOC_ID")
+	// Generate a random, reconstructable signed int32
+	seed := binary.LittleEndian.Uint64([]byte(machineID))
 	rand.Seed(int64(seed))
 	node.ID = rand.Int31()
 

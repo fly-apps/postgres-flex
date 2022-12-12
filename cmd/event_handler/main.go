@@ -19,6 +19,7 @@ func main() {
 
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
+		// TODO - Need to figure out what to do when success == 0.
 		client, err := state.NewConsulClient()
 		if err != nil {
 			fmt.Printf("failed to initialize consul client: %s", err)
@@ -26,15 +27,13 @@ func main() {
 
 		node, err := client.Node(int32(*nodeID))
 		if err != nil {
-			fmt.Printf("failed to register primary: %s", err)
+			fmt.Printf("failed to find node: %s", err)
 		}
 
 		if err := client.RegisterPrimary(string(node.Value)); err != nil {
 			fmt.Printf("failed to register primary: %s", err)
 		}
-
-		fmt.Println("Promotion handled like a boss")
 	default:
-		fmt.Printf("Unmanaged event: %s", *event)
+		// noop
 	}
 }
