@@ -177,12 +177,12 @@ func (n *Node) PostInit() error {
 			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", n.Region, os.Getenv("PRIMARY_REGION"))
 		}
 
-		// Initialize ourselves as the primary.
 		conn, err := n.NewLocalConnection(context.TODO())
 		if err != nil {
 			return err
 		}
 
+		// Initialize ourselves as the primary.
 		if err := n.createRequiredUsers(conn); err != nil {
 			return fmt.Errorf("failed to create required users: %s", err)
 		}
@@ -211,15 +211,30 @@ func (n *Node) PostInit() error {
 	case n.PrivateIP:
 	// We are an already initialized primary.
 	default:
-		// If we are here, we are a standby or a demoted primary who needs
+		// If we are here, we are a new node, a standby or a demoted primary who needs
 		// to be reconfigured as a standby.
 
-		// TODO - This should probably be a bit more calculated with this call.
-		// We don't care if this fails against a standby, but do care if this
-		// fails against a demoted primary.
-		fmt.Println("Unregistering primary")
-		if err := unregisterPrimary(*n); err != nil {
-			fmt.Printf("failed to unregister primary ( ignore ): %s\n", err)
+		conn, err := n.NewRepLocalConnection(context.TODO())
+		if err != nil {
+			return err
+		}
+
+		role, err := n.currentRole(context.TODO(), conn)
+		if err != nil {
+			return err
+		}
+
+		if role == "" {
+			fmt.Printf("Configuring a new node\n")
+		} else {
+			fmt.Printf("Reconfiguring a %s node as healthy\n", role)
+		}
+
+		if role == "primary" {
+			fmt.Println("Unregistering primary")
+			if err := unregisterPrimary(*n); err != nil {
+				fmt.Printf("failed to unregister primary: %s\n", err)
+			}
 		}
 
 		// TODO - Verify if there are any issues with attempting to re-register
@@ -248,7 +263,12 @@ func (n *Node) PostInit() error {
 
 func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGPort))
-	return openConnection(ctx, host, n.OperatorCredentials)
+	return openConnection(ctx, host, "postgres", n.OperatorCredentials)
+}
+
+func (n *Node) NewRepLocalConnection(ctx context.Context) (*pgx.Conn, error) {
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGPort))
+	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
 }
 
 func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
@@ -385,11 +405,11 @@ func (n *Node) setDefaultHBA() error {
 	return nil
 }
 
-func openConnection(ctx context.Context, host string, creds Credentials) (*pgx.Conn, error) {
+func openConnection(ctx context.Context, host string, database string, creds Credentials) (*pgx.Conn, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	url := fmt.Sprintf("postgres://%s/postgres", host)
+	url := fmt.Sprintf("postgres://%s/%s", host, database)
 	conf, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, err
