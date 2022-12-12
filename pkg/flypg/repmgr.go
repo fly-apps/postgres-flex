@@ -99,6 +99,7 @@ func writeManagerConf(node Node) error {
 		"follow_command":             fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", node.ManagerConfigPath),
 		"event_notification_command": fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\"'"),
 		"event_notifications":        "'repmgrd_failover_promote,standby_promote'",
+		"location":                   node.Region,
 	}
 
 	for key, value := range conf {

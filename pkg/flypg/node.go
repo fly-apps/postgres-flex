@@ -31,6 +31,7 @@ type Node struct {
 	AppName   string
 	PrivateIP string
 	DataDir   string
+	Region    string
 	PGPort    int
 
 	SUCredentials       Credentials
@@ -48,6 +49,7 @@ func NewNode() (*Node, error) {
 		DataDir:             "/data/postgresql",
 		ManagerDatabaseName: "repmgr",
 		ManagerConfigPath:   "/data/repmgr.conf",
+		Region:              os.Getenv("FLY_REGION"),
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -149,6 +151,13 @@ func (n *Node) Init() error {
 	return nil
 }
 
+func (n *Node) ValidPrimary() bool {
+	if n.Region == os.Getenv("PRIMARY_REGION") {
+		return true
+	}
+	return false
+}
+
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit() error {
 	client, err := state.NewConsulClient()
@@ -163,6 +172,11 @@ func (n *Node) PostInit() error {
 
 	switch primaryIP {
 	case "":
+		// Check if we can be a primary
+		if !n.ValidPrimary() {
+			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", n.Region, os.Getenv("PRIMARY_REGION"))
+		}
+
 		// Initialize ourselves as the primary.
 		conn, err := n.NewLocalConnection(context.TODO())
 		if err != nil {
