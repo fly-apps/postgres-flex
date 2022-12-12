@@ -33,7 +33,7 @@ func main() {
 		for range t.C {
 
 			if err := node.PostInit(); err != nil {
-				fmt.Printf("failed post-init: %s", err)
+				fmt.Printf("failed post-init: %s. Retrying...", err)
 				continue
 			}
 
