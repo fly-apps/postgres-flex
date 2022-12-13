@@ -16,6 +16,7 @@ ENV PGDATA=/data/postgresql
 ARG VERSION 
 
 LABEL fly.app_role=postgres_cluster
+LABEL fly.version=${VERSION}
 LABEL fly.pg-version=${PG_VERSION}
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
