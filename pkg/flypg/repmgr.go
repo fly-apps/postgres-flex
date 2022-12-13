@@ -71,8 +71,9 @@ func cloneFromPrimary(node Node, ipStr string) error {
 		return err
 	}
 
-	cmdStr = fmt.Sprintf("repmgr -h %s -d %s -U %s -f %s standby clone -F",
+	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -F",
 		ipStr,
+		node.PGPort,
 		node.ManagerDatabaseName,
 		node.ManagerCredentials.Username,
 		node.ManagerConfigPath)
@@ -99,9 +100,13 @@ func writeManagerConf(node Node) error {
 		"failover":                   "'automatic'",
 		"promote_command":            fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", node.ManagerConfigPath),
 		"follow_command":             fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", node.ManagerConfigPath),
-		"event_notification_command": fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\"'"),
-		"event_notifications":        "'repmgrd_failover_promote,standby_promote'",
+		"event_notification_command": fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\" -new-node-id \\'%%p\\''"),
+		"event_notifications":        "'repmgrd_failover_promote,standby_promote,standby_follow'",
 		"location":                   node.Region,
+	}
+
+	if !node.ValidPrimary() {
+		conf["priority"] = "0"
 	}
 
 	for key, value := range conf {

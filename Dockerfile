@@ -20,7 +20,7 @@ LABEL fly.version=${VERSION}
 LABEL fly.pg-version=${PG_VERSION}
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 haproxy postgresql-14-repmgr curl bash dnsutils vim procps jq \
+    ca-certificates iproute2 postgresql-14-repmgr curl bash dnsutils vim procps jq pgbouncer \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
