@@ -1,7 +1,9 @@
 package flypg
 
 import (
+	"context"
 	"fmt"
+	"github.com/jackc/pgx/v4"
 	"os"
 )
 
@@ -133,4 +135,17 @@ func writePasswdConf(node Node) error {
 	}
 
 	return nil
+}
+
+func (n *Node) currentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
+	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id WHERE n.node_id = '%d';", n.ID)
+	var role string
+	err := pg.QueryRow(ctx, sql).Scan(&role)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return role, nil
 }
