@@ -3,11 +3,17 @@ package flypg
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
 	"os"
+
+	"github.com/jackc/pgx/v4"
 )
 
-func InitializeManager(node Node) error {
+const (
+	primaryRoleName = "primary"
+	standbyRoleName = "standby"
+)
+
+func configureRepmgr(node Node) error {
 	// Write conf file.
 	if err := writeManagerConf(node); err != nil {
 		return fmt.Errorf("failed to write repmgr config file: %s", err)
@@ -142,8 +148,21 @@ func writePasswdConf(node Node) error {
 	return nil
 }
 
-func (n *Node) currentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id WHERE n.node_id = '%d';", n.ID)
+func memberRole(ctx context.Context, pg *pgx.Conn, id int) (string, error) {
+	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id WHERE n.node_id = '%d';", id)
+	var role string
+	err := pg.QueryRow(ctx, sql).Scan(&role)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return role, nil
+}
+
+func memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (string, error) {
+	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id where n.connInfo LIKE '%%%s';", hostname)
 	var role string
 	err := pg.QueryRow(ctx, sql).Scan(&role)
 	if err != nil {

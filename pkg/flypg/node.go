@@ -112,7 +112,7 @@ func (n *Node) Init() error {
 	}
 
 	// Writes or updates the replication manager configuration.
-	if err := InitializeManager(*n); err != nil {
+	if err := configureRepmgr(*n); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 
@@ -133,15 +133,25 @@ func (n *Node) Init() error {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
 	} else {
-		// TODO If the Postgresql directory exists, then we know that we have already been initialized.
-		// If we have already been intialized we are either a current standby, or a demoted
-		// primary that's coming back online.
+		clonePrimary := true
+		// Check to see if we've already been initialized.
+		if n.isInitialized() {
+			remoteConn, err := n.NewRepRemoteConnection(context.TODO(), primaryIP)
+			if err != nil {
+				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
+			}
+			role, err := memberRoleByHostname(context.TODO(), remoteConn, n.PrivateIP)
+			// Don't re-clone if we are already a standby.
+			if role == standbyRoleName {
+				clonePrimary = false
+			}
+		}
 
-		// TODO - It may be necessary to flag the Primary node within Consul to let
-		// us know what we need to actually do here.
-		fmt.Println("Cloning from primary")
-		if err := cloneFromPrimary(*n, primaryIP); err != nil {
-			return fmt.Errorf("failed to clone primary: %s", err)
+		if clonePrimary {
+			fmt.Println("Cloning from primary")
+			if err := cloneFromPrimary(*n, primaryIP); err != nil {
+				return fmt.Errorf("failed to clone primary: %s", err)
+			}
 		}
 	}
 
@@ -158,15 +168,15 @@ func (n *Node) Init() error {
 	return nil
 }
 
-func (n *Node) ValidPrimary() bool {
-	if n.Region == os.Getenv("PRIMARY_REGION") {
-		return true
-	}
-	return false
-}
-
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit() error {
+	// Ensure local PG is up before establishing connection with
+	// consul.
+	conn, err := n.NewLocalConnection(context.TODO())
+	if err != nil {
+		return fmt.Errorf("failed to establish connection to local node: %s", err)
+	}
+
 	client, err := state.NewConsulClient()
 	if err != nil {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
@@ -180,13 +190,8 @@ func (n *Node) PostInit() error {
 	switch primaryIP {
 	case "":
 		// Check if we can be a primary
-		if !n.ValidPrimary() {
+		if !n.validPrimary() {
 			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", n.Region, os.Getenv("PRIMARY_REGION"))
-		}
-
-		conn, err := n.NewLocalConnection(context.TODO())
-		if err != nil {
-			return err
 		}
 
 		// Initialize ourselves as the primary.
@@ -220,7 +225,6 @@ func (n *Node) PostInit() error {
 	default:
 		// If we are here, we are a new node, a standby or a demoted primary who needs
 		// to be reconfigured as a standby.
-
 		conn, err := n.NewRepLocalConnection(context.TODO())
 		if err != nil {
 			return err
@@ -231,29 +235,17 @@ func (n *Node) PostInit() error {
 			return err
 		}
 
-		if role == "" {
-			fmt.Printf("Configuring a new node\n")
-		} else {
-			fmt.Printf("Reconfiguring a %s node as healthy\n", role)
-		}
-
-		if role == "primary" {
+		if role == primaryRoleName {
 			fmt.Println("Unregistering primary")
 			if err := unregisterPrimary(*n); err != nil {
 				fmt.Printf("failed to unregister primary: %s\n", err)
 			}
 		}
 
-		// TODO - Verify if there are any issues with attempting to re-register
-		// an already registered standby.  I don't think so, but need to verify.
-		fmt.Println("Registering standby")
 		if err := registerStandby(*n); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
-		// TODO - Verify if there are any issues with re-following a primary we are
-		// already following.  I don't think so, but need to verify.
-		fmt.Println("Follow the primary")
 		if err := standbyFollow(*n); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
@@ -293,6 +285,30 @@ func (n *Node) NewRepLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
 }
 
+func (n *Node) NewRepRemoteConnection(ctx context.Context, hostname string) (*pgx.Conn, error) {
+	host := net.JoinHostPort(hostname, strconv.Itoa(n.PGPort))
+	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
+}
+
+func (n *Node) isInitialized() bool {
+	_, err := os.Stat(n.DataDir)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func (n *Node) currentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
+	return memberRole(ctx, pg, int(n.ID))
+}
+
+func (n *Node) validPrimary() bool {
+	if n.Region == os.Getenv("PRIMARY_REGION") {
+		return true
+	}
+	return false
+}
+
 func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
 	curUsers, err := admin.ListUsers(context.TODO(), conn)
 	if err != nil {
@@ -330,21 +346,20 @@ func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
 }
 
 func (n *Node) initializePostgres() error {
-	_, err := os.Stat(n.DataDir)
-	if os.IsNotExist(err) {
-		if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("OPERATOR_PASSWORD")), 0644); err != nil {
-			return err
-		}
-		cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-		_, err := cmd.CombinedOutput()
-		if err != nil {
-			return err
-		}
-
+	if n.isInitialized() {
 		return nil
 	}
 
-	return err
+	if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("OPERATOR_PASSWORD")), 0644); err != nil {
+		return err
+	}
+	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (n *Node) ConfigurePGBouncerAuth() error {
