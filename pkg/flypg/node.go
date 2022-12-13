@@ -112,7 +112,7 @@ func (n *Node) Init() error {
 	}
 
 	// Writes or updates the replication manager configuration.
-	if err := configureRepmgr(*n); err != nil {
+	if err := initializeRepmgr(*n); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 

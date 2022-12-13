@@ -13,7 +13,7 @@ const (
 	standbyRoleName = "standby"
 )
 
-func configureRepmgr(node Node) error {
+func initializeRepmgr(node Node) error {
 	// Write conf file.
 	if err := writeManagerConf(node); err != nil {
 		return fmt.Errorf("failed to write repmgr config file: %s", err)
