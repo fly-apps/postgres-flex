@@ -11,6 +11,7 @@ import (
 const (
 	primaryRoleName = "primary"
 	standbyRoleName = "standby"
+	unknownRoleName = ""
 )
 
 func initializeRepmgr(node Node) error {
@@ -162,7 +163,7 @@ func memberRole(ctx context.Context, pg *pgx.Conn, id int) (string, error) {
 }
 
 func memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (string, error) {
-	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id where n.connInfo LIKE '%%%s';", hostname)
+	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id where n.connInfo LIKE '%%%s%%';", hostname)
 	var role string
 	err := pg.QueryRow(ctx, sql).Scan(&role)
 	if err != nil {

@@ -141,6 +141,11 @@ func (n *Node) Init() error {
 				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
 			}
 			role, err := memberRoleByHostname(context.TODO(), remoteConn, n.PrivateIP)
+			if err != nil {
+				return fmt.Errorf("failed to resolve role for %s: %s", primaryIP, err)
+			}
+
+			fmt.Printf("My Role is: %s\n", role)
 			// Don't re-clone if we are already a standby.
 			if role == standbyRoleName {
 				clonePrimary = false
