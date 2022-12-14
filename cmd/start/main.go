@@ -33,7 +33,7 @@ func main() {
 		for range t.C {
 
 			if err := node.PostInit(); err != nil {
-				fmt.Printf("failed post-init: %s. Retrying...", err)
+				fmt.Printf("failed post-init: %s. Retrying...\n", err)
 				continue
 			}
 
@@ -43,12 +43,7 @@ func main() {
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
-	proxyEnv := map[string]string{
-		"FLY_APP_NAME":      os.Getenv("FLY_APP_NAME"),
-		"PRIMARY_REGION":    os.Getenv("PRIMARY_REGION"),
-		"PG_LISTEN_ADDRESS": node.PrivateIP,
-	}
-	svisor.AddProcess("proxy", "/usr/sbin/haproxy -W -db -f /fly/haproxy.cfg", supervisor.WithEnv(proxyEnv), supervisor.WithRestart(0, 1*time.Second))
+	svisor.AddProcess("pgbouncer", "/usr/sbin/pgbouncer /fly/pgbouncer.ini", supervisor.WithRestart(0, 1*time.Second))
 
 	env := map[string]string{
 		"PGDATA":     os.Getenv("PGDATA"),
