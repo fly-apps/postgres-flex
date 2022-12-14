@@ -3,11 +3,18 @@ package flypg
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
 	"os"
+
+	"github.com/jackc/pgx/v4"
 )
 
-func InitializeManager(node Node) error {
+const (
+	primaryRoleName = "primary"
+	standbyRoleName = "standby"
+	unknownRoleName = ""
+)
+
+func initializeRepmgr(node Node) error {
 	// Write conf file.
 	if err := writeManagerConf(node); err != nil {
 		return fmt.Errorf("failed to write repmgr config file: %s", err)
@@ -26,7 +33,7 @@ func InitializeManager(node Node) error {
 }
 
 func registerPrimary(node Node) error {
-	cmdStr := fmt.Sprintf("repmgr -f %s primary register",
+	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F",
 		node.ManagerConfigPath,
 	)
 	if err := runCommand(cmdStr); err != nil {
@@ -57,7 +64,8 @@ func standbyFollow(node Node) error {
 }
 
 func registerStandby(node Node) error {
-	cmdStr := fmt.Sprintf("repmgr -f %s standby register", node.ManagerConfigPath)
+	// Force re-registry to ensure the standby picks up any new configuration changes.
+	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", node.ManagerConfigPath)
 	if err := runCommand(cmdStr); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
@@ -105,7 +113,7 @@ func writeManagerConf(node Node) error {
 		"location":                   node.Region,
 	}
 
-	if !node.ValidPrimary() {
+	if !node.validPrimary() {
 		conf["priority"] = "0"
 	}
 
@@ -142,8 +150,21 @@ func writePasswdConf(node Node) error {
 	return nil
 }
 
-func (n *Node) currentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id WHERE n.node_id = '%d';", n.ID)
+func memberRole(ctx context.Context, pg *pgx.Conn, id int) (string, error) {
+	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id WHERE n.node_id = '%d';", id)
+	var role string
+	err := pg.QueryRow(ctx, sql).Scan(&role)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return role, nil
+}
+
+func memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (string, error) {
+	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id where n.connInfo LIKE '%%%s%%';", hostname)
 	var role string
 	err := pg.QueryRow(ctx, sql).Scan(&role)
 	if err != nil {
