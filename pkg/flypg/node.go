@@ -144,8 +144,7 @@ func (n *Node) Init() error {
 				return fmt.Errorf("failed to resolve role for %s: %s", primaryIP, err)
 			}
 
-			fmt.Printf("My Role is: %s\n", role)
-			// Don't re-clone if we are already a standby.
+			fmt.Printf("My role is: %s\n", role)
 			if role == standbyRoleName {
 				clonePrimary = false
 			}
@@ -193,7 +192,12 @@ func (n *Node) PostInit() error {
 
 	switch primaryIP {
 	case n.PrivateIP:
-		// Noop
+		// Re-register the primary in order to pick up any changes made to the
+		// configuration file.
+		fmt.Println("Updating primary record")
+		if err := registerPrimary(*n); err != nil {
+			fmt.Printf("failed to register primary: %s", err)
+		}
 	case "":
 		// Check if we can be a primary
 		if !n.validPrimary() {

@@ -33,7 +33,7 @@ func initializeRepmgr(node Node) error {
 }
 
 func registerPrimary(node Node) error {
-	cmdStr := fmt.Sprintf("repmgr -f %s primary register",
+	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F",
 		node.ManagerConfigPath,
 	)
 	if err := runCommand(cmdStr); err != nil {
