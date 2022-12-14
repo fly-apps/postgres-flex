@@ -112,7 +112,7 @@ func writeManagerConf(node Node) error {
 		"location":                   node.Region,
 	}
 
-	if !node.ValidPrimary() {
+	if !node.validPrimary() {
 		conf["priority"] = "0"
 	}
 

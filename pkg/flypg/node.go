@@ -116,13 +116,9 @@ func (n *Node) Init() error {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 
-	// We are done here if we are the primary.
-	if primaryIP == n.PrivateIP {
-		return nil
-	}
-
-	// If there's no primary then we should initialize ourself as the primary.
-	if primaryIP == "" {
+	switch primaryIP {
+	case "":
+		// Initialize ourselves as the primary.
 		fmt.Println("Initializing postgres")
 		if err := n.initializePostgres(); err != nil {
 			return fmt.Errorf("failed to initialize postgres %s", err)
@@ -132,10 +128,13 @@ func (n *Node) Init() error {
 		if err := n.setDefaultHBA(); err != nil {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
-	} else {
+	case n.PrivateIP:
+
+	default:
+		// If we are here we are either a standby, new node or primary coming back from the dead.
 		clonePrimary := true
-		// Check to see if we've already been initialized.
 		if n.isInitialized() {
+			// Attempt to resolve our role by querying the primary.
 			remoteConn, err := n.NewRepRemoteConnection(context.TODO(), primaryIP)
 			if err != nil {
 				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
