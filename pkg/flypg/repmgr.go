@@ -64,7 +64,8 @@ func standbyFollow(node Node) error {
 }
 
 func registerStandby(node Node) error {
-	cmdStr := fmt.Sprintf("repmgr -f %s standby register", node.ManagerConfigPath)
+	// Force re-registry to ensure the standby picks up any new configuration changes.
+	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", node.ManagerConfigPath)
 	if err := runCommand(cmdStr); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
