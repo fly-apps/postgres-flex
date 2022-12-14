@@ -117,6 +117,8 @@ func (n *Node) Init() error {
 	}
 
 	switch primaryIP {
+	case n.PrivateIP:
+		// Noop
 	case "":
 		// Initialize ourselves as the primary.
 		fmt.Println("Initializing postgres")
@@ -128,8 +130,6 @@ func (n *Node) Init() error {
 		if err := n.setDefaultHBA(); err != nil {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
-	case n.PrivateIP:
-
 	default:
 		// If we are here we are either a standby, new node or primary coming back from the dead.
 		clonePrimary := true
@@ -192,6 +192,8 @@ func (n *Node) PostInit() error {
 	}
 
 	switch primaryIP {
+	case n.PrivateIP:
+		// Noop
 	case "":
 		// Check if we can be a primary
 		if !n.validPrimary() {
@@ -224,8 +226,6 @@ func (n *Node) PostInit() error {
 		if err := client.RegisterNode(n.ID, n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
-	case n.PrivateIP:
-	// We are an already initialized primary.
 	default:
 		// If we are here, we are a new node, a standby or a demoted primary who needs
 		// to be reconfigured as a standby.
