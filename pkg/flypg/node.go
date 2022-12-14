@@ -280,12 +280,12 @@ func (n *Node) PostInit() error {
 
 func (n *Node) NewPGBouncerConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.ProxyPort))
-	return openConnection(ctx, host, "pgbouncer", n.OperatorCredentials)
+	return openConnection(ctx, host, "pgbouncer", n.SUCredentials)
 }
 
 func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGPort))
-	return openConnection(ctx, host, "postgres", n.OperatorCredentials)
+	return openConnection(ctx, host, "postgres", n.SUCredentials)
 }
 
 func (n *Node) NewRepLocalConnection(ctx context.Context) (*pgx.Conn, error) {
