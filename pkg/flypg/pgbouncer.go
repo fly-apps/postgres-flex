@@ -62,8 +62,13 @@ func (p *PGBouncer) configure(primary string) error {
 		}
 	}
 
-	p.configureAuth()
-	p.ConfigurePrimary(primary, false)
+	if err := p.configureAuth(); err != nil {
+		return fmt.Errorf("failed to configure pgbouncer auth. %s", err)
+	}
+
+	if err := p.ConfigurePrimary(primary, false); err != nil {
+		return fmt.Errorf("failed to configure pgbouncer primary. %s", err)
+	}
 
 	return nil
 }

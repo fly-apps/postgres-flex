@@ -64,8 +64,8 @@ func NewNode() (*Node, error) {
 	}
 	node.PrivateIP = ipv6.String()
 
-	machineID := os.Getenv("FLY_ALLOC_ID")
 	// Generate a random, reconstructable signed int32
+	machineID := os.Getenv("FLY_ALLOC_ID")
 	seed := binary.LittleEndian.Uint64([]byte(machineID))
 	rand.Seed(int64(seed))
 	node.ID = rand.Int31()
@@ -117,11 +117,6 @@ func (n *Node) Init() error {
 	primaryIP, err := client.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
-	}
-
-	// Initialize PGBouncer
-	if err := n.PGBouncer.configure(primaryIP); err != nil {
-		return err
 	}
 
 	// Writes or updates the replication manager configuration.
@@ -176,9 +171,10 @@ func (n *Node) Init() error {
 		return fmt.Errorf("failed to configure postgres %s", err)
 	}
 
-	fmt.Println("Configuring pgbouncer auth")
-	if err := n.PGBouncer.configureAuth(); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer auth %s", err)
+	// Initialize PGBouncer
+	fmt.Println("Configuring PGBouncer")
+	if err := n.PGBouncer.configure(primaryIP); err != nil {
+		return err
 	}
 
 	return nil
