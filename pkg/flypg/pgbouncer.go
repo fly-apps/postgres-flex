@@ -44,7 +44,7 @@ func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
 	return nil
 }
 
-func (p *PGBouncer) configure(primary string) error {
+func (p *PGBouncer) initialize() error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
 	if err := runCommand(cmdStr); err != nil {
 		return err
@@ -64,10 +64,6 @@ func (p *PGBouncer) configure(primary string) error {
 
 	if err := p.configureAuth(); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer auth. %s", err)
-	}
-
-	if err := p.ConfigurePrimary(primary, false); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer primary. %s", err)
 	}
 
 	return nil

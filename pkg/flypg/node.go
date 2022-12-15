@@ -124,6 +124,12 @@ func (n *Node) Init() error {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 
+	// Initialize PGBouncer
+	fmt.Println("Initializing PGBouncer")
+	if err := n.PGBouncer.initialize(); err != nil {
+		return err
+	}
+
 	switch primaryIP {
 	case n.PrivateIP:
 		// Noop
@@ -169,12 +175,6 @@ func (n *Node) Init() error {
 	fmt.Println("Configuring postgres")
 	if err := n.configurePostgres(); err != nil {
 		return fmt.Errorf("failed to configure postgres %s", err)
-	}
-
-	// Initialize PGBouncer
-	fmt.Println("Configuring PGBouncer")
-	if err := n.PGBouncer.configure(primaryIP); err != nil {
-		return err
 	}
 
 	return nil
@@ -279,9 +279,8 @@ func (n *Node) PostInit() error {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	fmt.Println("Configuring pgbouncer primary")
-	if err := n.PGBouncer.ConfigurePrimary(primaryIP, false); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer primary %s", err)
+	if err := n.PGBouncer.ConfigurePrimary(primaryIP, true); err != nil {
+		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 
 	return nil
