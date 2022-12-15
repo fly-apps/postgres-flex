@@ -96,7 +96,7 @@ func NewNode() (*Node, error) {
 		PrivateIP:   node.PrivateIP,
 		Port:        5432,
 		ConfigPath:  "/data/pgbouncer",
-		Credentials: node.SUCredentials,
+		Credentials: node.OperatorCredentials,
 	}
 
 	return node, nil
@@ -292,7 +292,7 @@ func (n *Node) PostInit() error {
 
 func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, "postgres", n.SUCredentials)
+	return openConnection(ctx, host, "postgres", n.OperatorCredentials)
 }
 
 func (n *Node) NewRepLocalConnection(ctx context.Context) (*pgx.Conn, error) {
