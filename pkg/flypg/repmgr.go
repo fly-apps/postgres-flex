@@ -109,7 +109,7 @@ func (r *RepMgr) writeManagerConf() error {
 }
 
 func (r *RepMgr) registerPrimary() error {
-	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F", r.ConfigPath)
+	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
 	if err := runCommand(cmdStr); err != nil {
 		return err
 	}

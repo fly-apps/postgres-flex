@@ -76,7 +76,7 @@ func ResolveRole(ctx context.Context, pg *pgx.Conn) (string, error) {
 }
 
 func EnableExtension(pg *pgx.Conn, extension string) error {
-	sql := fmt.Sprintf("CREATE EXTENSION %s;", extension)
+	sql := fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s;", extension)
 	_, err := pg.Exec(context.Background(), sql)
 	return err
 }

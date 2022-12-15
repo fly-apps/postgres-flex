@@ -91,7 +91,7 @@ func NewNode() (*Node, error) {
 		ConfigPath:   "/data/repmgr.conf",
 		DataDir:      node.DataDir,
 		PrivateIP:    node.PrivateIP,
-		Port:         5432,
+		Port:         5433,
 		DatabaseName: "repmgr",
 		Credentials: Credentials{
 			Username: "repmgr",
@@ -112,7 +112,6 @@ func (n *Node) Init() error {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
 	}
 
-	// Check to see if there's already a registered primary.
 	primaryIP, err := consul.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
@@ -224,6 +223,7 @@ func (n *Node) PostInit() error {
 		}
 
 		// Creates the replication manager database.
+		fmt.Println("Perform Repmgr setup")
 		if err := repmgr.setup(conn); err != nil {
 			return fmt.Errorf("failed to setup repmgr: %s", err)
 		}
