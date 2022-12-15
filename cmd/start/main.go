@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	requiredPasswords := []string{"SU_PASSWORD", "OPERATOR_PASSWORD"}
+	requiredPasswords := []string{"SU_PASSWORD", "OPERATOR_PASSWORD", "REPL_PASSWORD"}
 	for _, str := range requiredPasswords {
 		if _, exists := os.LookupEnv(str); !exists {
 			panic(fmt.Errorf("%s is required", str))
