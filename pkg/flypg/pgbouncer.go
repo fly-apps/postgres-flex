@@ -15,6 +15,7 @@ type PGBouncer struct {
 	Credentials Credentials
 	ConfigPath  string
 	Port        int
+	ForwardPort int
 }
 
 func (p *PGBouncer) NewConnection(ctx context.Context) (*pgx.Conn, error) {
@@ -28,7 +29,7 @@ func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
 	if err != nil {
 		return err
 	}
-	contents := fmt.Sprintf("[databases]\n* = host=%s port=%d\n", primary, p.Port)
+	contents := fmt.Sprintf("[databases]\n* = host=%s port=%d\n", primary, p.ForwardPort)
 	_, err = file.Write([]byte(contents))
 	if err != nil {
 		return err

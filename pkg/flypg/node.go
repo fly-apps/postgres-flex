@@ -95,6 +95,7 @@ func NewNode() (*Node, error) {
 	node.PGBouncer = PGBouncer{
 		PrivateIP:   node.PrivateIP,
 		Port:        5432,
+		ForwardPort: 5433,
 		ConfigPath:  "/data/pgbouncer",
 		Credentials: node.OperatorCredentials,
 	}
