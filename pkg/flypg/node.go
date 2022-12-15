@@ -212,7 +212,7 @@ func (n *Node) PostInit() error {
 	case "":
 		// Check if we can be a primary
 		if !repmgr.eligiblePrimary() {
-			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", repmgr.Region, os.Getenv("PRIMARY_REGION"))
+			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", os.Getenv("PRIMARY_REGION"), repmgr.Region)
 		}
 
 		// Create required users
