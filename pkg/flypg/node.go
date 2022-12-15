@@ -95,7 +95,7 @@ func NewNode() (*Node, error) {
 		DatabaseName: "repmgr",
 		Credentials: Credentials{
 			Username: "repmgr",
-			Password: "supersecret",
+			Password: os.Getenv("REPL_PASSWORD"),
 		},
 	}
 
