@@ -262,7 +262,6 @@ func (n *Node) PostInit() error {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
-		fmt.Println("Registering Node with Consul")
 		if err := repmgr.followPrimary(); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
