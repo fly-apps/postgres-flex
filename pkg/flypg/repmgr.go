@@ -214,8 +214,8 @@ func (r *RepMgr) memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostnam
 	return role, nil
 }
 
-func (n *RepMgr) eligiblePrimary() bool {
-	if n.Region == os.Getenv("PRIMARY_REGION") {
+func (r *RepMgr) eligiblePrimary() bool {
+	if r.Region == os.Getenv("PRIMARY_REGION") {
 		return true
 	}
 	return false
