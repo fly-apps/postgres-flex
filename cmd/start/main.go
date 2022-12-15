@@ -46,7 +46,7 @@ func main() {
 	svisor.AddProcess("pgbouncer", fmt.Sprintf("pgbouncer %s/pgbouncer.ini", node.PGBouncer.ConfigPath),
 		supervisor.WithRestart(0, 1*time.Second),
 	)
-	svisor.AddProcess("repmgrd", fmt.Sprintf("gosu postgres repmgrd -f %s --daemonize=false", node.ManagerConfigPath),
+	svisor.AddProcess("repmgrd", fmt.Sprintf("gosu postgres repmgrd -f %s --daemonize=false", node.RepMgr.ConfigPath),
 		supervisor.WithRestart(0, 5*time.Second),
 	)
 
