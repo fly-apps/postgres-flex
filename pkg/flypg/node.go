@@ -32,13 +32,14 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Region    string
-	PGPort    int
-	ProxyPort int
+	Port      int
+
+	PGBouncer PGBouncer
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
-	ManagerCredentials  Credentials
 
+	ManagerCredentials  Credentials
 	ManagerConfigPath   string
 	ManagerDatabaseName string
 }
@@ -46,8 +47,7 @@ type Node struct {
 func NewNode() (*Node, error) {
 	node := &Node{
 		AppName:             "local",
-		PGPort:              5433,
-		ProxyPort:           5432,
+		Port:                5433,
 		DataDir:             "/data/postgresql",
 		ManagerDatabaseName: "repmgr",
 		ManagerConfigPath:   "/data/repmgr.conf",
@@ -64,14 +64,14 @@ func NewNode() (*Node, error) {
 	}
 	node.PrivateIP = ipv6.String()
 
-	machineID := os.Getenv("FLY_ALLOC_ID")
 	// Generate a random, reconstructable signed int32
+	machineID := os.Getenv("FLY_ALLOC_ID")
 	seed := binary.LittleEndian.Uint64([]byte(machineID))
 	rand.Seed(int64(seed))
 	node.ID = rand.Int31()
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
-		node.PGPort = port
+		node.Port = port
 	}
 
 	// Internal user
@@ -90,6 +90,14 @@ func NewNode() (*Node, error) {
 	node.ManagerCredentials = Credentials{
 		Username: "repmgr",
 		Password: "supersecret",
+	}
+
+	node.PGBouncer = PGBouncer{
+		PrivateIP:   node.PrivateIP,
+		Port:        5432,
+		ForwardPort: 5433,
+		ConfigPath:  "/data/pgbouncer",
+		Credentials: node.OperatorCredentials,
 	}
 
 	return node, nil
@@ -114,6 +122,12 @@ func (n *Node) Init() error {
 	// Writes or updates the replication manager configuration.
 	if err := initializeRepmgr(*n); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
+	}
+
+	// Initialize PGBouncer
+	fmt.Println("Initializing PGBouncer")
+	if err := n.PGBouncer.initialize(); err != nil {
+		return err
 	}
 
 	switch primaryIP {
@@ -161,11 +175,6 @@ func (n *Node) Init() error {
 	fmt.Println("Configuring postgres")
 	if err := n.configurePostgres(); err != nil {
 		return fmt.Errorf("failed to configure postgres %s", err)
-	}
-
-	fmt.Println("Configuring pgbouncer auth")
-	if err := n.ConfigurePGBouncerAuth(); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer auth %s", err)
 	}
 
 	return nil
@@ -270,31 +279,25 @@ func (n *Node) PostInit() error {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	fmt.Println("Configuring pgbouncer primary")
-	if err := n.ConfigurePGBouncerPrimary(primaryIP, false); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer primary %s", err)
+	if err := n.PGBouncer.ConfigurePrimary(primaryIP, true); err != nil {
+		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 
 	return nil
 }
 
-func (n *Node) NewPGBouncerConnection(ctx context.Context) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.ProxyPort))
-	return openConnection(ctx, host, "pgbouncer", n.SUCredentials)
-}
-
 func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGPort))
-	return openConnection(ctx, host, "postgres", n.SUCredentials)
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
+	return openConnection(ctx, host, "postgres", n.OperatorCredentials)
 }
 
 func (n *Node) NewRepLocalConnection(ctx context.Context) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGPort))
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
 	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
 }
 
 func (n *Node) NewRepRemoteConnection(ctx context.Context, hostname string) (*pgx.Conn, error) {
-	host := net.JoinHostPort(hostname, strconv.Itoa(n.PGPort))
+	host := net.JoinHostPort(hostname, strconv.Itoa(n.Port))
 	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
 }
 
@@ -367,53 +370,6 @@ func (n *Node) initializePostgres() error {
 		return err
 	}
 
-	return nil
-}
-
-func (n *Node) ConfigurePGBouncerAuth() error {
-	path := fmt.Sprintf("%s/pgbouncer.auth", "/data")
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	contents := fmt.Sprintf("\"%s\" \"%s\"", n.OperatorCredentials.Username, n.OperatorCredentials.Password)
-	_, err = file.Write([]byte(contents))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (n *Node) ConfigurePGBouncerPrimary(primary string, reload bool) error {
-	path := fmt.Sprintf("%s/pgbouncer.database.ini", "/data")
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	contents := fmt.Sprintf("[databases]\n* = host=%s port=%d\n", primary, n.PGPort)
-	_, err = file.Write([]byte(contents))
-	if err != nil {
-		return err
-	}
-
-	if reload {
-		err = n.ReloadPGBouncerConfig()
-		if err != nil {
-			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
-		}
-	}
-	return nil
-}
-
-func (n *Node) ReloadPGBouncerConfig() error {
-	conn, err := n.NewPGBouncerConnection(context.TODO())
-	if err != nil {
-		return err
-	}
-	_, err = conn.Exec(context.TODO(), "RELOAD;")
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
