@@ -3,9 +3,11 @@ module github.com/fly-apps/postgres-flex
 go 1.16
 
 require (
+	github.com/fly-examples/postgres-ha v0.0.33
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul/api v1.18.0
+	github.com/jackc/pgconn v1.10.0
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/term v1.1.0
