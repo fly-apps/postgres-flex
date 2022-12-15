@@ -120,14 +120,12 @@ func (n *Node) Init() error {
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
 
-	// Writes or updates the replication manager configuration.
 	fmt.Println("Initializing replication manager")
 	if err := repmgr.initialize(); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 
-	// Initialize PGBouncer
-	fmt.Println("Initializing PGBouncer")
+	fmt.Println("Initializing pgbouncer")
 	if err := pgbouncer.initialize(); err != nil {
 		return err
 	}
@@ -217,18 +215,17 @@ func (n *Node) PostInit() error {
 			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", repmgr.Region, os.Getenv("PRIMARY_REGION"))
 		}
 
-		// Initialize ourselves as the primary.
+		// Create required users
 		if err := n.createRequiredUsers(conn); err != nil {
 			return fmt.Errorf("failed to create required users: %s", err)
 		}
 
-		// Creates the replication manager database.
+		// Setup repmgr database, extension, and register ourselves as the primary
 		fmt.Println("Perform Repmgr setup")
 		if err := repmgr.setup(conn); err != nil {
 			return fmt.Errorf("failed to setup repmgr: %s", err)
 		}
 
-		// Register ourselves with Consul
 		if err := consul.RegisterPrimary(n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register primary with consul: %s", err)
 		}
@@ -250,6 +247,7 @@ func (n *Node) PostInit() error {
 			return err
 		}
 
+		// If we are a primary coming back from the dead, make sure we unregister ourselves as primary.
 		if role == primaryRoleName {
 			fmt.Println("Unregistering primary")
 			if err := repmgr.unregisterPrimary(); err != nil {
@@ -272,6 +270,7 @@ func (n *Node) PostInit() error {
 		}
 	}
 
+	// Requery the primaryIP in case a new primary was assigned above.
 	primaryIP, err = consul.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
