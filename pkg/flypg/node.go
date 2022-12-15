@@ -27,31 +27,23 @@ type Credentials struct {
 }
 
 type Node struct {
-	ID        int32
 	AppName   string
 	PrivateIP string
 	DataDir   string
-	Region    string
 	Port      int
 
 	PGBouncer PGBouncer
+	RepMgr    RepMgr
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
-
-	ManagerCredentials  Credentials
-	ManagerConfigPath   string
-	ManagerDatabaseName string
 }
 
 func NewNode() (*Node, error) {
 	node := &Node{
-		AppName:             "local",
-		Port:                5433,
-		DataDir:             "/data/postgresql",
-		ManagerDatabaseName: "repmgr",
-		ManagerConfigPath:   "/data/repmgr.conf",
-		Region:              os.Getenv("FLY_REGION"),
+		AppName: "local",
+		Port:    5433,
+		DataDir: "/data/postgresql",
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -63,12 +55,6 @@ func NewNode() (*Node, error) {
 		return nil, fmt.Errorf("failed getting private ip: %s", err)
 	}
 	node.PrivateIP = ipv6.String()
-
-	// Generate a random, reconstructable signed int32
-	machineID := os.Getenv("FLY_ALLOC_ID")
-	seed := binary.LittleEndian.Uint64([]byte(machineID))
-	rand.Seed(int64(seed))
-	node.ID = rand.Int31()
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.Port = port
@@ -86,18 +72,31 @@ func NewNode() (*Node, error) {
 		Password: os.Getenv("OPERATOR_PASSWORD"),
 	}
 
-	// Replication manager user
-	node.ManagerCredentials = Credentials{
-		Username: "repmgr",
-		Password: "supersecret",
-	}
-
 	node.PGBouncer = PGBouncer{
 		PrivateIP:   node.PrivateIP,
 		Port:        5432,
 		ForwardPort: 5433,
 		ConfigPath:  "/data/pgbouncer",
 		Credentials: node.OperatorCredentials,
+	}
+
+	// Generate a random, reconstructable signed int32
+	machineID := os.Getenv("FLY_ALLOC_ID")
+	seed := binary.LittleEndian.Uint64([]byte(machineID))
+	rand.Seed(int64(seed))
+
+	node.RepMgr = RepMgr{
+		ID:           rand.Int31(),
+		Region:       os.Getenv("FLY_REGION"),
+		ConfigPath:   "/data/repmgr.conf",
+		DataDir:      node.DataDir,
+		PrivateIP:    node.PrivateIP,
+		Port:         5432,
+		DatabaseName: "repmgr",
+		Credentials: Credentials{
+			Username: "repmgr",
+			Password: "supersecret",
+		},
 	}
 
 	return node, nil
@@ -108,25 +107,29 @@ func (n *Node) Init() error {
 		return err
 	}
 
-	client, err := state.NewConsulClient()
+	consul, err := state.NewConsulClient()
 	if err != nil {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
 	}
 
 	// Check to see if there's already a registered primary.
-	primaryIP, err := client.CurrentPrimary()
+	primaryIP, err := consul.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
+	repmgr := n.RepMgr
+	pgbouncer := n.PGBouncer
+
 	// Writes or updates the replication manager configuration.
-	if err := initializeRepmgr(*n); err != nil {
+	fmt.Println("Initializing replication manager")
+	if err := repmgr.initialize(); err != nil {
 		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
 	}
 
 	// Initialize PGBouncer
 	fmt.Println("Initializing PGBouncer")
-	if err := n.PGBouncer.initialize(); err != nil {
+	if err := pgbouncer.initialize(); err != nil {
 		return err
 	}
 
@@ -136,7 +139,7 @@ func (n *Node) Init() error {
 	case "":
 		// Initialize ourselves as the primary.
 		fmt.Println("Initializing postgres")
-		if err := n.initializePostgres(); err != nil {
+		if err := n.initialize(); err != nil {
 			return fmt.Errorf("failed to initialize postgres %s", err)
 		}
 
@@ -149,11 +152,12 @@ func (n *Node) Init() error {
 		clonePrimary := true
 		if n.isInitialized() {
 			// Attempt to resolve our role by querying the primary.
-			remoteConn, err := n.NewRepRemoteConnection(context.TODO(), primaryIP)
+			remoteConn, err := repmgr.NewRemoteConnection(context.TODO(), primaryIP)
 			if err != nil {
 				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
 			}
-			role, err := memberRoleByHostname(context.TODO(), remoteConn, n.PrivateIP)
+
+			role, err := repmgr.memberRoleByHostname(context.TODO(), remoteConn, n.PrivateIP)
 			if err != nil {
 				return fmt.Errorf("failed to resolve role for %s: %s", primaryIP, err)
 			}
@@ -166,7 +170,7 @@ func (n *Node) Init() error {
 
 		if clonePrimary {
 			fmt.Println("Cloning from primary")
-			if err := cloneFromPrimary(*n, primaryIP); err != nil {
+			if err := repmgr.clonePrimary(primaryIP); err != nil {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
@@ -182,35 +186,36 @@ func (n *Node) Init() error {
 
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit() error {
-	// Ensure local PG is up before establishing connection with
-	// consul.
+	// Ensure local PG is up before establishing connection with consul.
 	conn, err := n.NewLocalConnection(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
 
-	client, err := state.NewConsulClient()
+	consul, err := state.NewConsulClient()
 	if err != nil {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
 	}
 
-	primaryIP, err := client.CurrentPrimary()
+	primaryIP, err := consul.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
+	repmgr := n.RepMgr
+	pgbouncer := n.PGBouncer
+
 	switch primaryIP {
 	case n.PrivateIP:
-		// Re-register the primary in order to pick up any changes made to the
-		// configuration file.
+		// Re-register the primary in order to pick up any changes made to the configuration file.
 		fmt.Println("Updating primary record")
-		if err := registerPrimary(*n); err != nil {
-			fmt.Printf("failed to register primary: %s", err)
+		if err := repmgr.registerPrimary(); err != nil {
+			fmt.Printf("failed to register primary with repmgr: %s", err)
 		}
 	case "":
 		// Check if we can be a primary
-		if !n.validPrimary() {
-			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", n.Region, os.Getenv("PRIMARY_REGION"))
+		if !repmgr.eligiblePrimary() {
+			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", repmgr.Region, os.Getenv("PRIMARY_REGION"))
 		}
 
 		// Initialize ourselves as the primary.
@@ -219,67 +224,61 @@ func (n *Node) PostInit() error {
 		}
 
 		// Creates the replication manager database.
-		if _, err := admin.CreateDatabase(conn, n.ManagerDatabaseName, n.ManagerCredentials.Username); err != nil {
-			return err
-		}
-
-		if err := admin.EnableExtension(conn, "repmgr"); err != nil {
-			return err
-		}
-
-		if err := registerPrimary(*n); err != nil {
-			fmt.Printf("failed to register primary: %s", err)
+		if err := repmgr.setup(conn); err != nil {
+			return fmt.Errorf("failed to setup repmgr: %s", err)
 		}
 
 		// Register ourselves with Consul
-		if err := client.RegisterPrimary(n.PrivateIP); err != nil {
+		if err := consul.RegisterPrimary(n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register primary with consul: %s", err)
 		}
 
-		if err := client.RegisterNode(n.ID, n.PrivateIP); err != nil {
+		if err := consul.RegisterNode(repmgr.ID, n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	default:
-		// If we are here, we are a new node, a standby or a demoted primary who needs
-		// to be reconfigured as a standby.
-		conn, err := n.NewRepLocalConnection(context.TODO())
+		// If we are here we are a new node, standby or a demoted primary who needs to be reconfigured as a standby.
+
+		// Attempt to resolve our role from repmgr
+		conn, err := repmgr.NewLocalConnection(context.TODO())
 		if err != nil {
 			return err
 		}
 
-		role, err := n.currentRole(context.TODO(), conn)
+		role, err := repmgr.currentRole(context.TODO(), conn)
 		if err != nil {
 			return err
 		}
 
 		if role == primaryRoleName {
 			fmt.Println("Unregistering primary")
-			if err := unregisterPrimary(*n); err != nil {
+			if err := repmgr.unregisterPrimary(); err != nil {
 				fmt.Printf("failed to unregister primary: %s\n", err)
 			}
 		}
 
-		if err := registerStandby(*n); err != nil {
+		fmt.Println("Registering standby")
+		if err := repmgr.registerStandby(); err != nil {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
-		if err := standbyFollow(*n); err != nil {
-			fmt.Printf("failed to register standby: %s\n", err)
-		}
-
-		// This will noop if the Node has already been registered.
 		fmt.Println("Registering Node with Consul")
-		if err := client.RegisterNode(n.ID, n.PrivateIP); err != nil {
+		if err := repmgr.followPrimary(); err != nil {
+			fmt.Printf("failed to register standby: %s\n", err)
+		}
+
+		fmt.Println("Registering Node with Consul")
+		if err := consul.RegisterNode(repmgr.ID, n.PrivateIP); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
 
-	primaryIP, err = client.CurrentPrimary()
+	primaryIP, err = consul.CurrentPrimary()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	if err := n.PGBouncer.ConfigurePrimary(primaryIP, true); err != nil {
+	if err := pgbouncer.ConfigurePrimary(primaryIP, true); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 
@@ -291,16 +290,6 @@ func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	return openConnection(ctx, host, "postgres", n.OperatorCredentials)
 }
 
-func (n *Node) NewRepLocalConnection(ctx context.Context) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
-}
-
-func (n *Node) NewRepRemoteConnection(ctx context.Context, hostname string) (*pgx.Conn, error) {
-	host := net.JoinHostPort(hostname, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, "repmgr", n.ManagerCredentials)
-}
-
 func (n *Node) isInitialized() bool {
 	_, err := os.Stat(n.DataDir)
 	if os.IsNotExist(err) {
@@ -309,15 +298,21 @@ func (n *Node) isInitialized() bool {
 	return true
 }
 
-func (n *Node) currentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-	return memberRole(ctx, pg, int(n.ID))
-}
-
-func (n *Node) validPrimary() bool {
-	if n.Region == os.Getenv("PRIMARY_REGION") {
-		return true
+func (n *Node) initialize() error {
+	if n.isInitialized() {
+		return nil
 	}
-	return false
+
+	if err := ioutil.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
+		return err
+	}
+	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
@@ -329,7 +324,7 @@ func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
 	credMap := map[string]string{
 		n.SUCredentials.Username:       n.SUCredentials.Password,
 		n.OperatorCredentials.Username: n.OperatorCredentials.Password,
-		n.ManagerCredentials.Username:  n.ManagerCredentials.Password,
+		n.RepMgr.Credentials.Username:  n.RepMgr.Credentials.Password,
 	}
 
 	for user, pass := range credMap {
@@ -351,23 +346,6 @@ func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
 				return err
 			}
 		}
-	}
-
-	return nil
-}
-
-func (n *Node) initializePostgres() error {
-	if n.isInitialized() {
-		return nil
-	}
-
-	if err := ioutil.WriteFile("/data/.default_password", []byte(os.Getenv("OPERATOR_PASSWORD")), 0644); err != nil {
-		return err
-	}
-	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		return err
 	}
 
 	return nil
@@ -396,27 +374,27 @@ func (n *Node) setDefaultHBA() error {
 		},
 		{
 			Type:     "local",
-			Database: n.ManagerDatabaseName,
-			User:     n.ManagerCredentials.Username,
+			Database: n.RepMgr.DatabaseName,
+			User:     n.RepMgr.Credentials.Username,
 			Method:   "trust",
 		},
 		{
 			Type:     "local",
 			Database: "replication",
-			User:     n.ManagerCredentials.Username,
+			User:     n.RepMgr.Credentials.Username,
 			Method:   "trust",
 		},
 		{
 			Type:     "host",
 			Database: "replication",
-			User:     n.ManagerCredentials.Username,
+			User:     n.RepMgr.Credentials.Username,
 			Address:  "::0/0",
 			Method:   "trust",
 		},
 		{
 			Type:     "host",
-			Database: n.ManagerDatabaseName,
-			User:     n.ManagerCredentials.Username,
+			Database: n.RepMgr.DatabaseName,
+			User:     n.RepMgr.Credentials.Username,
 			Address:  "::0/0",
 			Method:   "trust",
 		},
