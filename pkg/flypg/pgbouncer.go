@@ -17,7 +17,7 @@ type PGBouncer struct {
 	Port        int
 }
 
-func (p *PGBouncer) init(primary string) error {
+func (p *PGBouncer) configure(primary string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
 	if err := runCommand(cmdStr); err != nil {
 		return err
@@ -59,7 +59,7 @@ func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
 	}
 
 	if reload {
-		err = p.reloadPGBouncerConfig()
+		err = p.reloadConfig()
 		if err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
@@ -67,7 +67,7 @@ func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
 	return nil
 }
 
-func (p *PGBouncer) reloadPGBouncerConfig() error {
+func (p *PGBouncer) reloadConfig() error {
 	conn, err := p.NewConnection(context.TODO())
 	if err != nil {
 		return err

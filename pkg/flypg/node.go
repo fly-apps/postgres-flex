@@ -119,7 +119,7 @@ func (n *Node) Init() error {
 	}
 
 	// Initialize PGBouncer
-	if err := n.PGBouncer.init(primaryIP); err != nil {
+	if err := n.PGBouncer.configure(primaryIP); err != nil {
 		return err
 	}
 
