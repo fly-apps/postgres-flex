@@ -377,53 +377,6 @@ func (n *Node) initializePostgres() error {
 	return nil
 }
 
-// func (n *Node) ConfigurePGBouncerAuth() error {
-// 	path := fmt.Sprintf("%s/pgbouncer.auth", n.PGBouncerConfigPath)
-// 	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	contents := fmt.Sprintf("\"%s\" \"%s\"", n.OperatorCredentials.Username, n.OperatorCredentials.Password)
-// 	_, err = file.Write([]byte(contents))
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
-// func (n *Node) ConfigurePGBouncerPrimary(primary string, reload bool) error {
-// 	path := fmt.Sprintf("%s/pgbouncer.database.ini", n.PGBouncerConfigPath)
-// 	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	contents := fmt.Sprintf("[databases]\n* = host=%s port=%d\n", primary, n.Port)
-// 	_, err = file.Write([]byte(contents))
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if reload {
-// 		err = n.ReloadPGBouncerConfig()
-// 		if err != nil {
-// 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
-// 		}
-// 	}
-// 	return nil
-// }
-
-// func (n *Node) ReloadPGBouncerConfig() error {
-// 	conn, err := n.NewPGBouncerConnection(context.TODO())
-// 	if err != nil {
-// 		return err
-// 	}
-// 	_, err = conn.Exec(context.TODO(), "RELOAD;")
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 func (n *Node) configurePostgres() error {
 	cmdStr := fmt.Sprintf("sed -i \"s/#shared_preload_libraries.*/shared_preload_libraries = 'repmgr'/\" /data/postgresql/postgresql.conf")
 	return runCommand(cmdStr)
