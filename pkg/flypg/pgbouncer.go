@@ -17,30 +17,6 @@ type PGBouncer struct {
 	Port        int
 }
 
-func (p *PGBouncer) configure(primary string) error {
-	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
-		return err
-	}
-
-	// If pgbouncer.ini file is not present, set defaults.
-	if _, err := os.Stat(fmt.Sprintf("%s/pgbouncer.ini", p.ConfigPath)); err != nil {
-		if os.IsNotExist(err) {
-			cmdStr := fmt.Sprintf("cp /fly/pgbouncer.ini %s", p.ConfigPath)
-			if err := runCommand(cmdStr); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-
-	p.configureAuth()
-	p.ConfigurePrimary(primary, false)
-
-	return nil
-}
-
 func (p *PGBouncer) NewConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(p.PrivateIP, strconv.Itoa(p.Port))
 	return openConnection(ctx, host, "pgbouncer", p.Credentials)
@@ -67,15 +43,27 @@ func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
 	return nil
 }
 
-func (p *PGBouncer) reloadConfig() error {
-	conn, err := p.NewConnection(context.TODO())
-	if err != nil {
+func (p *PGBouncer) configure(primary string) error {
+	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
+	if err := runCommand(cmdStr); err != nil {
 		return err
 	}
-	_, err = conn.Exec(context.TODO(), "RELOAD;")
-	if err != nil {
-		return err
+
+	// If pgbouncer.ini file is not present, set defaults.
+	if _, err := os.Stat(fmt.Sprintf("%s/pgbouncer.ini", p.ConfigPath)); err != nil {
+		if os.IsNotExist(err) {
+			cmdStr := fmt.Sprintf("cp /fly/pgbouncer.ini %s", p.ConfigPath)
+			if err := runCommand(cmdStr); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
+
+	p.configureAuth()
+	p.ConfigurePrimary(primary, false)
+
 	return nil
 }
 
@@ -87,6 +75,18 @@ func (p *PGBouncer) configureAuth() error {
 	}
 	contents := fmt.Sprintf("\"%s\" \"%s\"", p.Credentials.Username, p.Credentials.Password)
 	_, err = file.Write([]byte(contents))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *PGBouncer) reloadConfig() error {
+	conn, err := p.NewConnection(context.TODO())
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(context.TODO(), "RELOAD;")
 	if err != nil {
 		return err
 	}
