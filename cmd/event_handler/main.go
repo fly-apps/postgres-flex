@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"strconv"
+
+	"github.com/fly-apps/postgres-flex/pkg/flypg"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 )
@@ -47,7 +48,7 @@ func main() {
 		}
 
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.ConfigurePGBouncerPrimary(string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(string(node.Value), true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	case "standby_follow":
@@ -68,7 +69,7 @@ func main() {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.ConfigurePGBouncerPrimary(string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(string(node.Value), true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	default:
