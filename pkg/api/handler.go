@@ -26,7 +26,7 @@ func Handler() http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/users", func(r chi.Router) {
-		r.Get("/{name}", handleFindUser)
+		r.Get("/{name}", handleGetUser)
 		r.Get("/list", handleListUsers)
 		r.Post("/create", handleCreateUser)
 		r.Delete("/delete/{name}", handleDeleteUser)
@@ -34,7 +34,7 @@ func Handler() http.Handler {
 
 	r.Route("/databases", func(r chi.Router) {
 		r.Get("/list", handleListDatabases)
-		r.Get("/{name}", handleFindDatabase)
+		r.Get("/{name}", handleGetDatabase)
 		r.Post("/create", handleCreateDatabase)
 		r.Delete("/delete/{name}", handleDeleteDatabase)
 	})

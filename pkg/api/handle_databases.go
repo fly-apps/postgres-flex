@@ -28,7 +28,7 @@ func handleListDatabases(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, res, http.StatusOK)
 }
 
-func handleFindDatabase(w http.ResponseWriter, r *http.Request) {
+func handleGetDatabase(w http.ResponseWriter, r *http.Request) {
 	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
