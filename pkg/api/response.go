@@ -15,13 +15,6 @@ func renderJSON(w http.ResponseWriter, data interface{}, status int) {
 	json.NewEncoder(w).Encode(data)
 }
 
-type errRes struct {
-	Error string `json:"error"`
-}
-
-// Error should be able to render custom error from pkg/flypg/admin/error.go:
-// package admin
-// it will use errors.As to check if the error is an admin
 func renderErr(w http.ResponseWriter, err error) {
 	renderJSON(w, errRes{Error: err.Error()}, status(err))
 }

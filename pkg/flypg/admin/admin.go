@@ -198,10 +198,29 @@ func FindUser(ctx context.Context, pg *pgx.Conn, username string) (*UserInfo, er
 	return nil, nil
 }
 
-func DeleteUser(ctx context.Context, pg *pgx.Conn, username string) error {
-	sql := fmt.Sprintf("DROP USER %s", username)
+func DropRole(ctx context.Context, conn *pgx.Conn, username string) error {
+	sql := fmt.Sprintf("DROP ROLE %s", username)
+	_, err := conn.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
 
-	_, err := pg.Exec(ctx, sql)
+	return nil
+}
+
+func ReassignOwnership(ctx context.Context, conn *pgx.Conn, user, targetUser string) error {
+	sql := fmt.Sprintf("REASSIGN OWNED BY %s TO %s;", user, targetUser)
+	_, err := conn.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DropOwned(ctx context.Context, conn *pgx.Conn, user string) error {
+	sql := fmt.Sprintf("DROP OWNED BY %s;", user)
+	_, err := conn.Exec(ctx, sql)
 	if err != nil {
 		return err
 	}

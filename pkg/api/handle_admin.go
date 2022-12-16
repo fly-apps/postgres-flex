@@ -1,4 +1,4 @@
-package commands
+package api
 
 import (
 	"net/http"
@@ -7,7 +7,7 @@ import (
 )
 
 func handleRole(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context())
+	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return

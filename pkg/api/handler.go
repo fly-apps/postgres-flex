@@ -2,12 +2,25 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
+	"github.com/fly-apps/postgres-flex/pkg/flycheck"
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4"
 )
+
+const Port = 5500
+
+func StartHttpServer() {
+	r := chi.NewMux()
+
+	r.Mount("/flycheck", flycheck.Handler())
+	r.Mount("/commands", Handler())
+
+	http.ListenAndServe(fmt.Sprintf(":%d", Port), r)
+}
 
 func Handler() http.Handler {
 	r := chi.NewRouter()
@@ -35,13 +48,13 @@ func Handler() http.Handler {
 	return r
 }
 
-func localConnection(ctx context.Context) (*pgx.Conn, func() error, error) {
+func localConnection(ctx context.Context, database string) (*pgx.Conn, func() error, error) {
 	node, err := flypg.NewNode()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pg, err := node.NewLocalConnection(ctx)
+	pg, err := node.NewLocalConnection(ctx, database)
 	if err != nil {
 		return nil, nil, err
 	}

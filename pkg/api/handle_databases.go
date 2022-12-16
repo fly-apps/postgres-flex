@@ -9,7 +9,7 @@ import (
 )
 
 func handleListDatabases(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context())
+	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -29,7 +29,7 @@ func handleListDatabases(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleFindDatabase(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context())
+	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -51,7 +51,7 @@ func handleFindDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context())
+	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -79,7 +79,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context())
+	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
