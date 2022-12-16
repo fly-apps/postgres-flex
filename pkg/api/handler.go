@@ -26,6 +26,7 @@ func Handler() http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/users", func(r chi.Router) {
+		r.Get("/{name}", handleFindUser)
 		r.Get("/list", handleListUsers)
 		r.Post("/create", handleCreateUser)
 		r.Delete("/delete/{name}", handleDeleteUser)
