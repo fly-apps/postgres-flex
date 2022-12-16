@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -114,7 +117,12 @@ func (n *Node) Init() error {
 
 	primaryIP, err := consul.CurrentPrimary()
 	if err != nil {
-		return fmt.Errorf("failed to query current primary: %s", err)
+		fmt.Println("Failed to get primary from consul trying dns...")
+		fallback, fallbackerr := n.dnsGetPrimary()
+		if fallbackerr != nil {
+			return fmt.Errorf("failed to query current primary: %s, %s", err, fallbackerr)
+		}
+		primaryIP = fallback
 	}
 
 	repmgr := n.RepMgr
@@ -181,6 +189,30 @@ func (n *Node) Init() error {
 	return nil
 }
 
+func (n *Node) dnsGetPrimary() (string, error) {
+	siblings, err := privnet.AllPeers(context.TODO(), n.AppName)
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range siblings {
+		//Don't query itself
+		if addr.IP.String() != n.PrivateIP {
+			resp, err := http.Get(fmt.Sprintf("http://[%s]:5500/flycheck/role", addr.IP.String()))
+			if err != nil {
+				panic(err)
+			}
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if string(body) == "primary" {
+				return addr.IP.String(), nil
+			}
+		}
+	}
+	return "", nil
+}
+
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit() error {
 	// Ensure local PG is up before establishing connection with consul.
@@ -196,7 +228,12 @@ func (n *Node) PostInit() error {
 
 	primaryIP, err := consul.CurrentPrimary()
 	if err != nil {
-		return fmt.Errorf("failed to query current primary: %s", err)
+		fmt.Println("Failed to get primary from consul trying dns...")
+		fallback, fallbackerr := n.dnsGetPrimary()
+		if fallbackerr != nil {
+			return fmt.Errorf("failed to query current primary: %s, %s", err, fallbackerr)
+		}
+		primaryIP = fallback
 	}
 
 	repmgr := n.RepMgr
@@ -273,7 +310,12 @@ func (n *Node) PostInit() error {
 	// Requery the primaryIP in case a new primary was assigned above.
 	primaryIP, err = consul.CurrentPrimary()
 	if err != nil {
-		return fmt.Errorf("failed to query current primary: %s", err)
+		fmt.Println("Failed to get primary from consul trying dns... trying dns...")
+		fallback, fallbackerr := n.dnsGetPrimary()
+		if fallbackerr != nil {
+			return fmt.Errorf("failed to query current primary: %s, %s", err, fallbackerr)
+		}
+		primaryIP = fallback
 	}
 
 	if err := pgbouncer.ConfigurePrimary(primaryIP, true); err != nil {
