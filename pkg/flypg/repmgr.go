@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	primaryRoleName = "primary"
-	standbyRoleName = "standby"
-	unknownRoleName = ""
+	PrimaryRoleName = "primary"
+	StandbyRoleName = "standby"
+	UnknownRoleName = ""
 )
 
 type RepMgr struct {
@@ -70,7 +70,7 @@ func (r *RepMgr) setup(conn *pgx.Conn) error {
 	return nil
 }
 
-func (r *RepMgr) currentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
+func (r *RepMgr) CurrentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
 	return r.memberRole(ctx, pg, int(r.ID))
 }
 

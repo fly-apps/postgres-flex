@@ -2,11 +2,8 @@ package flycheck
 
 import (
 	"context"
-	"fmt"
-
 	chk "github.com/fly-apps/postgres-flex/pkg/check"
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/pkg/errors"
 )
 
@@ -17,7 +14,7 @@ func PostgreSQLRole(ctx context.Context, checks *chk.CheckSuite) (*chk.CheckSuit
 		return checks, errors.Wrap(err, "failed to initialize node")
 	}
 
-	conn, err := node.NewLocalConnection(ctx)
+	conn, err := node.RepMgr.NewLocalConnection(ctx)
 	if err != nil {
 		return checks, errors.Wrap(err, "failed to connect to local node")
 	}
@@ -28,19 +25,18 @@ func PostgreSQLRole(ctx context.Context, checks *chk.CheckSuite) (*chk.CheckSuit
 	}
 
 	checks.AddCheck("role", func() (string, error) {
-		// checkDisk usage is >90% return "readonly"
-		size, available, err := diskUsage("/data/")
-
+		role, err := node.RepMgr.CurrentRole(ctx, conn)
 		if err != nil {
-			fmt.Printf("failed to get disk usage: %s\n", err)
+			return "failed", errors.Wrap(err, "failed to check role")
 		}
 
-		used := float64(size-available) / float64(size) * 100
-
-		if used > 90 {
-			return "readonly", nil
+		if role == flypg.PrimaryRoleName {
+			return "primary", nil
+		} else if role == flypg.StandbyRoleName {
+			return "replica", nil
+		} else {
+			return "unknown", nil
 		}
-		return admin.ResolveRole(ctx, conn)
 	})
 	return checks, nil
 }

@@ -160,7 +160,7 @@ func (n *Node) Init() error {
 			}
 
 			fmt.Printf("My role is: %s\n", role)
-			if role == standbyRoleName {
+			if role == StandbyRoleName {
 				clonePrimary = false
 			}
 		}
@@ -242,13 +242,13 @@ func (n *Node) PostInit() error {
 			return err
 		}
 
-		role, err := repmgr.currentRole(context.TODO(), conn)
+		role, err := repmgr.CurrentRole(context.TODO(), conn)
 		if err != nil {
 			return err
 		}
 
 		// If we are a primary coming back from the dead, make sure we unregister ourselves as primary.
-		if role == primaryRoleName {
+		if role == PrimaryRoleName {
 			fmt.Println("Unregistering primary")
 			if err := repmgr.unregisterPrimary(); err != nil {
 				fmt.Printf("failed to unregister primary: %s\n", err)
