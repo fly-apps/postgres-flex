@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"strconv"
@@ -48,7 +49,7 @@ func main() {
 		}
 
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), string(node.Value), true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	case "standby_follow":
@@ -69,7 +70,7 @@ func main() {
 			fmt.Printf("failed to reference node: %s\n", err)
 		}
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), string(node.Value), true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	default:

@@ -54,12 +54,12 @@ func (r *RepMgr) initialize() error {
 	return nil
 }
 
-func (r *RepMgr) setup(conn *pgx.Conn) error {
-	if _, err := admin.CreateDatabase(conn, r.DatabaseName, r.Credentials.Username); err != nil {
+func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
+	if _, err := admin.CreateDatabase(ctx, conn, r.DatabaseName, r.Credentials.Username); err != nil {
 		return fmt.Errorf("failed to create repmgr database: %s", err)
 	}
 
-	if err := admin.EnableExtension(conn, "repmgr"); err != nil {
+	if err := admin.EnableExtension(ctx, conn, "repmgr"); err != nil {
 		return fmt.Errorf("failed to enable repmgr extension: %s", err)
 	}
 
@@ -159,11 +159,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	if err := runCommand(cmdStr); err != nil {
-		return err
-	}
-
-	return nil
+	return runCommand(cmdStr)
 }
 
 func (r *RepMgr) writePasswdConf() error {
@@ -215,8 +211,5 @@ func (r *RepMgr) memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostnam
 }
 
 func (r *RepMgr) eligiblePrimary() bool {
-	if r.Region == os.Getenv("PRIMARY_REGION") {
-		return true
-	}
-	return false
+	return r.Region == os.Getenv("PRIMARY_REGION")
 }
