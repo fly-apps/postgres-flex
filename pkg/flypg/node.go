@@ -102,7 +102,7 @@ func NewNode() (*Node, error) {
 	return node, nil
 }
 
-func (n *Node) Init() error {
+func (n *Node) Init(ctx context.Context) error {
 	if err := setDirOwnership(); err != nil {
 		return err
 	}
@@ -149,12 +149,13 @@ func (n *Node) Init() error {
 		clonePrimary := true
 		if n.isInitialized() {
 			// Attempt to resolve our role by querying the primary.
-			remoteConn, err := repmgr.NewRemoteConnection(context.TODO(), primaryIP)
+			remoteConn, err := repmgr.NewRemoteConnection(ctx, primaryIP)
 			if err != nil {
 				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
 			}
+			defer remoteConn.Close(ctx)
 
-			role, err := repmgr.memberRoleByHostname(context.TODO(), remoteConn, n.PrivateIP)
+			role, err := repmgr.memberRoleByHostname(ctx, remoteConn, n.PrivateIP)
 			if err != nil {
 				return fmt.Errorf("failed to resolve role for %s: %s", primaryIP, err)
 			}
@@ -182,12 +183,13 @@ func (n *Node) Init() error {
 }
 
 // PostInit are operations that should be executed against a running Postgres on boot.
-func (n *Node) PostInit() error {
+func (n *Node) PostInit(ctx context.Context) error {
 	// Ensure local PG is up before establishing connection with consul.
-	conn, err := n.NewLocalConnection(context.TODO())
+	conn, err := n.NewLocalConnection(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
+	defer conn.Close(ctx)
 
 	consul, err := state.NewConsulClient()
 	if err != nil {
@@ -216,13 +218,13 @@ func (n *Node) PostInit() error {
 		}
 
 		// Create required users
-		if err := n.createRequiredUsers(conn); err != nil {
+		if err := n.createRequiredUsers(ctx, conn); err != nil {
 			return fmt.Errorf("failed to create required users: %s", err)
 		}
 
 		// Setup repmgr database, extension, and register ourselves as the primary
 		fmt.Println("Perform Repmgr setup")
-		if err := repmgr.setup(conn); err != nil {
+		if err := repmgr.setup(ctx, conn); err != nil {
 			return fmt.Errorf("failed to setup repmgr: %s", err)
 		}
 
@@ -235,14 +237,14 @@ func (n *Node) PostInit() error {
 		}
 	default:
 		// If we are here we are a new node, standby or a demoted primary who needs to be reconfigured as a standby.
-
 		// Attempt to resolve our role from repmgr
-		conn, err := repmgr.NewLocalConnection(context.TODO())
+		conn, err := repmgr.NewLocalConnection(ctx)
 		if err != nil {
 			return err
 		}
+		defer conn.Close(ctx)
 
-		role, err := repmgr.CurrentRole(context.TODO(), conn)
+		role, err := repmgr.CurrentRole(ctx, conn)
 		if err != nil {
 			return err
 		}
@@ -276,7 +278,7 @@ func (n *Node) PostInit() error {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	if err := pgbouncer.ConfigurePrimary(primaryIP, true); err != nil {
+	if err := pgbouncer.ConfigurePrimary(ctx, primaryIP, true); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 
@@ -306,15 +308,12 @@ func (n *Node) initialize() error {
 	}
 	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
 	_, err := cmd.CombinedOutput()
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
-func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
-	curUsers, err := admin.ListUsers(context.TODO(), conn)
+func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
+	curUsers, err := admin.ListUsers(ctx, conn)
 	if err != nil {
 		return errors.Wrap(err, "failed to list current users")
 	}
@@ -339,7 +338,7 @@ func (n *Node) createRequiredUsers(conn *pgx.Conn) error {
 		} else {
 			fmt.Printf("Creating %s\n", user)
 			sql = fmt.Sprintf(`CREATE USER %s WITH SUPERUSER LOGIN PASSWORD '%s'`, user, pass)
-			_, err := conn.Exec(context.Background(), sql)
+			_, err := conn.Exec(ctx, sql)
 			if err != nil {
 				return err
 			}
@@ -429,8 +428,8 @@ func (n *Node) setDefaultHBA() error {
 	return nil
 }
 
-func openConnection(ctx context.Context, host string, database string, creds Credentials) (*pgx.Conn, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+func openConnection(parentCtx context.Context, host string, database string, creds Credentials) (*pgx.Conn, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	url := fmt.Sprintf("postgres://%s/%s", host, database)
@@ -443,12 +442,7 @@ func openConnection(ctx context.Context, host string, database string, creds Cre
 	conf.Password = creds.Password
 	conf.ConnectTimeout = 5 * time.Second
 
-	conn, err := pgx.ConnectConfig(ctx, conf)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
+	return pgx.ConnectConfig(ctx, conf)
 }
 
 func setDirOwnership() error {
@@ -468,11 +462,7 @@ func setDirOwnership() error {
 	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
 	cmd := exec.Command("sh", "-c", cmdStr)
 	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func runCommand(cmdStr string) error {
@@ -493,9 +483,5 @@ func runCommand(cmdStr string) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(pgUID), Gid: uint32(pgGID)}
 	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

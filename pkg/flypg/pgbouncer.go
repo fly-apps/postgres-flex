@@ -23,7 +23,7 @@ func (p *PGBouncer) NewConnection(ctx context.Context) (*pgx.Conn, error) {
 	return openConnection(ctx, host, "pgbouncer", p.Credentials)
 }
 
-func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
+func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload bool) error {
 	path := fmt.Sprintf("%s/pgbouncer.database.ini", p.ConfigPath)
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
@@ -36,7 +36,7 @@ func (p *PGBouncer) ConfigurePrimary(primary string, reload bool) error {
 	}
 
 	if reload {
-		err = p.reloadConfig()
+		err = p.reloadConfig(ctx)
 		if err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
@@ -77,20 +77,16 @@ func (p *PGBouncer) configureAuth() error {
 	}
 	contents := fmt.Sprintf("\"%s\" \"%s\"", p.Credentials.Username, p.Credentials.Password)
 	_, err = file.Write([]byte(contents))
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
-func (p *PGBouncer) reloadConfig() error {
-	conn, err := p.NewConnection(context.TODO())
+func (p *PGBouncer) reloadConfig(ctx context.Context) error {
+	conn, err := p.NewConnection(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = conn.Exec(context.TODO(), "RELOAD;")
-	if err != nil {
-		return err
-	}
-	return nil
+	defer conn.Close(ctx)
+
+	_, err = conn.Exec(ctx, "RELOAD;")
+	return err
 }

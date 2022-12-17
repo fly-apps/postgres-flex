@@ -11,37 +11,25 @@ func CreateUser(ctx context.Context, pg *pgx.Conn, username string, password str
 	sql := fmt.Sprintf(`CREATE USER %s WITH LOGIN PASSWORD '%s'`, username, password)
 
 	_, err := pg.Exec(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func GrantSuperuser(ctx context.Context, pg *pgx.Conn, username string) error {
 	sql := fmt.Sprintf("ALTER USER %s WITH SUPERUSER;", username)
 
 	_, err := pg.Exec(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string) error {
 	sql := fmt.Sprintf("ALTER USER %s WITH LOGIN PASSWORD '%s';", username, password)
 
 	_, err := pg.Exec(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func CreateDatabase(pg *pgx.Conn, name, owner string) (interface{}, error) {
-	databases, err := ListDatabases(context.TODO(), pg)
+func CreateDatabase(ctx context.Context, pg *pgx.Conn, name, owner string) (interface{}, error) {
+	databases, err := ListDatabases(ctx, pg)
 	if err != nil {
 		return false, err
 	}
@@ -53,8 +41,7 @@ func CreateDatabase(pg *pgx.Conn, name, owner string) (interface{}, error) {
 	}
 
 	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, owner)
-
-	_, err = pg.Exec(context.Background(), sql)
+	_, err = pg.Exec(ctx, sql)
 	if err != nil {
 		return false, err
 	}
@@ -75,7 +62,7 @@ func ResolveRole(ctx context.Context, pg *pgx.Conn) (string, error) {
 	return "leader", nil
 }
 
-func EnableExtension(pg *pgx.Conn, extension string) error {
+func EnableExtension(ctx context.Context, pg *pgx.Conn, extension string) error {
 	sql := fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s;", extension)
 	_, err := pg.Exec(context.Background(), sql)
 	return err

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"syscall"
@@ -23,7 +24,9 @@ func main() {
 		panicHandler(err)
 	}
 
-	if err = node.Init(); err != nil {
+	ctx := context.Background()
+
+	if err = node.Init(ctx); err != nil {
 		panicHandler(err)
 	}
 
@@ -32,7 +35,7 @@ func main() {
 		defer t.Stop()
 		for range t.C {
 
-			if err := node.PostInit(); err != nil {
+			if err := node.PostInit(ctx); err != nil {
 				fmt.Printf("failed post-init: %s. Retrying...\n", err)
 				continue
 			}

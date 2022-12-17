@@ -17,21 +17,23 @@ func main() {
 
 	flag.Parse()
 
-	conn, err := openConnection(context.TODO(), *uri)
+	ctx := context.Background()
+	conn, err := openConnection(ctx, *uri)
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close(ctx)
 
 	if *totalWrites == 0 {
 		*totalWrites = 1000
 	}
 
-	if _, err := admin.CreateDatabase(conn, "benchmark", "postgres"); err != nil {
+	if _, err := admin.CreateDatabase(ctx, conn, "benchmark", "postgres"); err != nil {
 		panic(err)
 	}
 
 	sql := fmt.Sprintf("CREATE TABLE IF NOT EXISTS bench ( id serial primary key, val varchar(100));")
-	_, err = conn.Exec(context.Background(), sql)
+	_, err = conn.Exec(ctx, sql)
 	if err != nil {
 		panic(conn)
 	}
@@ -41,7 +43,7 @@ func main() {
 	for i := 0; i < *totalWrites; i++ {
 		val := fmt.Sprintf("%s-%d", seed, i)
 		sql := fmt.Sprintf("INSERT INTO bench (val) VALUES ('%s');", val)
-		_, err = conn.Exec(context.Background(), sql)
+		_, err = conn.Exec(ctx, sql)
 		if err != nil {
 			fmt.Printf("(%d of %d) - Failed\n", i, *totalWrites-1)
 			time.Sleep(2)
@@ -62,8 +64,8 @@ func generateSeed() string {
 	return string(b)
 }
 
-func openConnection(ctx context.Context, uri string) (*pgx.Conn, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+func openConnection(parentCtx context.Context, uri string) (*pgx.Conn, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	fmt.Println(uri)
