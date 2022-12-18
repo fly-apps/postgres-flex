@@ -55,7 +55,7 @@ func (r *RepMgr) initialize() error {
 }
 
 func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
-	if _, err := admin.CreateDatabase(ctx, conn, r.DatabaseName); err != nil {
+	if err := admin.CreateDatabaseWithOwner(ctx, conn, r.DatabaseName, r.Credentials.Username); err != nil {
 		return fmt.Errorf("failed to create repmgr database: %s", err)
 	}
 

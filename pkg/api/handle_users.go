@@ -80,19 +80,20 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = admin.GrantAccess(ctx, conn, input.Username)
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
 	if input.Superuser {
 		err = admin.GrantSuperuser(ctx, conn, input.Username)
 		if err != nil {
 			renderErr(w, err)
 			return
 		}
+	} else {
+		err = admin.GrantAccess(ctx, conn, input.Username)
+		if err != nil {
+			renderErr(w, err)
+			return
+		}
 	}
+
 	res := &Response{
 		Result: true,
 	}

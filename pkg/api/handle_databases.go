@@ -73,7 +73,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	_, err = admin.CreateDatabase(ctx, conn, input.Name)
+	err = admin.CreateDatabase(ctx, conn, input.Name)
 	if err != nil {
 		renderErr(w, err)
 		return

@@ -36,13 +36,8 @@ func GrantSuperuser(ctx context.Context, pg *pgx.Conn, username string) error {
 
 func CreateUser(ctx context.Context, pg *pgx.Conn, username string, password string) error {
 	sql := fmt.Sprintf(`CREATE USER %s WITH LOGIN PASSWORD '%s'`, username, password)
-
 	_, err := pg.Exec(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string) error {
@@ -52,25 +47,34 @@ func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string
 	return err
 }
 
-func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) (interface{}, error) {
-	databases, err := ListDatabases(ctx, pg)
+func CreateDatabaseWithOwner(ctx context.Context, pg *pgx.Conn, name, owner string) error {
+	dbInfo, err := FindDatabase(ctx, pg, name)
 	if err != nil {
-		return false, err
+		return err
 	}
-
-	for _, db := range databases {
-		if db.Name == name {
-			return true, nil
-		}
+	// Database already exists.
+	if dbInfo != nil {
+		return nil
 	}
-
-	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, name)
+	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, owner)
 	_, err = pg.Exec(ctx, sql)
+
+	return err
+}
+
+func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
+	dbInfo, err := FindDatabase(ctx, pg, name)
 	if err != nil {
-		return false, err
+		return err
+	}
+	// Database already exists.
+	if dbInfo != nil {
+		return nil
 	}
 
-	return true, nil
+	sql := fmt.Sprintf("CREATE DATABASE %s;", name)
+	_, err = pg.Exec(ctx, sql)
+	return err
 }
 
 func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
