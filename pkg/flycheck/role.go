@@ -2,6 +2,7 @@ package flycheck
 
 import (
 	"context"
+
 	chk "github.com/fly-apps/postgres-flex/pkg/check"
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/pkg/errors"
@@ -14,11 +15,7 @@ func PostgreSQLRole(ctx context.Context, checks *chk.CheckSuite) (*chk.CheckSuit
 		return checks, errors.Wrap(err, "failed to initialize node")
 	}
 
-<<<<<<< HEAD
 	conn, err := node.RepMgr.NewLocalConnection(ctx)
-=======
-	conn, err := node.NewLocalConnection(ctx, "postgres")
->>>>>>> cf09643 (Fixing detach process)
 	if err != nil {
 		return checks, errors.Wrap(err, "failed to connect to local node")
 	}
