@@ -5,20 +5,21 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/go-chi/chi/v5"
 )
 
 func handleListUsers(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	ctx := r.Context()
+
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer close()
 
-	users, err := admin.ListUsers(r.Context(), conn)
+	users, err := admin.ListUsers(ctx, conn)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -32,16 +33,19 @@ func handleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetUser(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	var (
+		ctx  = r.Context()
+		name = chi.URLParam(r, "name")
+	)
+
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer close()
 
-	name := chi.URLParam(r, "name")
-
-	user, err := admin.FindUser(r.Context(), conn, name)
+	user, err := admin.FindUser(ctx, conn, name)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -53,7 +57,9 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	ctx := r.Context()
+
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -61,7 +67,6 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	defer close()
 
 	var input createUserRequest
-
 	err = json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
 		renderErr(w, err)
@@ -69,20 +74,20 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	err = admin.CreateUser(r.Context(), conn, input.Username, input.Password)
+	err = admin.CreateUser(ctx, conn, input.Username, input.Password)
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 
-	err = admin.GrantAccess(r.Context(), conn, input.Username)
+	err = admin.GrantAccess(ctx, conn, input.Username)
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 
 	if input.Superuser {
-		err = admin.GrantSuperuser(r.Context(), conn, input.Username)
+		err = admin.GrantSuperuser(ctx, conn, input.Username)
 		if err != nil {
 			renderErr(w, err)
 			return
@@ -101,18 +106,12 @@ func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		name = chi.URLParam(r, "name")
 	)
 
-	node, err := flypg.NewNode()
+	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-
-	conn, err := node.NewLocalConnection(ctx, "postgres")
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-	defer conn.Close(ctx)
+	defer close()
 
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -121,12 +120,12 @@ func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, database := range databases {
-		dbConn, err := node.NewLocalConnection(r.Context(), database.Name)
+		dbConn, close, err := localConnection(r.Context(), database.Name)
 		if err != nil {
 			renderErr(w, err)
 			return
 		}
-		defer dbConn.Close(ctx)
+		defer close()
 
 		if err := admin.ReassignOwnership(ctx, dbConn, name, "postgres"); err != nil {
 			renderErr(w, fmt.Errorf("failed to reassign ownership: %s", err))

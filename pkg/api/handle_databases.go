@@ -9,14 +9,16 @@ import (
 )
 
 func handleListDatabases(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	ctx := r.Context()
+
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer close()
 
-	dbs, err := admin.ListDatabases(r.Context(), conn)
+	dbs, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -29,16 +31,19 @@ func handleListDatabases(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetDatabase(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	var (
+		ctx  = r.Context()
+		name = chi.URLParam(r, "name")
+	)
+
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer close()
 
-	name := chi.URLParam(r, "name")
-
-	db, err := admin.FindDatabase(r.Context(), conn, name)
+	db, err := admin.FindDatabase(ctx, conn, name)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -51,7 +56,9 @@ func handleGetDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	ctx := r.Context()
+
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -59,7 +66,6 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	defer close()
 
 	input := createDatabaseRequest{}
-
 	err = json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
 		renderErr(w, err)
@@ -67,7 +73,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	_, err = admin.CreateDatabase(r.Context(), conn, input.Name)
+	_, err = admin.CreateDatabase(ctx, conn, input.Name)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -79,16 +85,18 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	var (
+		ctx  = r.Context()
+		name = chi.URLParam(r, "name")
+	)
+	conn, close, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer close()
 
-	name := chi.URLParam(r, "name")
-
-	err = admin.DeleteDatabase(r.Context(), conn, name)
+	err = admin.DeleteDatabase(ctx, conn, name)
 	if err != nil {
 		renderErr(w, err)
 		return
