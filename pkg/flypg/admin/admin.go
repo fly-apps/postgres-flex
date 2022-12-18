@@ -64,7 +64,7 @@ func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) (interface{}
 		}
 	}
 
-	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name)
+	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, name)
 	_, err = pg.Exec(ctx, sql)
 	if err != nil {
 		return false, err
