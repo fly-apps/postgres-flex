@@ -289,7 +289,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, database, n.OperatorCredentials)
+	return openConnection(ctx, host, database, n.SUCredentials)
 }
 
 func (n *Node) isInitialized() bool {
