@@ -67,7 +67,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	_, err = admin.CreateDatabase(conn, input.Name, "postgres")
+	_, err = admin.CreateDatabase(r.Context(), conn, input.Name)
 	if err != nil {
 		renderErr(w, err)
 		return

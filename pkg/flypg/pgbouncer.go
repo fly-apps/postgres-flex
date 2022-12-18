@@ -18,11 +18,6 @@ type PGBouncer struct {
 	ForwardPort int
 }
 
-func (p *PGBouncer) NewConnection(ctx context.Context) (*pgx.Conn, error) {
-	host := net.JoinHostPort(p.PrivateIP, strconv.Itoa(p.Port))
-	return openConnection(ctx, host, "pgbouncer", p.Credentials)
-}
-
 func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload bool) error {
 	path := fmt.Sprintf("%s/pgbouncer.database.ini", p.ConfigPath)
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
@@ -81,7 +76,7 @@ func (p *PGBouncer) configureAuth() error {
 }
 
 func (p *PGBouncer) reloadConfig(ctx context.Context) error {
-	conn, err := p.NewConnection(ctx)
+	conn, err := p.newConnection(ctx)
 	if err != nil {
 		return err
 	}
@@ -89,4 +84,9 @@ func (p *PGBouncer) reloadConfig(ctx context.Context) error {
 
 	_, err = conn.Exec(ctx, "RELOAD;")
 	return err
+}
+
+func (p *PGBouncer) newConnection(ctx context.Context) (*pgx.Conn, error) {
+	host := net.JoinHostPort(p.PrivateIP, strconv.Itoa(p.Port))
+	return openConnection(ctx, host, "pgbouncer", p.Credentials)
 }

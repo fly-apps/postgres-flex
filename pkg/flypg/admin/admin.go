@@ -52,7 +52,7 @@ func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string
 	return err
 }
 
-func CreateDatabase(ctx context.Context, pg *pgx.Conn, name, owner string) (interface{}, error) {
+func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) (interface{}, error) {
 	databases, err := ListDatabases(ctx, pg)
 	if err != nil {
 		return false, err
@@ -64,7 +64,7 @@ func CreateDatabase(ctx context.Context, pg *pgx.Conn, name, owner string) (inte
 		}
 	}
 
-	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, owner)
+	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name)
 	_, err = pg.Exec(ctx, sql)
 	if err != nil {
 		return false, err
