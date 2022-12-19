@@ -64,7 +64,7 @@ func CreateDatabaseWithOwner(ctx context.Context, pg *pgx.Conn, name, owner stri
 
 func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 	dbInfo, err := FindDatabase(ctx, pg, name)
-	if err != nil {
+	if err != nil && err != pgx.ErrNoRows {
 		return err
 	}
 	// Database already exists.
