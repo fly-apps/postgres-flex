@@ -9,7 +9,7 @@ require (
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/term v1.1.0
-	github.com/superfly/fly-checks v0.0.0-20221220174319-c54297cfb245
+	github.com/superfly/fly-checks v0.0.0-20221220181423-23e7448f5ec5
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
 )
