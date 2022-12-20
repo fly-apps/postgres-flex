@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/pkg/flypg"
 )
 
 func handleRole(w http.ResponseWriter, r *http.Request) {
@@ -14,13 +14,28 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 	}
 	defer close()
 
-	role, err := admin.ResolveRole(r.Context(), conn)
+	node, err := flypg.NewNode()
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 
-	res := &Response{Result: role}
+	role, err := node.RepMgr.CurrentRole(r.Context(), conn)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	var alteredRole string
+	if role == flypg.PrimaryRoleName {
+		alteredRole = "primary"
+	} else if role == flypg.StandbyRoleName {
+		alteredRole = "replica"
+	} else {
+		alteredRole = "unknown"
+	}
+
+	res := &Response{Result: alteredRole}
 
 	renderJSON(w, res, http.StatusOK)
 }

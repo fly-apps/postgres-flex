@@ -7,19 +7,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-func ResolveRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-	var readonly string
-	err := pg.QueryRow(ctx, "SHOW transaction_read_only").Scan(&readonly)
-	if err != nil {
-		return "offline", err
-	}
-
-	if readonly == "on" {
-		return "standby", nil
-	}
-	return "leader", nil
-}
-
 func GrantAccess(ctx context.Context, pg *pgx.Conn, username string) error {
 	sql := fmt.Sprintf("GRANT pg_read_all_data, pg_write_all_data TO %q", username)
 
