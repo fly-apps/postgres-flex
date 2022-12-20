@@ -2,13 +2,14 @@ package flycheck
 
 import (
 	"context"
-	chk "github.com/fly-apps/postgres-flex/pkg/check"
+
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/pkg/errors"
+	"github.com/superfly/fly-checks/check"
 )
 
 // PostgreSQLRole outputs current role
-func PostgreSQLRole(ctx context.Context, checks *chk.CheckSuite) (*chk.CheckSuite, error) {
+func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
 	node, err := flypg.NewNode()
 	if err != nil {
 		return checks, errors.Wrap(err, "failed to initialize node")
