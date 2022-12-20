@@ -187,7 +187,7 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	// Ensure local PG is up before establishing connection with consul.
-	conn, err := n.NewLocalConnection(context.TODO(), "postgres")
+	conn, err := n.NewLocalConnection(ctx, "postgres")
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
