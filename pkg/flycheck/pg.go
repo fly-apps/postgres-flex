@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	chk "github.com/fly-apps/postgres-flex/pkg/check"
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/superfly/fly-checks/check"
 )
 
 // CheckPostgreSQL health, replication, etc
-func CheckPostgreSQL(ctx context.Context, checks *chk.CheckSuite) (*chk.CheckSuite, error) {
+func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
 
 	node, err := flypg.NewNode()
 	if err != nil {
