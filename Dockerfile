@@ -11,6 +11,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/event_handler ./cmd/event_h
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
 COPY ./bin/* /fly/bin/
 
+FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
+
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/postgresql
 ARG VERSION 
@@ -24,6 +26,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
+COPY --from=postgres_exporter /postgres_exporter /usr/local/bin/
 
 ADD /config/* /fly/
 RUN mkdir -p /run/haproxy/
