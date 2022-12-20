@@ -195,6 +195,8 @@ github.com/superfly/fly-checks v0.0.0-20221220173343-2d0d1fa97105 h1:Ikj6MZod7UL
 github.com/superfly/fly-checks v0.0.0-20221220173343-2d0d1fa97105/go.mod h1:BbqpB4y6Z/cijQqKWJ3i8LMsAoC29gzX6vsSD3Qq7uw=
 github.com/superfly/fly-checks v0.0.0-20221220174319-c54297cfb245 h1:0w2wBif1LgURF0F9e9jYBkoEmLk4THv/OL+0Y1gJeNU=
 github.com/superfly/fly-checks v0.0.0-20221220174319-c54297cfb245/go.mod h1:BbqpB4y6Z/cijQqKWJ3i8LMsAoC29gzX6vsSD3Qq7uw=
+github.com/superfly/fly-checks v0.0.0-20221220181423-23e7448f5ec5 h1:ywFokDcpcUrqMq1g6sE59NKVBWkLWT1LI7SI0iimURk=
+github.com/superfly/fly-checks v0.0.0-20221220181423-23e7448f5ec5/go.mod h1:BbqpB4y6Z/cijQqKWJ3i8LMsAoC29gzX6vsSD3Qq7uw=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
