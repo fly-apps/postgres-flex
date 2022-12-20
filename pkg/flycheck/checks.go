@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	suite "github.com/fly-apps/postgres-flex/pkg/check"
+	"github.com/superfly/fly-checks/check"
 )
 
 const Port = 5500
@@ -25,7 +25,8 @@ func Handler() http.Handler {
 func runVMChecks(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), (5 * time.Second))
 	defer cancel()
-	suite := &suite.CheckSuite{Name: "VM"}
+
+	suite := &check.CheckSuite{Name: "VM"}
 	suite = CheckVM(suite)
 
 	go func(ctx context.Context) {
@@ -41,7 +42,8 @@ func runVMChecks(w http.ResponseWriter, r *http.Request) {
 func runPGChecks(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), (5 * time.Second))
 	defer cancel()
-	suite := &suite.CheckSuite{Name: "PG"}
+
+	suite := &check.CheckSuite{Name: "PG"}
 	suite, err := CheckPostgreSQL(ctx, suite)
 	if err != nil {
 		suite.ErrOnSetup = err
@@ -62,7 +64,7 @@ func runRoleCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), (time.Second * 5))
 	defer cancel()
 
-	suite := &suite.CheckSuite{Name: "Role"}
+	suite := &check.CheckSuite{Name: "Role"}
 	suite, err := PostgreSQLRole(ctx, suite)
 	if err != nil {
 		suite.ErrOnSetup = err
@@ -79,7 +81,7 @@ func runRoleCheck(w http.ResponseWriter, r *http.Request) {
 	handleCheckResponse(w, suite, true)
 }
 
-func handleCheckResponse(w http.ResponseWriter, suite *suite.CheckSuite, raw bool) {
+func handleCheckResponse(w http.ResponseWriter, suite *check.CheckSuite, raw bool) {
 	if suite.ErrOnSetup != nil {
 		handleError(w, suite.ErrOnSetup)
 		return
