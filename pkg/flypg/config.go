@@ -36,6 +36,9 @@ func NewConfig(dataDir string) *Config {
 	}
 }
 
+// SetDefaults will apply the default configuration settings to the config struct.
+// Warning - it's important that this is called prior to any new settings, otherwise
+// they may be overwritten.
 func (c *Config) SetDefaults() error {
 	mem, err := memTotal()
 	if err != nil {
