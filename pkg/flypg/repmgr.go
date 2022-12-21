@@ -86,6 +86,7 @@ func (r *RepMgr) writeManagerConf() error {
 		"conninfo":                   fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":             fmt.Sprintf("'%s'", r.DataDir),
 		"failover":                   "'automatic'",
+		"use_replication_slots":      "yes",
 		"promote_command":            fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", r.ConfigPath),
 		"follow_command":             fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", r.ConfigPath),
 		"event_notification_command": fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\" -new-node-id \\'%%p\\''"),

@@ -48,6 +48,7 @@ func (c *Config) SetDefaults() error {
 	c.pgConfig = map[string]interface{}{
 		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
 		"max_wal_senders":          10,
+		"max_replication_slots":    10,
 		"max_connections":          300,
 		"wal_level":                "hot_standby",
 		"hot_standby":              true,
