@@ -38,8 +38,11 @@ func NewConfig(dataDir string) *Config {
 
 // SaveOffline will write our configuration data to Consul and to our local configuration
 // file. This is safe to run when Postgres is not running.
-func (c *Config) SaveOffline(consul *state.ConsulClient) error {
-
+func (c Config) SaveOffline(consul *state.ConsulClient) error {
+	// Don't persist an empty config
+	if c.pgConfig == nil {
+		return nil
+	}
 	// Push configuration to Consul.
 	if err := c.writeToConsul(consul); err != nil {
 		return fmt.Errorf("failed to write to consul: %s", err)
@@ -56,6 +59,10 @@ func (c *Config) SaveOffline(consul *state.ConsulClient) error {
 // SaveOnline will write our configuration information to Consul, local configuration
 // and will attempt to apply eligible changes at runtime.
 func (c Config) SaveOnline(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient) error {
+	// Don't persist an empty config
+	if c.pgConfig == nil {
+		return fmt.Errorf("unable to save an empty config")
+	}
 	// Push configuration to Consul.
 	if err := c.writeToConsul(consul); err != nil {
 		return fmt.Errorf("failed to write to consul: %s", err)
