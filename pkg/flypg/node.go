@@ -45,7 +45,6 @@ func NewNode() (*Node, error) {
 		AppName: "local",
 		Port:    5433,
 		DataDir: "/data/postgresql",
-		Config:  NewConfig(),
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -61,6 +60,9 @@ func NewNode() (*Node, error) {
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.Port = port
 	}
+
+	// Stub configuration
+	node.Config = NewConfig(node.DataDir)
 
 	// Internal user
 	node.SUCredentials = Credentials{
@@ -198,7 +200,6 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	config.PopulateLocalConfig()
 	config.Print(os.Stdout)
 
 	return nil

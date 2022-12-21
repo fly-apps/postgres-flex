@@ -17,56 +17,23 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
-type PGConfig map[string]interface{}
+type pgConfig map[string]interface{}
 
 type Config struct {
-	ConfigFile string
-	PGConfig   PGConfig
+	configFile       string
+	customConfigFile string
+	dataDir          string
+
+	pgConfig pgConfig
 }
 
-func NewConfig() *Config {
+func NewConfig(dataDir string) *Config {
 	return &Config{
-		ConfigFile: "/data/postgresql/postgresql.custom.conf",
-		PGConfig:   PGConfig{},
+		dataDir:          dataDir,
+		configFile:       fmt.Sprintf("%s/postgresql.conf", dataDir),
+		customConfigFile: fmt.Sprintf("%s/postgresql.custom.conf", dataDir),
+		pgConfig:         pgConfig{},
 	}
-}
-
-func (c *Config) PopulateLocalConfig() error {
-	if err := c.SetDefaults(); err != nil {
-		return err
-	}
-	if err := c.pullConfigFromFile(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c Config) EnableCustomConfig() error {
-	if err := runCommand(fmt.Sprintf("touch %s", c.ConfigFile)); err != nil {
-		return err
-	}
-
-	// read the whole file at once
-	b, err := ioutil.ReadFile("/data/postgresql/postgresql.conf")
-	if err != nil {
-		return err
-	}
-
-	if strings.Contains(string(b), "postgresql.custom.conf") {
-		return nil
-	}
-
-	f, err := os.OpenFile("/data/postgresql/postgresql.conf", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	if _, err := f.WriteString("include 'postgresql.custom.conf'"); err != nil {
-		return fmt.Errorf("failed append to conf file: %s", err)
-	}
-
-	return nil
 }
 
 // SaveOffline will write our configuration data to Consul and to our local configuration
@@ -144,7 +111,7 @@ func (c *Config) SetDefaults() error {
 		return fmt.Errorf("failed to fetch total system memory: %s", err)
 	}
 
-	c.PGConfig = map[string]interface{}{
+	c.pgConfig = map[string]interface{}{
 		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
 		"max_wal_senders":          10,
 		"max_connections":          300,
@@ -158,8 +125,52 @@ func (c *Config) SetDefaults() error {
 	return nil
 }
 
+// Print will output the local "custom" configuration data
+// to stdout.
+func (c *Config) Print(w io.Writer) error {
+	if err := c.SetDefaults(); err != nil {
+		return err
+	}
+	if err := c.pullConfigFromFile(); err != nil {
+		return err
+	}
+
+	e := json.NewEncoder(w)
+	e.SetIndent("", "    ")
+
+	return e.Encode(c.pgConfig)
+}
+
+func (c Config) EnableCustomConfig() error {
+	if err := runCommand(fmt.Sprintf("touch %s", c.customConfigFile)); err != nil {
+		return err
+	}
+
+	// read the whole file at once
+	b, err := ioutil.ReadFile(c.configFile)
+	if err != nil {
+		return err
+	}
+
+	if strings.Contains(string(b), "postgresql.custom.conf") {
+		return nil
+	}
+
+	f, err := os.OpenFile(c.configFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString("include 'postgresql.custom.conf'"); err != nil {
+		return fmt.Errorf("failed append to conf file: %s", err)
+	}
+
+	return nil
+}
+
 func (c Config) applyPGConfigAtRuntime(ctx context.Context, conn *pgx.Conn) error {
-	for key, value := range c.PGConfig {
+	for key, value := range c.pgConfig {
 		if err := admin.SetConfigurationSetting(ctx, conn, key, value); err != nil {
 			fmt.Printf("failed to set configuration setting %s -> %s: %s", key, value, err)
 		}
@@ -169,7 +180,7 @@ func (c Config) applyPGConfigAtRuntime(ctx context.Context, conn *pgx.Conn) erro
 }
 
 func (c Config) writeToConsul(consul *state.ConsulClient) error {
-	configBytes, err := json.Marshal(c.PGConfig)
+	configBytes, err := json.Marshal(c.pgConfig)
 	if err != nil {
 		return err
 	}
@@ -189,13 +200,13 @@ func (c Config) writeToConsul(consul *state.ConsulClient) error {
 }
 
 func (c Config) writeToFile() error {
-	file, err := os.OpenFile(c.ConfigFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(c.customConfigFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	for key, value := range c.PGConfig {
+	for key, value := range c.pgConfig {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
 		file.Write([]byte(entry))
 	}
@@ -204,7 +215,7 @@ func (c Config) writeToFile() error {
 }
 
 func (c *Config) pullConfigFromFile() error {
-	file, err := os.Open(c.ConfigFile)
+	file, err := os.Open(c.customConfigFile)
 	if err != nil {
 		return err
 	}
@@ -215,7 +226,7 @@ func (c *Config) pullConfigFromFile() error {
 		lineArr := strings.Split(scanner.Text(), "=")
 		key := strings.TrimSpace(lineArr[0])
 		value := strings.TrimSpace(lineArr[1])
-		c.PGConfig[key] = value
+		c.pgConfig[key] = value
 	}
 
 	return nil
@@ -227,22 +238,16 @@ func (c *Config) pullConsulPGConfig(consul *state.ConsulClient) error {
 		return err
 	}
 
-	var storeCfg PGConfig
+	var storeCfg pgConfig
 	if err = json.Unmarshal(configBytes, &storeCfg); err != nil {
 		return err
 	}
 
 	for key, value := range storeCfg {
-		c.PGConfig[key] = value
+		c.pgConfig[key] = value
 	}
 
 	return nil
-}
-
-func (c Config) Print(w io.Writer) error {
-	e := json.NewEncoder(w)
-	e.SetIndent("", "    ")
-	return e.Encode(c.PGConfig)
 }
 
 func memTotal() (memoryMb int64, err error) {
