@@ -9,12 +9,12 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-type consulClient struct {
+type ConsulClient struct {
 	client *api.Client
 	prefix string
 }
 
-func NewConsulClient() (*consulClient, error) {
+func NewConsulClient() (*ConsulClient, error) {
 	conf, err := clientConfig()
 	if err != nil {
 		return nil, err
@@ -30,13 +30,27 @@ func NewConsulClient() (*consulClient, error) {
 		return nil, err
 	}
 
-	return &consulClient{
+	return &ConsulClient{
 		client: client,
 		prefix: prefix,
 	}, nil
 }
 
-func (c *consulClient) CurrentPrimary() (string, error) {
+func (c *ConsulClient) PushConfig(config []byte) error {
+	kv := &api.KVPair{Key: c.targetKey("Config"), Value: config}
+	_, err := c.client.KV().Put(kv, nil)
+	return err
+}
+
+func (c *ConsulClient) PullConfig() ([]byte, error) {
+	pair, _, err := c.client.KV().Get(c.targetKey("Config"), nil)
+	if err != nil {
+		return nil, err
+	}
+	return pair.Value, nil
+}
+
+func (c *ConsulClient) CurrentPrimary() (string, error) {
 	pair, _, err := c.client.KV().Get(c.targetKey("PRIMARY_NODE"), nil)
 	if err != nil {
 		return "", err
@@ -49,7 +63,7 @@ func (c *consulClient) CurrentPrimary() (string, error) {
 	return "", nil
 }
 
-func (c *consulClient) RegisterPrimary(hostname string) error {
+func (c *ConsulClient) RegisterPrimary(hostname string) error {
 	kv := &api.KVPair{Key: c.targetKey("PRIMARY_NODE"), Value: []byte(hostname)}
 	_, err := c.client.KV().Put(kv, nil)
 	if err != nil {
@@ -59,7 +73,7 @@ func (c *consulClient) RegisterPrimary(hostname string) error {
 	return nil
 }
 
-func (c *consulClient) Node(id int32) (*api.KVPair, error) {
+func (c *ConsulClient) Node(id int32) (*api.KVPair, error) {
 	idBytes, err := json.Marshal(id)
 	if err != nil {
 		return nil, err
@@ -74,7 +88,7 @@ func (c *consulClient) Node(id int32) (*api.KVPair, error) {
 	return result, nil
 }
 
-func (c *consulClient) RegisterNode(id int32, hostname string) error {
+func (c *ConsulClient) RegisterNode(id int32, hostname string) error {
 	node, err := c.Node(id)
 	if err != nil {
 		return err
@@ -98,7 +112,7 @@ func (c *consulClient) RegisterNode(id int32, hostname string) error {
 	return nil
 }
 
-func (c *consulClient) DeleteNode(id int32) error {
+func (c *ConsulClient) DeleteNode(id int32) error {
 	idBytes, err := json.Marshal(id)
 	if err != nil {
 		return err
@@ -112,7 +126,7 @@ func (c *consulClient) DeleteNode(id int32) error {
 	return nil
 }
 
-func (c *consulClient) targetKey(key string) string {
+func (c *ConsulClient) targetKey(key string) string {
 	return c.prefix + key
 }
 

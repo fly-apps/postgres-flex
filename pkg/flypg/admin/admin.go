@@ -218,3 +218,9 @@ func DropOwned(ctx context.Context, conn *pgx.Conn, user string) error {
 
 	return nil
 }
+
+func SetConfigurationSetting(ctx context.Context, conn *pgx.Conn, key string, value interface{}) error {
+	sql := fmt.Sprintf("SET %s to %s", key, value)
+	_, err := conn.Exec(ctx, sql)
+	return err
+}
