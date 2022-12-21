@@ -32,7 +32,9 @@ func NewConfig() *Config {
 }
 
 func (c *Config) PopulateLocalConfig() error {
-	c.SetDefaults()
+	if err := c.SetDefaults(); err != nil {
+		return err
+	}
 	if err := c.pullConfigFromFile(); err != nil {
 		return err
 	}
@@ -69,7 +71,8 @@ func (c Config) EnableCustomConfig() error {
 
 // SaveOffline will write our configuration data to Consul and to our local configuration
 // file. This is safe to run when Postgres is not running.
-func (c Config) SaveOffline(consul *state.ConsulClient) error {
+func (c *Config) SaveOffline(consul *state.ConsulClient) error {
+
 	// Push configuration to Consul.
 	if err := c.writeToConsul(consul); err != nil {
 		return fmt.Errorf("failed to write to consul: %s", err)
@@ -107,13 +110,10 @@ func (c Config) SaveOnline(ctx context.Context, conn *pgx.Conn, consul *state.Co
 // SyncOffline will pull the latest Postgres configuration information from Consul and
 // write it to the configuration file.
 func (c *Config) SyncOffline(ctx context.Context, consul *state.ConsulClient) error {
-	fmt.Println("Pulling consul config")
-	// Pull consul config
+	// Apply Consul configuration.
 	if err := c.pullConsulPGConfig(consul); err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
 	}
-
-	fmt.Println("Pulling config file")
 	// Write configuration to local file.
 	if err := c.writeToFile(); err != nil {
 		return fmt.Errorf("failed to write to pg config file: %s", err)
@@ -122,19 +122,11 @@ func (c *Config) SyncOffline(ctx context.Context, consul *state.ConsulClient) er
 	return nil
 }
 
-// SyncPGConfig will pull the latest Postgres configuration information from Consul and
+// SyncOnline will pull the latest Postgres configuration information from Consul and
 // write it to the configuration file and attempt to apply any new changes at runtime.
 func (c *Config) SyncOnline(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient) error {
-	fmt.Println("Pulling consul config")
-	// Pull consul config
-	if err := c.pullConsulPGConfig(consul); err != nil {
-		return fmt.Errorf("failed to pull config from consul: %s", err)
-	}
-
-	fmt.Println("Pulling config file")
-	// Write configuration to local file.
-	if err := c.writeToFile(); err != nil {
-		return fmt.Errorf("failed to write to pg config file: %s", err)
+	if err := c.SyncOffline(ctx, consul); err != nil {
+		return err
 	}
 
 	fmt.Println("Applying config at runtime")
