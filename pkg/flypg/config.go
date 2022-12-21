@@ -20,20 +20,40 @@ import (
 type pgConfig map[string]interface{}
 
 type Config struct {
-	configFile       string
-	customConfigFile string
-	dataDir          string
+	configFilePath       string
+	customConfigFilePath string
+	dataDir              string
 
 	pgConfig pgConfig
 }
 
 func NewConfig(dataDir string) *Config {
 	return &Config{
-		dataDir:          dataDir,
-		configFile:       fmt.Sprintf("%s/postgresql.conf", dataDir),
-		customConfigFile: fmt.Sprintf("%s/postgresql.custom.conf", dataDir),
-		pgConfig:         pgConfig{},
+		dataDir:              dataDir,
+		configFilePath:       fmt.Sprintf("%s/postgresql.conf", dataDir),
+		customConfigFilePath: fmt.Sprintf("%s/postgresql.custom.conf", dataDir),
+		pgConfig:             pgConfig{},
 	}
+}
+
+func (c *Config) SetDefaults() error {
+	mem, err := memTotal()
+	if err != nil {
+		return fmt.Errorf("failed to fetch total system memory: %s", err)
+	}
+
+	c.pgConfig = map[string]interface{}{
+		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
+		"max_wal_senders":          10,
+		"max_connections":          300,
+		"wal_level":                "hot_standby",
+		"hot_standby":              true,
+		"archive_mode":             true,
+		"archive_command":          "'/bin/true'",
+		"shared_preload_libraries": "repmgr",
+	}
+
+	return nil
 }
 
 // SaveOffline will write our configuration data to Consul and to our local configuration
@@ -82,7 +102,7 @@ func (c Config) SaveOnline(ctx context.Context, conn *pgx.Conn, consul *state.Co
 }
 
 // SyncOffline will pull the latest Postgres configuration information from Consul and
-// write it to the configuration file.
+// write it to our local configuration file.
 func (c *Config) SyncOffline(ctx context.Context, consul *state.ConsulClient) error {
 	// Apply Consul configuration.
 	if err := c.pullConsulPGConfig(consul); err != nil {
@@ -97,7 +117,7 @@ func (c *Config) SyncOffline(ctx context.Context, consul *state.ConsulClient) er
 }
 
 // SyncOnline will pull the latest Postgres configuration information from Consul and
-// write it to the configuration file and attempt to apply any new changes at runtime.
+// write it to our local configuration file and attempt to apply any new changes at runtime.
 func (c *Config) SyncOnline(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient) error {
 	if err := c.SyncOffline(ctx, consul); err != nil {
 		return err
@@ -112,28 +132,7 @@ func (c *Config) SyncOnline(ctx context.Context, conn *pgx.Conn, consul *state.C
 	return nil
 }
 
-func (c *Config) SetDefaults() error {
-	mem, err := memTotal()
-	if err != nil {
-		return fmt.Errorf("failed to fetch total system memory: %s", err)
-	}
-
-	c.pgConfig = map[string]interface{}{
-		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
-		"max_wal_senders":          10,
-		"max_connections":          300,
-		"wal_level":                "hot_standby",
-		"hot_standby":              true,
-		"archive_mode":             true,
-		"archive_command":          "'/bin/true'",
-		"shared_preload_libraries": "repmgr",
-	}
-
-	return nil
-}
-
-// Print will output the local "custom" configuration data
-// to stdout.
+// Print will output the local configuration data to stdout.
 func (c *Config) Print(w io.Writer) error {
 	if err := c.SetDefaults(); err != nil {
 		return err
@@ -149,12 +148,12 @@ func (c *Config) Print(w io.Writer) error {
 }
 
 func (c Config) EnableCustomConfig() error {
-	if err := runCommand(fmt.Sprintf("touch %s", c.customConfigFile)); err != nil {
+	if err := runCommand(fmt.Sprintf("touch %s", c.customConfigFilePath)); err != nil {
 		return err
 	}
 
 	// read the whole file at once
-	b, err := ioutil.ReadFile(c.configFile)
+	b, err := ioutil.ReadFile(c.configFilePath)
 	if err != nil {
 		return err
 	}
@@ -163,7 +162,7 @@ func (c Config) EnableCustomConfig() error {
 		return nil
 	}
 
-	f, err := os.OpenFile(c.configFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return nil
 	}
@@ -207,7 +206,7 @@ func (c Config) writeToConsul(consul *state.ConsulClient) error {
 }
 
 func (c Config) writeToFile() error {
-	file, err := os.OpenFile(c.customConfigFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(c.customConfigFilePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -222,7 +221,7 @@ func (c Config) writeToFile() error {
 }
 
 func (c *Config) pullConfigFromFile() error {
-	file, err := os.Open(c.customConfigFile)
+	file, err := os.Open(c.customConfigFilePath)
 	if err != nil {
 		return err
 	}
