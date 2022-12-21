@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -244,6 +245,12 @@ func (c *Config) pullConsulPGConfig(consul *state.ConsulClient) error {
 	}
 
 	return nil
+}
+
+func (c Config) Print(w io.Writer) error {
+	e := json.NewEncoder(w)
+	e.SetIndent("", "    ")
+	return e.Encode(c.PGConfig)
 }
 
 func memTotal() (memoryMb int64, err error) {

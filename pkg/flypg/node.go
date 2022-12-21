@@ -157,7 +157,7 @@ func (n *Node) Init(ctx context.Context) error {
 			return err
 		}
 
-		fmt.Println("Initializing config")
+		fmt.Println("Initializing PG configuration with the defaults")
 		// Set config defaults
 		if err := config.SetDefaults(); err != nil {
 			return err
@@ -196,9 +196,10 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
-
-		// TODO - Repmgr should include the Postgres configuration file
 	}
+
+	config.PopulateLocalConfig()
+	config.Print(os.Stdout)
 
 	return nil
 }
