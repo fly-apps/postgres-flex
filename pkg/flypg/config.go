@@ -123,7 +123,7 @@ func (c *Config) SyncOffline(ctx context.Context, consul *state.ConsulClient) er
 
 // SyncPGConfig will pull the latest Postgres configuration information from Consul and
 // write it to the configuration file and attempt to apply any new changes at runtime.
-func (c *Config) SyncPGConfig(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient) error {
+func (c *Config) SyncOnline(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient) error {
 	fmt.Println("Pulling consul config")
 	// Pull consul config
 	if err := c.pullConsulPGConfig(consul); err != nil {
