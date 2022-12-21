@@ -18,7 +18,6 @@ import (
 	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 	"github.com/fly-apps/postgres-flex/pkg/privnet"
 	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 )
 
 type Credentials struct {
@@ -32,11 +31,12 @@ type Node struct {
 	DataDir   string
 	Port      int
 
-	PGBouncer PGBouncer
-	RepMgr    RepMgr
-
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
+	ReplCredentials     Credentials
+
+	PGBouncer PGBouncer
+	RepMgr    RepMgr
 }
 
 func NewNode() (*Node, error) {
@@ -72,6 +72,11 @@ func NewNode() (*Node, error) {
 		Password: os.Getenv("OPERATOR_PASSWORD"),
 	}
 
+	node.ReplCredentials = Credentials{
+		Username: "repmgr",
+		Password: os.Getenv("REPL_PASSWORD"),
+	}
+
 	node.PGBouncer = PGBouncer{
 		PrivateIP:   node.PrivateIP,
 		Port:        5432,
@@ -93,10 +98,7 @@ func NewNode() (*Node, error) {
 		PrivateIP:    node.PrivateIP,
 		Port:         5433,
 		DatabaseName: "repmgr",
-		Credentials: Credentials{
-			Username: "repmgr",
-			Password: os.Getenv("REPL_PASSWORD"),
-		},
+		Credentials:  node.ReplCredentials,
 	}
 
 	return node, nil
@@ -185,7 +187,7 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	// Ensure local PG is up before establishing connection with consul.
-	conn, err := n.NewLocalConnection(ctx)
+	conn, err := n.NewLocalConnection(ctx, "postgres")
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
@@ -285,9 +287,9 @@ func (n *Node) PostInit(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
+func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, "postgres", n.OperatorCredentials)
+	return openConnection(ctx, host, database, n.SUCredentials)
 }
 
 func (n *Node) isInitialized() bool {
@@ -315,13 +317,13 @@ func (n *Node) initialize() error {
 func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
 	curUsers, err := admin.ListUsers(ctx, conn)
 	if err != nil {
-		return errors.Wrap(err, "failed to list current users")
+		return fmt.Errorf("failed to list existing users: %s", err)
 	}
 
 	credMap := map[string]string{
 		n.SUCredentials.Username:       n.SUCredentials.Password,
 		n.OperatorCredentials.Username: n.OperatorCredentials.Password,
-		n.RepMgr.Credentials.Username:  n.RepMgr.Credentials.Password,
+		n.ReplCredentials.Username:     n.ReplCredentials.Password,
 	}
 
 	for user, pass := range credMap {
@@ -331,16 +333,18 @@ func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
 				exists = true
 			}
 		}
-		var sql string
 
 		if exists {
-			sql = fmt.Sprintf("ALTER USER %s WITH PASSWORD '%s'", user, pass)
+			if err := admin.ChangePassword(ctx, conn, user, pass); err != nil {
+				return fmt.Errorf("failed to update credentials for user %s: %s", user, err)
+			}
 		} else {
-			fmt.Printf("Creating %s\n", user)
-			sql = fmt.Sprintf(`CREATE USER %s WITH SUPERUSER LOGIN PASSWORD '%s'`, user, pass)
-			_, err := conn.Exec(ctx, sql)
-			if err != nil {
-				return err
+			if err := admin.CreateUser(ctx, conn, user, pass); err != nil {
+				return fmt.Errorf("failed to create require user %s: %s", user, err)
+			}
+
+			if err := admin.GrantSuperuser(ctx, conn, user); err != nil {
+				return fmt.Errorf("failed to grant superuser privileges to user %s: %s", user, err)
 			}
 		}
 	}

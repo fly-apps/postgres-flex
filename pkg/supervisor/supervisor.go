@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-apps/postgres-flex/pkg/server"
+	"github.com/fly-apps/postgres-flex/pkg/api"
 	"github.com/google/shlex"
 	"golang.org/x/sync/errgroup"
 )
@@ -127,7 +127,7 @@ func (h *Supervisor) waitForExit(ctx context.Context) {
 }
 
 func (h *Supervisor) StartHttpListener() {
-	go server.StartHttpServer()
+	go api.StartHttpServer()
 }
 
 func (h *Supervisor) Run() error {

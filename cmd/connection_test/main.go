@@ -28,7 +28,7 @@ func main() {
 		*totalWrites = 1000
 	}
 
-	if _, err := admin.CreateDatabase(ctx, conn, "benchmark", "postgres"); err != nil {
+	if err := admin.CreateDatabase(ctx, conn, "benchmark"); err != nil {
 		panic(err)
 	}
 

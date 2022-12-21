@@ -6,7 +6,6 @@ FROM golang:1.19 as flyutil
 WORKDIR /go/src/github.com/fly-examples/fly-postgres
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/flyadmin ./cmd/flyadmin
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/event_handler ./cmd/event_handler
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
 COPY ./bin/* /fly/bin/

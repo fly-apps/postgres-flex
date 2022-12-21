@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-func CreateUser(ctx context.Context, pg *pgx.Conn, username string, password string) error {
-	sql := fmt.Sprintf(`CREATE USER %s WITH LOGIN PASSWORD '%s'`, username, password)
+func GrantAccess(ctx context.Context, pg *pgx.Conn, username string) error {
+	sql := fmt.Sprintf("GRANT pg_read_all_data, pg_write_all_data TO %q", username)
 
 	_, err := pg.Exec(ctx, sql)
 	return err
@@ -21,6 +21,12 @@ func GrantSuperuser(ctx context.Context, pg *pgx.Conn, username string) error {
 	return err
 }
 
+func CreateUser(ctx context.Context, pg *pgx.Conn, username string, password string) error {
+	sql := fmt.Sprintf(`CREATE USER %s WITH LOGIN PASSWORD '%s'`, username, password)
+	_, err := pg.Exec(ctx, sql)
+	return err
+}
+
 func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string) error {
 	sql := fmt.Sprintf("ALTER USER %s WITH LOGIN PASSWORD '%s';", username, password)
 
@@ -28,38 +34,45 @@ func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string
 	return err
 }
 
-func CreateDatabase(ctx context.Context, pg *pgx.Conn, name, owner string) (interface{}, error) {
-	databases, err := ListDatabases(ctx, pg)
+func CreateDatabaseWithOwner(ctx context.Context, pg *pgx.Conn, name, owner string) error {
+	dbInfo, err := FindDatabase(ctx, pg, name)
 	if err != nil {
-		return false, err
+		return err
 	}
-
-	for _, db := range databases {
-		if db.Name == name {
-			return true, nil
-		}
+	// Database already exists.
+	if dbInfo != nil {
+		return nil
 	}
-
 	sql := fmt.Sprintf("CREATE DATABASE %s OWNER %s;", name, owner)
 	_, err = pg.Exec(ctx, sql)
-	if err != nil {
-		return false, err
-	}
 
-	return true, nil
+	return err
 }
 
-func ResolveRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-	var readonly string
-	err := pg.QueryRow(ctx, "SHOW transaction_read_only").Scan(&readonly)
-	if err != nil {
-		return "offline", err
+func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
+	dbInfo, err := FindDatabase(ctx, pg, name)
+	if err != nil && err != pgx.ErrNoRows {
+		return err
+	}
+	// Database already exists.
+	if dbInfo != nil {
+		return nil
 	}
 
-	if readonly == "on" {
-		return "replica", nil
+	sql := fmt.Sprintf("CREATE DATABASE %s;", name)
+	_, err = pg.Exec(ctx, sql)
+	return err
+}
+
+func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
+	sql := fmt.Sprintf("DROP DATABASE %s;", name)
+
+	_, err := pg.Exec(ctx, sql)
+	if err != nil {
+		return err
 	}
-	return "leader", nil
+
+	return nil
 }
 
 func EnableExtension(ctx context.Context, pg *pgx.Conn, extension string) error {
@@ -95,6 +108,26 @@ func ListDatabases(ctx context.Context, pg *pgx.Conn) ([]DbInfo, error) {
 	}
 
 	return values, nil
+}
+
+func FindDatabase(ctx context.Context, pg *pgx.Conn, name string) (*DbInfo, error) {
+	sql := `
+	SELECT 
+		datname, 
+		(SELECT array_agg(u.usename::text order by u.usename) FROM pg_user u WHERE has_database_privilege(u.usename, d.datname, 'CONNECT')) as allowed_users 
+	FROM pg_database d WHERE d.datname='%s';
+	`
+
+	sql = fmt.Sprintf(sql, name)
+
+	row := pg.QueryRow(ctx, sql)
+
+	db := new(DbInfo)
+	if err := row.Scan(&db.Name, &db.Users); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 type UserInfo struct {
@@ -154,4 +187,34 @@ func FindUser(ctx context.Context, pg *pgx.Conn, username string) (*UserInfo, er
 	}
 
 	return nil, nil
+}
+
+func DropRole(ctx context.Context, conn *pgx.Conn, username string) error {
+	sql := fmt.Sprintf("DROP ROLE %s", username)
+	_, err := conn.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ReassignOwnership(ctx context.Context, conn *pgx.Conn, user, targetUser string) error {
+	sql := fmt.Sprintf("REASSIGN OWNED BY %s TO %s;", user, targetUser)
+	_, err := conn.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DropOwned(ctx context.Context, conn *pgx.Conn, user string) error {
+	sql := fmt.Sprintf("DROP OWNED BY %s;", user)
+	_, err := conn.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
