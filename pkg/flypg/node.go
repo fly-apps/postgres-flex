@@ -30,6 +30,7 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Port      int
+	Config    *Config
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -44,6 +45,7 @@ func NewNode() (*Node, error) {
 		AppName: "local",
 		Port:    5433,
 		DataDir: "/data/postgresql",
+		Config:  NewConfig(),
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -121,6 +123,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
+	config := n.Config
 
 	fmt.Println("Initializing replication manager")
 	if err := repmgr.initialize(); err != nil {
@@ -134,7 +137,9 @@ func (n *Node) Init(ctx context.Context) error {
 
 	switch primaryIP {
 	case n.PrivateIP:
-		// Noop
+		if err := config.SyncOffline(ctx, consul); err != nil {
+			return fmt.Errorf("failed to sync configuration data offline: %s", err)
+		}
 	case "":
 		// Initialize ourselves as the primary.
 		fmt.Println("Initializing postgres")
@@ -146,6 +151,23 @@ func (n *Node) Init(ctx context.Context) error {
 		if err := n.setDefaultHBA(); err != nil {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
+
+		fmt.Println("Enabling custom config")
+		if err := config.EnableCustomConfig(); err != nil {
+			return err
+		}
+
+		fmt.Println("Initializing config")
+		// Set config defaults
+		if err := config.SetDefaults(); err != nil {
+			return err
+		}
+
+		// Persist configuration
+		if err := config.SaveOffline(consul); err != nil {
+			return err
+		}
+
 	default:
 		// If we are here we are either a standby, new node or primary coming back from the dead.
 		clonePrimary := true
@@ -174,11 +196,8 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
-	}
 
-	fmt.Println("Configuring postgres")
-	if err := n.configurePostgres(); err != nil {
-		return fmt.Errorf("failed to configure postgres %s", err)
+		// TODO - Repmgr should include the Postgres configuration file
 	}
 
 	return nil
@@ -350,11 +369,6 @@ func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	return nil
-}
-
-func (n *Node) configurePostgres() error {
-	cmdStr := fmt.Sprintf("sed -i \"s/#shared_preload_libraries.*/shared_preload_libraries = 'repmgr'/\" /data/postgresql/postgresql.conf")
-	return runCommand(cmdStr)
 }
 
 type HBAEntry struct {
