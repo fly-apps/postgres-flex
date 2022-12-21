@@ -310,7 +310,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, database, n.SUCredentials)
+	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
 func (n *Node) isInitialized() bool {
@@ -387,6 +387,12 @@ func (n *Node) setDefaultHBA() error {
 			Type:     "local",
 			Database: "all",
 			User:     "postgres",
+			Method:   "trust",
+		},
+		{
+			Type:     "local",
+			Database: "all",
+			User:     "flypgadmin",
 			Method:   "trust",
 		},
 		{
