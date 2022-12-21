@@ -67,7 +67,7 @@ func (c Config) SaveOffline(consul *state.ConsulClient) error {
 		return nil
 	}
 	// Push configuration to Consul.
-	if err := c.writeToConsul(consul); err != nil {
+	if err := c.pushToConsul(consul); err != nil {
 		return fmt.Errorf("failed to write to consul: %s", err)
 	}
 
@@ -103,7 +103,7 @@ func (c Config) SaveOnline(ctx context.Context, conn *pgx.Conn, consul *state.Co
 // write it to our local configuration file.
 func (c *Config) SyncOffline(ctx context.Context, consul *state.ConsulClient) error {
 	// Apply Consul configuration.
-	if err := c.pullConsulPGConfig(consul); err != nil {
+	if err := c.pullConfigFromConsul(consul); err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
 	}
 	// Write configuration to local file.
@@ -135,7 +135,7 @@ func (c *Config) Print(w io.Writer) error {
 	if err := c.SetDefaults(); err != nil {
 		return err
 	}
-	if err := c.pullConfigFromFile(); err != nil {
+	if err := c.pullFromFile(); err != nil {
 		return err
 	}
 
@@ -183,7 +183,7 @@ func (c Config) applyPGConfigAtRuntime(ctx context.Context, conn *pgx.Conn) erro
 	return nil
 }
 
-func (c Config) writeToConsul(consul *state.ConsulClient) error {
+func (c Config) pushToConsul(consul *state.ConsulClient) error {
 	configBytes, err := json.Marshal(c.pgConfig)
 	if err != nil {
 		return err
@@ -196,7 +196,7 @@ func (c Config) writeToConsul(consul *state.ConsulClient) error {
 		}
 	}
 
-	if err := consul.PushPGConfig(configBytes); err != nil {
+	if err := consul.PushConfig(configBytes); err != nil {
 		return err
 	}
 
@@ -218,7 +218,7 @@ func (c Config) writeToFile() error {
 	return nil
 }
 
-func (c *Config) pullConfigFromFile() error {
+func (c *Config) pullFromFile() error {
 	file, err := os.Open(c.customConfigFilePath)
 	if err != nil {
 		return err
@@ -236,8 +236,8 @@ func (c *Config) pullConfigFromFile() error {
 	return nil
 }
 
-func (c *Config) pullConsulPGConfig(consul *state.ConsulClient) error {
-	configBytes, err := consul.PullPGConfig()
+func (c *Config) pullConfigFromConsul(consul *state.ConsulClient) error {
+	configBytes, err := consul.PullConfig()
 	if err != nil {
 		return err
 	}
