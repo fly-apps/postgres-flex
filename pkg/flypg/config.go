@@ -97,7 +97,7 @@ func (c *Config) SyncOnline(ctx context.Context, conn *pgx.Conn, consul *state.C
 	}
 
 	fmt.Println("Applying config at runtime")
-	// Attempt to set configurations ettings at runtime.
+	// Attempt to set configuration settings at runtime.
 	if err := c.applyPGConfigAtRuntime(ctx, conn); err != nil {
 		return fmt.Errorf("faield to write to pg runtime: %s", err)
 	}
