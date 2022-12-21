@@ -86,14 +86,9 @@ func (c Config) SaveOnline(ctx context.Context, conn *pgx.Conn, consul *state.Co
 	if c.pgConfig == nil {
 		return fmt.Errorf("unable to save an empty config")
 	}
-	// Push configuration to Consul.
-	if err := c.writeToConsul(consul); err != nil {
-		return fmt.Errorf("failed to write to consul: %s", err)
-	}
 
-	// Write configuration to local file.
-	if err := c.writeToFile(); err != nil {
-		return fmt.Errorf("failed to write to pg config file: %s", err)
+	if err := c.SaveOffline(consul); err != nil {
+		return err
 	}
 
 	// Attempt to set configurations ettings at runtime.
