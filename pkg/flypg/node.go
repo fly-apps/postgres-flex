@@ -139,9 +139,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	switch primaryIP {
 	case n.PrivateIP:
-		if err := config.SyncOffline(ctx, consul); err != nil {
-			return fmt.Errorf("failed to sync configuration data offline: %s", err)
-		}
+		// noop
 	case "":
 		// Initialize ourselves as the primary.
 		fmt.Println("Initializing postgres")
@@ -153,23 +151,6 @@ func (n *Node) Init(ctx context.Context) error {
 		if err := n.setDefaultHBA(); err != nil {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
-
-		fmt.Println("Enabling custom config")
-		if err := config.EnableCustomConfig(); err != nil {
-			return err
-		}
-
-		fmt.Println("Initializing PG configuration with the defaults")
-		// Set config defaults
-		if err := config.SetDefaults(); err != nil {
-			return err
-		}
-
-		// Persist configuration
-		if err := config.SaveOffline(consul); err != nil {
-			return err
-		}
-
 	default:
 		// If we are here we are either a standby, new node or primary coming back from the dead.
 		clonePrimary := true
@@ -199,6 +180,10 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 		}
 	}
+
+	fmt.Println("Resolving PG Configurtion settings.")
+	config.Setup()
+	config.WriteDefaults()
 
 	config.Print(os.Stdout)
 

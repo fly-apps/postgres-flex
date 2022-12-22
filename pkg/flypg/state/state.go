@@ -36,13 +36,13 @@ func NewConsulClient() (*ConsulClient, error) {
 	}, nil
 }
 
-func (c *ConsulClient) PushConfig(config []byte) error {
+func (c *ConsulClient) PushUserConfig(config []byte) error {
 	kv := &api.KVPair{Key: c.targetKey("Config"), Value: config}
 	_, err := c.client.KV().Put(kv, nil)
 	return err
 }
 
-func (c *ConsulClient) PullConfig() ([]byte, error) {
+func (c *ConsulClient) PullUserConfig() ([]byte, error) {
 	pair, _, err := c.client.KV().Get(c.targetKey("Config"), nil)
 	if err != nil {
 		return nil, err
