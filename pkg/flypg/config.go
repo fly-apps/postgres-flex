@@ -17,7 +17,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
-type pgConfig map[string]interface{}
+type PGConfig map[string]interface{}
 
 type Config struct {
 	configFilePath string
@@ -26,8 +26,8 @@ type Config struct {
 	userConfigFilePath     string
 	dataDir                string
 
-	internalConfig pgConfig
-	userConfig     pgConfig
+	internalConfig PGConfig
+	userConfig     PGConfig
 }
 
 func NewConfig(dataDir string) *Config {
@@ -38,8 +38,8 @@ func NewConfig(dataDir string) *Config {
 		internalConfigFilePath: fmt.Sprintf("%s/postgresql.internal.conf", dataDir),
 		userConfigFilePath:     fmt.Sprintf("%s/postgresql.user.conf", dataDir),
 
-		internalConfig: pgConfig{},
-		userConfig:     pgConfig{},
+		internalConfig: PGConfig{},
+		userConfig:     PGConfig{},
 	}
 }
 
@@ -55,7 +55,7 @@ func (c *Config) Print(w io.Writer) error {
 		return fmt.Errorf("failed to read internal config: %s", err)
 	}
 
-	cfg := pgConfig{}
+	cfg := PGConfig{}
 
 	for k, v := range internalCfg {
 		cfg[k] = v
@@ -69,33 +69,6 @@ func (c *Config) Print(w io.Writer) error {
 	e.SetIndent("", "    ")
 
 	return e.Encode(cfg)
-}
-
-// WriteInternalConfig will resolve the default configuration settings and write them to the
-// internal config file.
-func (c *Config) WriteDefaults() error {
-	mem, err := memTotal()
-	if err != nil {
-		return fmt.Errorf("failed to fetch total system memory: %s", err)
-	}
-
-	conf := pgConfig{
-		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
-		"max_wal_senders":          10,
-		"max_connections":          300,
-		"wal_level":                "hot_standby",
-		"hot_standby":              true,
-		"archive_mode":             true,
-		"archive_command":          "'/bin/true'",
-		"shared_preload_libraries": "repmgr",
-	}
-
-	// Write configuration to local file.
-	if err := c.writeToConfig(c.internalConfigFilePath, conf); err != nil {
-		return fmt.Errorf("failed to write to pg config file: %s", err)
-	}
-
-	return nil
 }
 
 // Setup will ensure the required configuration files are created and that the parent
@@ -132,7 +105,7 @@ func (c Config) Setup() error {
 	}
 
 	if !strings.Contains(string(b), "postgresql.user.conf") {
-		entries = append(entries, "include 'postgresql.user.conf'")
+		entries = append(entries, "include 'postgresql.user.conf'\n")
 	}
 
 	if len(entries) > 0 {
@@ -152,9 +125,35 @@ func (c Config) Setup() error {
 	return nil
 }
 
-// WriteUserConfig will push any user-defined configuration to Consul, the user configuration file
-// and apply eligible changes at runtime.
-func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient, cfg pgConfig) error {
+// WriteDefaults will resolve the default configuration settings and write them to the
+// internal config file.
+func (c Config) WriteDefaults() error {
+	mem, err := memTotal()
+	if err != nil {
+		return fmt.Errorf("failed to fetch total system memory: %s", err)
+	}
+
+	conf := PGConfig{
+		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
+		"max_wal_senders":          10,
+		"max_connections":          300,
+		"wal_level":                "hot_standby",
+		"hot_standby":              true,
+		"archive_mode":             true,
+		"archive_command":          "'/bin/true'",
+		"shared_preload_libraries": "repmgr",
+	}
+
+	// Write configuration to local file.
+	if err := c.writeToConfig(c.internalConfigFilePath, conf); err != nil {
+		return fmt.Errorf("failed to write to pg config file: %s", err)
+	}
+
+	return nil
+}
+
+// WriteUserConfig will push any user-defined configuration to Consul and write it to the user config file.
+func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient, cfg PGConfig) error {
 	if c.userConfig != nil {
 		if err := c.pushToConsul(consul, cfg); err != nil {
 			return fmt.Errorf("failed to write to consul: %s", err)
@@ -164,19 +163,14 @@ func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *sta
 		if err := c.writeToConfig(c.userConfigFilePath, cfg); err != nil {
 			return fmt.Errorf("failed to write to pg config file: %s", err)
 		}
-
-		// Attempt to set configurations ettings at runtime.
-		if err := c.applyUserConfigAtRuntime(ctx, conn, cfg); err != nil {
-			return fmt.Errorf("faield to write to pg runtime: %s", err)
-		}
 	}
 
 	return nil
 }
 
-// OfflineUserConfigSync will pull the latest user-defined configuration data from Consul and
+// SyncUserConfigOffline will pull the latest user-defined configuration data from Consul and
 // write it to the user config file.
-func (c Config) OfflineUserConfigSync(ctx context.Context, consul *state.ConsulClient) error {
+func (c Config) SyncUserConfig(ctx context.Context, consul *state.ConsulClient) error {
 	// Apply Consul configuration.
 	cfg, err := c.pullConfigFromConsul(consul)
 	if err != nil {
@@ -191,30 +185,8 @@ func (c Config) OfflineUserConfigSync(ctx context.Context, consul *state.ConsulC
 	return nil
 }
 
-// UserConfigSync will pull the latest user-defined configuration from Consul,
-// write it to the user config file and attempt to apply any new changes at runtime.
-func (c Config) UserConfigSync(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient) error {
-	// Apply Consul configuration.
-	cfg, err := c.pullConfigFromConsul(consul)
-	if err != nil {
-		return fmt.Errorf("failed to pull config from consul: %s", err)
-	}
-
-	// Write configuration to local file.
-	if err := c.writeToConfig(c.userConfigFilePath, cfg); err != nil {
-		return fmt.Errorf("failed to write to pg config file: %s", err)
-	}
-
-	fmt.Println("Applying config at runtime")
-	// Attempt to set configuration settings at runtime.
-	if err := c.applyUserConfigAtRuntime(ctx, conn, cfg); err != nil {
-		return fmt.Errorf("faield to write to pg runtime: %s", err)
-	}
-
-	return nil
-}
-
-func (c Config) applyUserConfigAtRuntime(ctx context.Context, conn *pgx.Conn, conf pgConfig) error {
+// ApplyUserConfigAtRuntime will take a config and attempt to set it at runtime.
+func (c Config) ApplyUserConfigAtRuntime(ctx context.Context, conn *pgx.Conn, conf PGConfig) error {
 	for key, value := range conf {
 		if err := admin.SetConfigurationSetting(ctx, conn, key, value); err != nil {
 			fmt.Printf("failed to set configuration setting %s -> %s: %s", key, value, err)
@@ -224,7 +196,7 @@ func (c Config) applyUserConfigAtRuntime(ctx context.Context, conn *pgx.Conn, co
 	return nil
 }
 
-func (c Config) pushToConsul(consul *state.ConsulClient, conf pgConfig) error {
+func (c Config) pushToConsul(consul *state.ConsulClient, conf PGConfig) error {
 	if conf == nil {
 		return nil
 	}
@@ -241,7 +213,7 @@ func (c Config) pushToConsul(consul *state.ConsulClient, conf pgConfig) error {
 	return nil
 }
 
-func (c Config) writeToConfig(pathToConfig string, conf pgConfig) error {
+func (c Config) writeToConfig(pathToConfig string, conf PGConfig) error {
 	file, err := os.OpenFile(pathToConfig, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -256,14 +228,14 @@ func (c Config) writeToConfig(pathToConfig string, conf pgConfig) error {
 	return nil
 }
 
-func (c *Config) pullFromConfig(pathToFile string) (pgConfig, error) {
+func (c Config) pullFromConfig(pathToFile string) (PGConfig, error) {
 	file, err := os.Open(pathToFile)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	pgConf := pgConfig{}
+	pgConf := PGConfig{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		lineArr := strings.Split(scanner.Text(), "=")
@@ -275,13 +247,13 @@ func (c *Config) pullFromConfig(pathToFile string) (pgConfig, error) {
 	return pgConf, nil
 }
 
-func (c Config) pullConfigFromConsul(consul *state.ConsulClient) (pgConfig, error) {
+func (c Config) pullConfigFromConsul(consul *state.ConsulClient) (PGConfig, error) {
 	configBytes, err := consul.PullUserConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	var storeCfg pgConfig
+	var storeCfg PGConfig
 	if err = json.Unmarshal(configBytes, &storeCfg); err != nil {
 		return nil, err
 	}
