@@ -86,7 +86,7 @@ func (c Config) Setup() error {
 
 	if _, err := os.Stat(c.userConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
-			if err := runCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {
+			if err := runCommand(fmt.Sprintf("touch %s", c.userConfigFilePath)); err != nil {
 				return err
 			}
 		} else {
