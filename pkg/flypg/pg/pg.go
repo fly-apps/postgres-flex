@@ -18,6 +18,8 @@ import (
 	"syscall"
 )
 
+var ConfKey = "PGConfig"
+
 type Config struct {
 	configFilePath string
 
@@ -241,7 +243,7 @@ func (c *Config) pushToConsul(consul *state.ConsulClient, conf types.ConfigMap) 
 		return err
 	}
 
-	if err := consul.PushUserConfig(configBytes); err != nil {
+	if err := consul.PushUserConfig(ConfKey, configBytes); err != nil {
 		return err
 	}
 
@@ -283,7 +285,7 @@ func (c *Config) pullFromFile(pathToFile string) (types.ConfigMap, error) {
 }
 
 func (c *Config) pullFromConsul(consul *state.ConsulClient) (types.ConfigMap, error) {
-	configBytes, err := consul.PullUserConfig()
+	configBytes, err := consul.PullUserConfig(ConfKey)
 	if err != nil {
 		return nil, err
 	}
