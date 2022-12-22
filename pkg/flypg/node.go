@@ -183,7 +183,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 	fmt.Println("Resolving PG Configurtion settings.")
 	PGConfig.Setup()
-	PGConfig.WriteDefaults()
 	flypg.WriteConfigFiles(PGConfig)
 
 	PGConfig.Print(os.Stdout)

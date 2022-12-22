@@ -7,6 +7,7 @@ import (
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -144,12 +145,17 @@ func (c *PGConfig) Setup() error {
 		}
 	}
 
+	err = c.SetDefaults()
+	if err != nil {
+		return errors.New("Failed to set PG defaults")
+	}
+
 	return nil
 }
 
 // WriteDefaults will resolve the default configuration settings and write them to the
 // internal config file.
-func (c *PGConfig) WriteDefaults() error {
+func (c *PGConfig) SetDefaults() error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
@@ -205,10 +211,6 @@ func (c *PGConfig) WriteDefaults() error {
 	}
 
 	c.internalConfig = conf
-
-	if err := WriteConfigFiles(c); err != nil {
-		return fmt.Errorf("failed to write to pg config file: %s", err)
-	}
 
 	return nil
 }
