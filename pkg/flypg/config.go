@@ -101,12 +101,24 @@ func (c *Config) WriteDefaults() error {
 // Setup will ensure the required configuration files are created and that the parent
 // postgresql.conf file is including them.
 func (c Config) Setup() error {
-	if err := runCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {
-		return err
+	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
+		if os.IsNotExist(err) {
+			if err := runCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
-	if err := runCommand(fmt.Sprintf("touch %s", c.userConfigFilePath)); err != nil {
-		return err
+	if _, err := os.Stat(c.userConfigFilePath); err != nil {
+		if os.IsNotExist(err) {
+			if err := runCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
 	b, err := ioutil.ReadFile(c.configFilePath)
