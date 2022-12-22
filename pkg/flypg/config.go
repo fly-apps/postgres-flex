@@ -148,6 +148,15 @@ func (c Config) WriteDefaults() error {
 	// Set min_wal_size to 25% of the max_wal_size
 	minWalBytes := maxWalBytes / 4
 	minWalMb := minWalBytes / (1024 * 1024)
+
+	// The default wal_segment_size in mb
+	const walSegmentSize = 16
+
+	// min_wal_size must be at least twice the wal_segment_size.
+	if minWalMb < (walSegmentSize * 2) {
+		minWalMb = walSegmentSize * 2
+	}
+
 	minWalSize := fmt.Sprintf("%dMB", int(minWalMb))
 
 	var sharedBuffersBytes int
@@ -160,7 +169,7 @@ func (c Config) WriteDefaults() error {
 		sharedBuffersBytes = int(memSizeInBytes) / 10
 	}
 
-	sharedBuffersMb := sharedBuffersBytes * (1024 * 1024)
+	sharedBuffersMb := sharedBuffersBytes / (1024 * 1024)
 	sharedBuffers := fmt.Sprintf("%dMB", sharedBuffersMb)
 
 	conf := PGConfig{
