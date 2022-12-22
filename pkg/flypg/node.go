@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/config"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/pg"
-	"github.com/fly-apps/postgres-flex/pkg/types"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -31,7 +31,7 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Port      int
-	PGConfig  types.ConfigModule
+	PGConfig  config.ConfigModule
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
