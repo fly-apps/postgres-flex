@@ -128,13 +128,16 @@ func (c Config) Setup() error {
 // WriteDefaults will resolve the default configuration settings and write them to the
 // internal config file.
 func (c Config) WriteDefaults() error {
-	// Calculate total disk size in bytes
+	// The default wal_segment_size in mb
+	const walSegmentSize = 16
+
+	// Calculate total allocated disk in bytes
 	diskSizeBytes, err := diskSizeInBytes()
 	if err != nil {
 		return fmt.Errorf("failed to fetch disk size: %s", err)
 	}
 
-	// Total allocated memory in bytes
+	// Calculate total allocated memory in bytes
 	memSizeInBytes, err := memTotalInBytes()
 	if err != nil {
 		return fmt.Errorf("failed to fetch total system memory: %s", err)
@@ -143,21 +146,15 @@ func (c Config) WriteDefaults() error {
 	// Set max_wal_size to 10% of disk capacity.
 	maxWalBytes := diskSizeBytes / 10
 	maxWalMb := maxWalBytes / (1024 * 1024)
-	maxWalSize := fmt.Sprintf("%dMB", int(maxWalMb))
 
-	// The default wal_segment_size in mb
-	const walSegmentSize = 16
-
-	// Set min_wal_size to 25% of the max_wal_size
+	// Set min_wal_size to 25% of max_wal_size
 	minWalBytes := maxWalBytes / 4
 	minWalMb := minWalBytes / (1024 * 1024)
 
-	// min_wal_size must be at least twice the wal_segment_size.
+	// min_wal_size must be at least twice the size of wal_segment_size.
 	if minWalMb < (walSegmentSize * 2) {
 		minWalMb = walSegmentSize * 2
 	}
-
-	minWalSize := fmt.Sprintf("%dMB", int(minWalMb))
 
 	var sharedBuffersBytes int
 	// If total memory is greater than or equal to 1GB
@@ -169,15 +166,14 @@ func (c Config) WriteDefaults() error {
 		sharedBuffersBytes = int(memSizeInBytes) / 10
 	}
 	sharedBuffersMb := sharedBuffersBytes / (1024 * 1024)
-	sharedBuffers := fmt.Sprintf("%dMB", sharedBuffersMb)
 
 	conf := PGConfig{
 		"random_page_cost":         "1.1",
-		"shared_buffers":           sharedBuffers,
+		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
 		"max_connections":          300,
 		"max_replication_slots":    10,
-		"min_wal_size":             minWalSize,
-		"max_wal_size":             maxWalSize,
+		"min_wal_size":             fmt.Sprintf("%dMB", int(minWalMb)),
+		"max_wal_size":             fmt.Sprintf("%dMB", int(maxWalMb)),
 		"wal_compression":          "on",
 		"wal_level":                "replica",
 		"hot_standby":              true,
