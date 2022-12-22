@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/config"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/pg"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/config"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -31,7 +30,7 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Port      int
-	PGConfig  config.ConfigModule
+	PGConfig  *flypg.PGConfig
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -63,7 +62,7 @@ func NewNode() (*Node, error) {
 	}
 
 	// Stub configuration
-	node.PGConfig = pg.NewConfig(node.DataDir)
+	node.PGConfig = flypg.NewConfig(node.DataDir)
 
 	// Internal user
 	node.SUCredentials = Credentials{
@@ -126,7 +125,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
-	config := n.PGConfig
+	PGConfig := n.PGConfig
 
 	fmt.Println("Initializing replication manager")
 	if err := repmgr.initialize(); err != nil {
@@ -183,10 +182,11 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	fmt.Println("Resolving PG Configurtion settings.")
-	config.Setup()
-	config.WriteDefaults()
+	PGConfig.Setup()
+	PGConfig.WriteDefaults()
+	flypg.WriteConfigFiles(PGConfig)
 
-	config.Print(os.Stdout)
+	PGConfig.Print(os.Stdout)
 
 	return nil
 }
