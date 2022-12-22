@@ -43,14 +43,14 @@ func NewConfig(dataDir string) *Config {
 	}
 }
 
-// Print will output the local configuration data to stdout.
+// Print outputs the interna/user config to stdout.
 func (c *Config) Print(w io.Writer) error {
-	internalCfg, err := c.pullFromConfig(c.internalConfigFilePath)
+	internalCfg, err := c.pullFromFile(c.internalConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read internal config: %s", err)
 	}
 
-	userCfg, err := c.pullFromConfig(c.userConfigFilePath)
+	userCfg, err := c.pullFromFile(c.userConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read internal config: %s", err)
 	}
@@ -71,8 +71,8 @@ func (c *Config) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-// Setup will ensure the required configuration files are created and that the parent
-// postgresql.conf file is including them.
+// Setup will ensure the required configuration files are stubbed and the parent
+// postgresql.conf file includes them.
 func (c Config) Setup() error {
 	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
@@ -145,8 +145,7 @@ func (c Config) WriteDefaults() error {
 		"shared_preload_libraries": "repmgr",
 	}
 
-	// Write configuration to local file.
-	if err := c.writeToConfig(c.internalConfigFilePath, conf); err != nil {
+	if err := c.writeToFile(c.internalConfigFilePath, conf); err != nil {
 		return fmt.Errorf("failed to write to pg config file: %s", err)
 	}
 
@@ -160,8 +159,7 @@ func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *sta
 			return fmt.Errorf("failed to write to consul: %s", err)
 		}
 
-		// Write configuration to local file.
-		if err := c.writeToConfig(c.userConfigFilePath, cfg); err != nil {
+		if err := c.writeToFile(c.userConfigFilePath, cfg); err != nil {
 			return fmt.Errorf("failed to write to pg config file: %s", err)
 		}
 	}
@@ -172,14 +170,12 @@ func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *sta
 // SyncUserConfig will pull the latest user-defined configuration data from Consul and
 // write it to the user config file.
 func (c Config) SyncUserConfig(ctx context.Context, consul *state.ConsulClient) error {
-	// Apply Consul configuration.
-	cfg, err := c.pullConfigFromConsul(consul)
+	cfg, err := c.pullFromConsul(consul)
 	if err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
 	}
 
-	// Write configuration to local file.
-	if err := c.writeToConfig(c.userConfigFilePath, cfg); err != nil {
+	if err := c.writeToFile(c.userConfigFilePath, cfg); err != nil {
 		return fmt.Errorf("failed to write to pg config file: %s", err)
 	}
 
@@ -214,8 +210,8 @@ func (c Config) pushToConsul(consul *state.ConsulClient, conf PGConfig) error {
 	return nil
 }
 
-func (c Config) writeToConfig(pathToConfig string, conf PGConfig) error {
-	file, err := os.OpenFile(pathToConfig, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+func (c Config) writeToFile(pathToFile string, conf PGConfig) error {
+	file, err := os.OpenFile(pathToFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -229,7 +225,7 @@ func (c Config) writeToConfig(pathToConfig string, conf PGConfig) error {
 	return nil
 }
 
-func (c Config) pullFromConfig(pathToFile string) (PGConfig, error) {
+func (c Config) pullFromFile(pathToFile string) (PGConfig, error) {
 	file, err := os.Open(pathToFile)
 	if err != nil {
 		return nil, err
@@ -248,7 +244,7 @@ func (c Config) pullFromConfig(pathToFile string) (PGConfig, error) {
 	return pgConf, nil
 }
 
-func (c Config) pullConfigFromConsul(consul *state.ConsulClient) (PGConfig, error) {
+func (c Config) pullFromConsul(consul *state.ConsulClient) (PGConfig, error) {
 	configBytes, err := consul.PullUserConfig()
 	if err != nil {
 		return nil, err
