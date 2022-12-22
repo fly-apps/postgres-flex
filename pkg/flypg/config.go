@@ -10,11 +10,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 	"github.com/jackc/pgx/v4"
-	"github.com/shirou/gopsutil/v3/mem"
 )
 
 type PGConfig map[string]interface{}
@@ -128,17 +128,50 @@ func (c Config) Setup() error {
 // WriteDefaults will resolve the default configuration settings and write them to the
 // internal config file.
 func (c Config) WriteDefaults() error {
-	mem, err := memTotal()
+	// Calculate total disk size in bytes
+	diskSizeBytes, err := diskSizeInBytes()
+	if err != nil {
+		return fmt.Errorf("failed to fetch disk size: %s", err)
+	}
+
+	// Total allocated memory in bytes
+	memSizeInBytes, err := memTotalInBytes()
 	if err != nil {
 		return fmt.Errorf("failed to fetch total system memory: %s", err)
 	}
 
+	// Set max_wal_size to 10% of disk capacity.
+	maxWalBytes := diskSizeBytes / 10
+	maxWalMb := maxWalBytes / (1024 * 1024)
+	maxWalSize := fmt.Sprintf("%dMB", int(maxWalMb))
+
+	// Set min_wal_size to 25% of the max_wal_size
+	minWalBytes := maxWalBytes / 4
+	minWalMb := minWalBytes / (1024 * 1024)
+	minWalSize := fmt.Sprintf("%dMB", int(minWalMb))
+
+	var sharedBuffersBytes int
+	// If total memory is greater than or equal to 1GB
+	if memSizeInBytes >= (1024 * 1024 * 1024) {
+		// Set shared_buffers to 25% of available memory
+		sharedBuffersBytes = int(memSizeInBytes) / 4
+	} else {
+		// Set shared buffers to 10% of available memory
+		sharedBuffersBytes = int(memSizeInBytes) / 10
+	}
+
+	sharedBuffersMb := sharedBuffersBytes * (1024 * 1024)
+	sharedBuffers := fmt.Sprintf("%dMB", sharedBuffersMb)
+
 	conf := PGConfig{
-		"shared_buffers":           fmt.Sprintf("%dMB", mem/4),
-		"max_wal_senders":          10,
-		"max_replication_slots":    10,
+		"random_page_cost":         "1.1",
+		"shared_buffers":           sharedBuffers,
 		"max_connections":          300,
-		"wal_level":                "hot_standby",
+		"max_replication_slots":    10,
+		"min_wal_size":             minWalSize,
+		"max_wal_size":             maxWalSize,
+		"wal_compression":          "on",
+		"wal_level":                "replica",
 		"hot_standby":              true,
 		"archive_mode":             true,
 		"archive_command":          "'/bin/true'",
@@ -258,22 +291,27 @@ func (c Config) pullFromConsul(consul *state.ConsulClient) (PGConfig, error) {
 	return storeCfg, nil
 }
 
-func memTotal() (memoryMb int64, err error) {
-	if raw := os.Getenv("FLY_VM_MEMORY_MB"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		memoryMb = parsed
+func memTotalInBytes() (int64, error) {
+	memoryStr := os.Getenv("FLY_VM_MEMORY_MB")
+
+	if memoryStr == "" {
+		return 0, fmt.Errorf("FLY_VM_MEMORY_MB envvar has not been set")
 	}
 
-	if memoryMb == 0 {
-		v, err := mem.VirtualMemory()
-		if err != nil {
-			return 0, err
-		}
-		memoryMb = int64(v.Total / 1024 / 1024)
+	parsed, err := strconv.ParseInt(memoryStr, 10, 64)
+	if err != nil {
+		return 0, err
 	}
 
-	return
+	memoryBytes := parsed * (1024 * 1024)
+
+	return memoryBytes, nil
+}
+
+func diskSizeInBytes() (uint64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/data", &stat); err != nil {
+		return 0, err
+	}
+	return stat.Blocks * uint64(stat.Bsize), nil
 }
