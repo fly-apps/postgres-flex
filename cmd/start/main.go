@@ -52,6 +52,7 @@ func main() {
 	svisor.AddProcess("repmgrd", fmt.Sprintf("gosu postgres repmgrd -f %s --daemonize=false", node.RepMgr.ConfigPath),
 		supervisor.WithRestart(0, 5*time.Second),
 	)
+	svisor.AddProcess("standby_cleaner", "/usr/local/bin/standby_cleaner", supervisor.WithRestart(0, 5*time.Second))
 
 	exporterEnv := map[string]string{
 		"DATA_SOURCE_URI":                     fmt.Sprintf("[%s]:%d/postgres?sslmode=disable", node.PrivateIP, node.Port),

@@ -74,6 +74,10 @@ func (r *RepMgr) CurrentRole(ctx context.Context, pg *pgx.Conn) (string, error) 
 	return r.memberRole(ctx, pg, int(r.ID))
 }
 
+func (r *RepMgr) Standbys(ctx context.Context, pg *pgx.Conn) ([]Standby, error) {
+	return r.standbyStatuses(ctx, pg, int(r.ID))
+}
+
 func (r *RepMgr) writeManagerConf() error {
 	file, err := os.OpenFile(r.ConfigPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
@@ -145,6 +149,15 @@ func (r *RepMgr) registerStandby() error {
 	return nil
 }
 
+func (r *RepMgr) UnregisterStandby(id int) error {
+	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
+	if err := runCommand(cmdStr); err != nil {
+		fmt.Printf("failed to unregister standby: %s", err)
+	}
+
+	return nil
+}
+
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
 	if err := runCommand(cmdStr); err != nil {
@@ -182,6 +195,29 @@ func (r *RepMgr) writePasswdConf() error {
 	}
 
 	return nil
+}
+
+type Standby struct {
+	Id int
+	Ip string
+}
+
+func (r *RepMgr) standbyStatuses(ctx context.Context, pg *pgx.Conn, id int) ([]Standby, error) {
+	sql := fmt.Sprintf("select node_id, node_name from repmgr.show_nodes where type = 'standby' and upstream_node_id = '%d';", id)
+	var standbys []Standby
+	rows, err := pg.Query(ctx, sql)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var s Standby
+		err := rows.Scan(&s.Id, &s.Ip)
+		if err != nil {
+			return nil, err
+		}
+		standbys = append(standbys, s)
+	}
+	return standbys, nil
 }
 
 func (r *RepMgr) memberRole(ctx context.Context, pg *pgx.Conn, id int) (string, error) {
