@@ -168,7 +168,7 @@ func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *sta
 	return nil
 }
 
-// SyncUserConfigOffline will pull the latest user-defined configuration data from Consul and
+// SyncUserConfig will pull the latest user-defined configuration data from Consul and
 // write it to the user config file.
 func (c Config) SyncUserConfig(ctx context.Context, consul *state.ConsulClient) error {
 	// Apply Consul configuration.
