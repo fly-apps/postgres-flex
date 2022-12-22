@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
 	"strconv"
@@ -115,7 +116,7 @@ func (r *RepMgr) writeManagerConf() error {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -124,7 +125,7 @@ func (r *RepMgr) registerPrimary() error {
 
 func (r *RepMgr) unregisterPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary unregister", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -133,7 +134,7 @@ func (r *RepMgr) unregisterPrimary() error {
 
 func (r *RepMgr) followPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s standby follow", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -143,7 +144,7 @@ func (r *RepMgr) followPrimary() error {
 func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -152,7 +153,7 @@ func (r *RepMgr) registerStandby() error {
 
 func (r *RepMgr) UnregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		fmt.Printf("failed to unregister standby: %s", err)
 	}
 
@@ -161,7 +162,7 @@ func (r *RepMgr) UnregisterStandby(id int) error {
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -173,7 +174,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	return runCommand(cmdStr)
+	return utils.RunCommand(cmdStr)
 }
 
 func (r *RepMgr) writePasswdConf() error {

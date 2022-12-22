@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
 	"strconv"
@@ -41,7 +42,7 @@ func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload
 
 func (p *PGBouncer) initialize() error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -49,7 +50,7 @@ func (p *PGBouncer) initialize() error {
 	if _, err := os.Stat(fmt.Sprintf("%s/pgbouncer.ini", p.ConfigPath)); err != nil {
 		if os.IsNotExist(err) {
 			cmdStr := fmt.Sprintf("cp /fly/pgbouncer.ini %s", p.ConfigPath)
-			if err := runCommand(cmdStr); err != nil {
+			if err := utils.RunCommand(cmdStr); err != nil {
 				return err
 			}
 		} else {

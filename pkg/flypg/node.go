@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/pg"
+	"github.com/fly-apps/postgres-flex/pkg/types"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -11,7 +13,6 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
@@ -30,7 +31,7 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Port      int
-	Config    *Config
+	PGConfig  types.ConfigModule
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -62,7 +63,7 @@ func NewNode() (*Node, error) {
 	}
 
 	// Stub configuration
-	node.Config = NewConfig(node.DataDir)
+	node.PGConfig = pg.NewConfig(node.DataDir)
 
 	// Internal user
 	node.SUCredentials = Credentials{
@@ -125,7 +126,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
-	config := n.Config
+	config := n.PGConfig
 
 	fmt.Println("Initializing replication manager")
 	if err := repmgr.initialize(); err != nil {
@@ -472,27 +473,6 @@ func setDirOwnership() error {
 
 	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
 	cmd := exec.Command("sh", "-c", cmdStr)
-	_, err = cmd.Output()
-	return err
-}
-
-func runCommand(cmdStr string) error {
-	pgUser, err := user.Lookup("postgres")
-	if err != nil {
-		return err
-	}
-	pgUID, err := strconv.Atoi(pgUser.Uid)
-	if err != nil {
-		return err
-	}
-	pgGID, err := strconv.Atoi(pgUser.Gid)
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("sh", "-c", cmdStr)
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(pgUID), Gid: uint32(pgGID)}
 	_, err = cmd.Output()
 	return err
 }

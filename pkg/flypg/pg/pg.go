@@ -1,23 +1,22 @@
-package flypg
+package pg
 
 import (
 	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
+	"github.com/fly-apps/postgres-flex/pkg/types"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
+	"github.com/jackc/pgx/v4"
 	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
-	"github.com/jackc/pgx/v4"
 )
-
-type PGConfig map[string]interface{}
 
 type Config struct {
 	configFilePath string
@@ -26,9 +25,11 @@ type Config struct {
 	userConfigFilePath     string
 	dataDir                string
 
-	internalConfig PGConfig
-	userConfig     PGConfig
+	internalConfig types.ConfigMap
+	userConfig     types.ConfigMap
 }
+
+var _ types.ConfigModule = &Config{}
 
 func NewConfig(dataDir string) *Config {
 	return &Config{
@@ -38,12 +39,12 @@ func NewConfig(dataDir string) *Config {
 		internalConfigFilePath: fmt.Sprintf("%s/postgresql.internal.conf", dataDir),
 		userConfigFilePath:     fmt.Sprintf("%s/postgresql.user.conf", dataDir),
 
-		internalConfig: PGConfig{},
-		userConfig:     PGConfig{},
+		internalConfig: types.ConfigMap{},
+		userConfig:     types.ConfigMap{},
 	}
 }
 
-// Print outputs the interna/user config to stdout.
+// Print outputs the internal/user config to stdout.
 func (c *Config) Print(w io.Writer) error {
 	internalCfg, err := c.pullFromFile(c.internalConfigFilePath)
 	if err != nil {
@@ -55,7 +56,7 @@ func (c *Config) Print(w io.Writer) error {
 		return fmt.Errorf("failed to read internal config: %s", err)
 	}
 
-	cfg := PGConfig{}
+	cfg := types.ConfigMap{}
 
 	for k, v := range internalCfg {
 		cfg[k] = v
@@ -73,10 +74,10 @@ func (c *Config) Print(w io.Writer) error {
 
 // Setup will ensure the required configuration files are stubbed and the parent
 // postgresql.conf file includes them.
-func (c Config) Setup() error {
+func (c *Config) Setup() error {
 	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
-			if err := runCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {
+			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {
 				return err
 			}
 		} else {
@@ -86,7 +87,7 @@ func (c Config) Setup() error {
 
 	if _, err := os.Stat(c.userConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
-			if err := runCommand(fmt.Sprintf("touch %s", c.userConfigFilePath)); err != nil {
+			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.userConfigFilePath)); err != nil {
 				return err
 			}
 		} else {
@@ -127,7 +128,7 @@ func (c Config) Setup() error {
 
 // WriteDefaults will resolve the default configuration settings and write them to the
 // internal config file.
-func (c Config) WriteDefaults() error {
+func (c *Config) WriteDefaults() error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
@@ -167,7 +168,7 @@ func (c Config) WriteDefaults() error {
 	}
 	sharedBuffersMb := sharedBuffersBytes / (1024 * 1024)
 
-	conf := PGConfig{
+	conf := types.ConfigMap{
 		"random_page_cost":         "1.1",
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
 		"max_connections":          300,
@@ -190,7 +191,7 @@ func (c Config) WriteDefaults() error {
 }
 
 // WriteUserConfig will push any user-defined configuration to Consul and write it to the user config file.
-func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient, cfg PGConfig) error {
+func (c *Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *state.ConsulClient, cfg types.ConfigMap) error {
 	if c.userConfig != nil {
 		if err := c.pushToConsul(consul, cfg); err != nil {
 			return fmt.Errorf("failed to write to consul: %s", err)
@@ -206,7 +207,7 @@ func (c Config) WriteUserConfig(ctx context.Context, conn *pgx.Conn, consul *sta
 
 // SyncUserConfig will pull the latest user-defined configuration data from Consul and
 // write it to the user config file.
-func (c Config) SyncUserConfig(ctx context.Context, consul *state.ConsulClient) error {
+func (c *Config) SyncUserConfig(ctx context.Context, consul *state.ConsulClient) error {
 	cfg, err := c.pullFromConsul(consul)
 	if err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
@@ -220,8 +221,8 @@ func (c Config) SyncUserConfig(ctx context.Context, consul *state.ConsulClient) 
 }
 
 // ApplyUserConfigAtRuntime will take a config and attempt to set it at runtime.
-func (c Config) ApplyUserConfigAtRuntime(ctx context.Context, conn *pgx.Conn, conf PGConfig) error {
-	for key, value := range conf {
+func (c *Config) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
+	for key, value := range c.userConfig {
 		if err := admin.SetConfigurationSetting(ctx, conn, key, value); err != nil {
 			fmt.Printf("failed to set configuration setting %s -> %s: %s", key, value, err)
 		}
@@ -230,7 +231,7 @@ func (c Config) ApplyUserConfigAtRuntime(ctx context.Context, conn *pgx.Conn, co
 	return nil
 }
 
-func (c Config) pushToConsul(consul *state.ConsulClient, conf PGConfig) error {
+func (c *Config) pushToConsul(consul *state.ConsulClient, conf types.ConfigMap) error {
 	if conf == nil {
 		return nil
 	}
@@ -247,7 +248,7 @@ func (c Config) pushToConsul(consul *state.ConsulClient, conf PGConfig) error {
 	return nil
 }
 
-func (c Config) writeToFile(pathToFile string, conf PGConfig) error {
+func (c *Config) writeToFile(pathToFile string, conf types.ConfigMap) error {
 	file, err := os.OpenFile(pathToFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -262,14 +263,14 @@ func (c Config) writeToFile(pathToFile string, conf PGConfig) error {
 	return nil
 }
 
-func (c Config) pullFromFile(pathToFile string) (PGConfig, error) {
+func (c *Config) pullFromFile(pathToFile string) (types.ConfigMap, error) {
 	file, err := os.Open(pathToFile)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	pgConf := PGConfig{}
+	pgConf := types.ConfigMap{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		lineArr := strings.Split(scanner.Text(), "=")
@@ -281,13 +282,13 @@ func (c Config) pullFromFile(pathToFile string) (PGConfig, error) {
 	return pgConf, nil
 }
 
-func (c Config) pullFromConsul(consul *state.ConsulClient) (PGConfig, error) {
+func (c *Config) pullFromConsul(consul *state.ConsulClient) (types.ConfigMap, error) {
 	configBytes, err := consul.PullUserConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	var storeCfg PGConfig
+	var storeCfg types.ConfigMap
 	if err = json.Unmarshal(configBytes, &storeCfg); err != nil {
 		return nil, err
 	}
