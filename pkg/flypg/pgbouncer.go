@@ -3,7 +3,6 @@ package flypg
 import (
 	"context"
 	"fmt"
-	flypg "github.com/fly-apps/postgres-flex/pkg/flypg/config"
 	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
@@ -19,8 +18,8 @@ type PGBouncer struct {
 	Port        int
 	ForwardPort int
 
-	internalConfig flypg.ConfigMap
-	userConfig     flypg.ConfigMap
+	internalConfig ConfigMap
+	userConfig     ConfigMap
 }
 
 func (p *PGBouncer) InternalConfigFile() string {
@@ -31,15 +30,15 @@ func (p *PGBouncer) UserConfigFile() string {
 	return fmt.Sprintf("%s/pgbouncer.user.ini", p.ConfigPath)
 }
 
-func (p *PGBouncer) InternalConfig() flypg.ConfigMap {
+func (p *PGBouncer) InternalConfig() ConfigMap {
 	return p.internalConfig
 }
 
-func (p *PGBouncer) UserConfig() flypg.ConfigMap {
+func (p *PGBouncer) UserConfig() ConfigMap {
 	return p.userConfig
 }
 
-func (p *PGBouncer) SetUserConfig(configMap flypg.ConfigMap) {
+func (p *PGBouncer) SetUserConfig(configMap ConfigMap) {
 	p.userConfig = configMap
 }
 
@@ -103,23 +102,17 @@ func (p *PGBouncer) initialize() error {
 }
 
 func (p *PGBouncer) setDefaults() {
-	conf := flypg.ConfigMap{
+	conf := ConfigMap{
 		"listen_addr":          "*",
 		"listen_port":          "5432",
-		"unix_socket_dir":      "/tmp",
 		"auth_user":            "postgres",
 		"auth_file":            fmt.Sprintf("%s/pgbouncer.auth", p.ConfigPath),
 		"admin_users":          "postgres",
 		"user":                 "postgres",
 		"pool_mode":            "transaction",
-		"max_client_conn":      "100",
-		"default_pool_size":    "20",
 		"min_pool_size":        "5",
 		"reserve_pool_size":    "5",
 		"reserve_pool_timeout": "3",
-		"log_connections":      "1",
-		"log_disconnections":   "1",
-		"log_pooler_errors":    "1",
 	}
 	p.internalConfig = conf
 }

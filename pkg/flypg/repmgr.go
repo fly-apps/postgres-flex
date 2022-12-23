@@ -3,7 +3,6 @@ package flypg
 import (
 	"context"
 	"fmt"
-	flypg "github.com/fly-apps/postgres-flex/pkg/flypg/config"
 	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
@@ -31,8 +30,8 @@ type RepMgr struct {
 	InternalConfigPath string
 	Port               int
 
-	internalConfig flypg.ConfigMap
-	userConfig     flypg.ConfigMap
+	internalConfig ConfigMap
+	userConfig     ConfigMap
 }
 
 func (r *RepMgr) InternalConfigFile() string {
@@ -43,15 +42,15 @@ func (r *RepMgr) UserConfigFile() string {
 	return r.UserConfigPath
 }
 
-func (r *RepMgr) InternalConfig() flypg.ConfigMap {
+func (r *RepMgr) InternalConfig() ConfigMap {
 	return r.internalConfig
 }
 
-func (r *RepMgr) UserConfig() flypg.ConfigMap {
+func (r *RepMgr) UserConfig() ConfigMap {
 	return r.userConfig
 }
 
-func (r *RepMgr) SetUserConfig(configMap flypg.ConfigMap) {
+func (r *RepMgr) SetUserConfig(configMap ConfigMap) {
 	r.userConfig = configMap
 }
 
@@ -122,7 +121,7 @@ func (r *RepMgr) Standbys(ctx context.Context, pg *pgx.Conn) ([]Standby, error) 
 }
 
 func (r *RepMgr) setDefaults() {
-	conf := flypg.ConfigMap{
+	conf := ConfigMap{
 		"node_id":                    fmt.Sprint(r.ID),
 		"node_name":                  fmt.Sprintf("'%s'", r.PrivateIP),
 		"conninfo":                   fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),

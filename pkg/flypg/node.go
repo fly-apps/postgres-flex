@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/config"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -30,7 +29,7 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Port      int
-	PGConfig  *flypg.PGConfig
+	PGConfig  *PGConfig
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -62,7 +61,7 @@ func NewNode() (*Node, error) {
 	}
 
 	// Stub configuration
-	node.PGConfig = flypg.NewConfig(node.DataDir)
+	node.PGConfig = NewConfig(node.DataDir)
 
 	// Internal user
 	node.SUCredentials = Credentials{
@@ -134,7 +133,7 @@ func (n *Node) Init(ctx context.Context) error {
 		fmt.Printf("Failed to initialize repmgr: %s\n", err.Error())
 	}
 
-	err = flypg.WriteConfigFiles(&repmgr)
+	err = WriteConfigFiles(&repmgr)
 	if err != nil {
 		fmt.Printf("Failed to write config files for repmgr: %s\n", err.Error())
 	}
@@ -144,7 +143,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	err = flypg.WriteConfigFiles(&pgbouncer)
+	err = WriteConfigFiles(&pgbouncer)
 	if err != nil {
 		fmt.Printf("Failed to write config files for pgbouncer: %s\n", err.Error())
 	}
@@ -195,7 +194,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	fmt.Println("Resolving PG configuration settings.")
 	PGConfig.Setup()
-	flypg.WriteConfigFiles(PGConfig)
+	WriteConfigFiles(PGConfig)
 
 	PGConfig.Print(os.Stdout)
 
