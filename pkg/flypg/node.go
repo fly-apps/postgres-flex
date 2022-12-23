@@ -144,6 +144,11 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
+	err = flypg.WriteConfigFiles(&pgbouncer)
+	if err != nil {
+		fmt.Printf("Failed to write config files for pgbouncer: %s\n", err.Error())
+	}
+
 	switch primaryIP {
 	case n.PrivateIP:
 		// noop
