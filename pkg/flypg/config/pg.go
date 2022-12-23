@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -27,6 +26,7 @@ type PGConfig struct {
 	userConfig     ConfigMap
 }
 
+// type assertion
 var _ Config = &PGConfig{}
 
 func (c *PGConfig) InternalConfig() ConfigMap {
@@ -45,11 +45,11 @@ func (c *PGConfig) SetUserConfig(newConfig ConfigMap) {
 	c.userConfig = newConfig
 }
 
-func (c PGConfig) InternalConfigFile() string {
+func (c *PGConfig) InternalConfigFile() string {
 	return c.internalConfigFilePath
 }
 
-func (c PGConfig) UserConfigFile() string {
+func (c *PGConfig) UserConfigFile() string {
 	return c.userConfigFilePath
 }
 
@@ -117,7 +117,7 @@ func (c *PGConfig) Setup() error {
 		}
 	}
 
-	b, err := ioutil.ReadFile(c.configFilePath)
+	b, err := os.ReadFile(c.configFilePath)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (c *PGConfig) Setup() error {
 	return nil
 }
 
-// WriteDefaults will resolve the default configuration settings and write them to the
+// SetDefaults WriteDefaults will resolve the default configuration settings and write them to the
 // internal config file.
 func (c *PGConfig) SetDefaults() error {
 	// The default wal_segment_size in mb

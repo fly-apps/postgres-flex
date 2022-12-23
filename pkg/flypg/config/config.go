@@ -22,7 +22,7 @@ type Config interface {
 
 func WriteUserConfig(c Config, consul *state.ConsulClient) error {
 	if c.UserConfig() != nil {
-		if err := PushToConsul(c, consul); err != nil {
+		if err := pushToConsul(c, consul); err != nil {
 			return fmt.Errorf("failed to write to consul: %s", err)
 		}
 
@@ -35,7 +35,7 @@ func WriteUserConfig(c Config, consul *state.ConsulClient) error {
 }
 
 func SyncUserConfig(c Config, consul *state.ConsulClient) error {
-	cfg, err := PullFromConsul(c, consul)
+	cfg, err := pullFromConsul(c, consul)
 	if err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
 	}
@@ -48,7 +48,7 @@ func SyncUserConfig(c Config, consul *state.ConsulClient) error {
 	return nil
 }
 
-func PushToConsul(c Config, consul *state.ConsulClient) error {
+func pushToConsul(c Config, consul *state.ConsulClient) error {
 	if c.UserConfig() == nil {
 		return nil
 	}
@@ -65,7 +65,7 @@ func PushToConsul(c Config, consul *state.ConsulClient) error {
 	return nil
 }
 
-func PullFromConsul(c Config, consul *state.ConsulClient) (ConfigMap, error) {
+func pullFromConsul(c Config, consul *state.ConsulClient) (ConfigMap, error) {
 	configBytes, err := consul.PullUserConfig(c.ConsulKey())
 	if err != nil {
 		return nil, err
