@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
 	"strconv"
@@ -18,14 +19,43 @@ const (
 )
 
 type RepMgr struct {
-	ID           int32
-	Region       string
-	PrivateIP    string
-	DataDir      string
-	DatabaseName string
-	Credentials  Credentials
-	ConfigPath   string
-	Port         int
+	ID                 int32
+	Region             string
+	PrivateIP          string
+	DataDir            string
+	DatabaseName       string
+	Credentials        Credentials
+	ConfigPath         string
+	UserConfigPath     string
+	InternalConfigPath string
+	Port               int
+
+	internalConfig ConfigMap
+	userConfig     ConfigMap
+}
+
+func (r *RepMgr) InternalConfigFile() string {
+	return r.InternalConfigPath
+}
+
+func (r *RepMgr) UserConfigFile() string {
+	return r.UserConfigPath
+}
+
+func (r *RepMgr) InternalConfig() ConfigMap {
+	return r.internalConfig
+}
+
+func (r *RepMgr) UserConfig() ConfigMap {
+	return r.userConfig
+}
+
+func (r *RepMgr) SetUserConfig(configMap ConfigMap) {
+	r.userConfig = configMap
+}
+
+func (r *RepMgr) ConsulKey() string {
+	return "repmgr"
 }
 
 func (r *RepMgr) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
@@ -39,8 +69,20 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 }
 
 func (r *RepMgr) initialize() error {
-	if err := r.writeManagerConf(); err != nil {
-		return fmt.Errorf("failed to write repmgr config file: %s", err)
+	r.setDefaults()
+
+	f, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	entries := []string{"include 'repmgr.internal.conf'\n", "include 'repmgr.user.conf'\n"}
+
+	for _, entry := range entries {
+		if _, err := f.WriteString(entry); err != nil {
+			return fmt.Errorf("failed append configuration entry: %s", err)
+		}
 	}
 
 	if err := r.writePasswdConf(); err != nil {
@@ -78,13 +120,8 @@ func (r *RepMgr) Standbys(ctx context.Context, pg *pgx.Conn) ([]Standby, error) 
 	return r.standbyStatuses(ctx, pg, int(r.ID))
 }
 
-func (r *RepMgr) writeManagerConf() error {
-	file, err := os.OpenFile(r.ConfigPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-
-	conf := map[string]interface{}{
+func (r *RepMgr) setDefaults() {
+	conf := ConfigMap{
 		"node_id":                    fmt.Sprint(r.ID),
 		"node_name":                  fmt.Sprintf("'%s'", r.PrivateIP),
 		"conninfo":                   fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
@@ -102,20 +139,12 @@ func (r *RepMgr) writeManagerConf() error {
 		conf["priority"] = "0"
 	}
 
-	for key, value := range conf {
-		str := fmt.Sprintf("%s=%s\n", key, value)
-		_, err := file.Write([]byte(str))
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	r.internalConfig = conf
 }
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -124,7 +153,7 @@ func (r *RepMgr) registerPrimary() error {
 
 func (r *RepMgr) unregisterPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary unregister", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -133,7 +162,7 @@ func (r *RepMgr) unregisterPrimary() error {
 
 func (r *RepMgr) followPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s standby follow", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -143,7 +172,7 @@ func (r *RepMgr) followPrimary() error {
 func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -152,7 +181,7 @@ func (r *RepMgr) registerStandby() error {
 
 func (r *RepMgr) UnregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		fmt.Printf("failed to unregister standby: %s", err)
 	}
 
@@ -161,7 +190,7 @@ func (r *RepMgr) UnregisterStandby(id int) error {
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
@@ -173,7 +202,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	return runCommand(cmdStr)
+	return utils.RunCommand(cmdStr)
 }
 
 func (r *RepMgr) writePasswdConf() error {

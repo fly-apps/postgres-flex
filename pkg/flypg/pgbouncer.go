@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
 	"strconv"
@@ -16,6 +17,33 @@ type PGBouncer struct {
 	ConfigPath  string
 	Port        int
 	ForwardPort int
+
+	internalConfig ConfigMap
+	userConfig     ConfigMap
+}
+
+func (p *PGBouncer) InternalConfigFile() string {
+	return fmt.Sprintf("%s/pgbouncer.internal.ini", p.ConfigPath)
+}
+
+func (p *PGBouncer) UserConfigFile() string {
+	return fmt.Sprintf("%s/pgbouncer.user.ini", p.ConfigPath)
+}
+
+func (p *PGBouncer) InternalConfig() ConfigMap {
+	return p.internalConfig
+}
+
+func (p *PGBouncer) UserConfig() ConfigMap {
+	return p.userConfig
+}
+
+func (p *PGBouncer) SetUserConfig(configMap ConfigMap) {
+	p.userConfig = configMap
+}
+
+func (p *PGBouncer) ConsulKey() string {
+	return "PGBouncer"
 }
 
 func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload bool) error {
@@ -41,27 +69,52 @@ func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload
 
 func (p *PGBouncer) initialize() error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
-	if err := runCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
 	}
 
-	// If pgbouncer.ini file is not present, set defaults.
-	if _, err := os.Stat(fmt.Sprintf("%s/pgbouncer.ini", p.ConfigPath)); err != nil {
-		if os.IsNotExist(err) {
-			cmdStr := fmt.Sprintf("cp /fly/pgbouncer.ini %s", p.ConfigPath)
-			if err := runCommand(cmdStr); err != nil {
-				return err
-			}
-		} else {
-			return err
+	f, err := os.OpenFile(fmt.Sprintf("%s/pgbouncer.ini", p.ConfigPath), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	entries := []string{
+		"[pgbouncer]\n",
+		fmt.Sprintf("%%include %s/pgbouncer.internal.ini\n", p.ConfigPath),
+		fmt.Sprintf("%%include %s/pgbouncer.user.ini\n", p.ConfigPath),
+		fmt.Sprintf("%%include %s/pgbouncer.database.ini\n", p.ConfigPath),
+	}
+
+	for _, entry := range entries {
+		if _, err := f.WriteString(entry); err != nil {
+			return fmt.Errorf("failed append configuration entry: %s", err)
 		}
 	}
+
+	p.setDefaults()
 
 	if err := p.configureAuth(); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer auth. %s", err)
 	}
 
 	return nil
+}
+
+func (p *PGBouncer) setDefaults() {
+	conf := ConfigMap{
+		"listen_addr":          "*",
+		"listen_port":          "5432",
+		"auth_user":            "postgres",
+		"auth_file":            fmt.Sprintf("%s/pgbouncer.auth", p.ConfigPath),
+		"admin_users":          "postgres",
+		"user":                 "postgres",
+		"pool_mode":            "transaction",
+		"min_pool_size":        "5",
+		"reserve_pool_size":    "5",
+		"reserve_pool_timeout": "3",
+	}
+	p.internalConfig = conf
 }
 
 func (p *PGBouncer) configureAuth() error {

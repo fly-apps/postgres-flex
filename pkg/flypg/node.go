@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
@@ -30,7 +29,7 @@ type Node struct {
 	PrivateIP string
 	DataDir   string
 	Port      int
-	Config    *Config
+	PGConfig  *PGConfig
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -62,7 +61,7 @@ func NewNode() (*Node, error) {
 	}
 
 	// Stub configuration
-	node.Config = NewConfig(node.DataDir)
+	node.PGConfig = NewConfig(node.DataDir)
 
 	// Internal user
 	node.SUCredentials = Credentials{
@@ -95,14 +94,16 @@ func NewNode() (*Node, error) {
 	rand.Seed(int64(seed))
 
 	node.RepMgr = RepMgr{
-		ID:           rand.Int31(),
-		Region:       os.Getenv("FLY_REGION"),
-		ConfigPath:   "/data/repmgr.conf",
-		DataDir:      node.DataDir,
-		PrivateIP:    node.PrivateIP,
-		Port:         5433,
-		DatabaseName: "repmgr",
-		Credentials:  node.ReplCredentials,
+		ID:                 rand.Int31(),
+		Region:             os.Getenv("FLY_REGION"),
+		ConfigPath:         "/data/repmgr.conf",
+		InternalConfigPath: "/data/repmgr.internal.conf",
+		UserConfigPath:     "/data/repmgr.user.conf",
+		DataDir:            node.DataDir,
+		PrivateIP:          node.PrivateIP,
+		Port:               5433,
+		DatabaseName:       "repmgr",
+		Credentials:        node.ReplCredentials,
 	}
 
 	return node, nil
@@ -125,16 +126,26 @@ func (n *Node) Init(ctx context.Context) error {
 
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
-	config := n.Config
+	PGConfig := n.PGConfig
 
 	fmt.Println("Initializing replication manager")
 	if err := repmgr.initialize(); err != nil {
-		fmt.Printf("Failed to initialize replmgr: %s\n", err.Error())
+		fmt.Printf("Failed to initialize repmgr: %s\n", err.Error())
+	}
+
+	err = WriteConfigFiles(&repmgr)
+	if err != nil {
+		fmt.Printf("Failed to write config files for repmgr: %s\n", err.Error())
 	}
 
 	fmt.Println("Initializing pgbouncer")
 	if err := pgbouncer.initialize(); err != nil {
 		return err
+	}
+
+	err = WriteConfigFiles(&pgbouncer)
+	if err != nil {
+		fmt.Printf("Failed to write config files for pgbouncer: %s\n", err.Error())
 	}
 
 	switch primaryIP {
@@ -181,11 +192,11 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	fmt.Println("Resolving PG Configurtion settings.")
-	config.Setup()
-	config.WriteDefaults()
+	fmt.Println("Resolving PG configuration settings.")
+	PGConfig.Setup()
+	WriteConfigFiles(PGConfig)
 
-	config.Print(os.Stdout)
+	PGConfig.Print(os.Stdout)
 
 	return nil
 }
@@ -472,27 +483,6 @@ func setDirOwnership() error {
 
 	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
 	cmd := exec.Command("sh", "-c", cmdStr)
-	_, err = cmd.Output()
-	return err
-}
-
-func runCommand(cmdStr string) error {
-	pgUser, err := user.Lookup("postgres")
-	if err != nil {
-		return err
-	}
-	pgUID, err := strconv.Atoi(pgUser.Uid)
-	if err != nil {
-		return err
-	}
-	pgGID, err := strconv.Atoi(pgUser.Gid)
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("sh", "-c", cmdStr)
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(pgUID), Gid: uint32(pgGID)}
 	_, err = cmd.Output()
 	return err
 }
