@@ -135,6 +135,7 @@ func (r *RepMgr) setDefaults() {
 		"event_notifications":          "'repmgrd_failover_promote,standby_promote,standby_follow'",
 		"location":                     r.Region,
 		"primary_visibility_consensus": true,
+		"failover_validation_command":  fmt.Sprintf("'/usr/local/bin/failover_validation -visible-nodes %%v -total-nodes %%t'"),
 	}
 
 	if !r.eligiblePrimary() {
