@@ -1,0 +1,43 @@
+services:
+  consul:
+    image: consul:1.9.7
+    volumes:
+      - ./dev/consul.hcl:/consul/config/config.hcl:ro
+#    networks:
+#      - consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/tcp"
+      - "8600:8600/udp"
+    healthcheck:
+      test: curl -s "http://localhost:8500/v1/status/leader" | grep -vq "\"\""
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    command: "agent -ui -server -bootstrap-expect=1 -datacenter=dev -client 0.0.0.0"
+  flex:
+    depends_on:
+      consul:
+        condition: service_healthy
+    build:
+      context: .
+    volumes:
+      - ./tmp/data:/data:rw
+    ports:
+      - "5500:5500"
+    environment:
+      - FLY_CONSUL_URL=http://:dev@consul:8500/default/
+      - SU_PASSWORD=dev
+      - OPERATOR_PASSWORD=dev
+      - REPL_PASSWORD=dev
+      - FLY_REGION=ewr
+      - PRIMARY_REGION=ewr
+      - FLY_APP_NAME=dev
+      - FLY_ALLOC_ID=24d8939c41e687
+      - FLY_VM_MEMORY_MB=528
+      - DEBUG=true
+      - SKIP_SET_OWNERSHIP=true
+
+#networks:
+#  consul:
+#    driver: bridge

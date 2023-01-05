@@ -78,7 +78,7 @@ func panicHandler(err error) {
 	debug := os.Getenv("DEBUG")
 	if debug != "" {
 		fmt.Println(err.Error())
-		fmt.Println("Entering debug mode... (Timeout: 10 minutes")
+		fmt.Println("Entering debug mode... (Timeout: 10 minutes)")
 		time.Sleep(time.Minute * 10)
 	}
 

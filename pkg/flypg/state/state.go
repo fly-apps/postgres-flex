@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -143,10 +144,18 @@ func clientConfig() (*api.Config, error) {
 
 	u.User = nil
 
+	port := 80
+	if u.Port() != "" {
+		port, err = strconv.Atoi(u.Port())
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	return &api.Config{
 		Token:   token,
 		Scheme:  u.Scheme,
-		Address: u.Hostname(),
+		Address: fmt.Sprintf("%s:%d", u.Hostname(), port),
 	}, nil
 }
 

@@ -111,7 +111,7 @@ func NewNode() (*Node, error) {
 
 func (n *Node) Init(ctx context.Context) error {
 	if err := setDirOwnership(); err != nil {
-		return err
+		return fmt.Errorf("setDirOwnership: %s", err)
 	}
 
 	consul, err := state.NewConsulClient()
@@ -140,7 +140,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	fmt.Println("Initializing pgbouncer")
 	if err := pgbouncer.initialize(); err != nil {
-		return err
+		return fmt.Errorf("pgbouncer.initialize : %s", err)
 	}
 
 	err = WriteConfigFiles(&pgbouncer)
