@@ -244,7 +244,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		// Setup repmgr database, extension, and register ourselves as the primary
 		fmt.Println("Perform Repmgr setup")
 		if err := repmgr.setup(ctx, conn); err != nil {
-			return fmt.Errorf("failed to setup repmgr: %s", err)
+			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
 		if err := consul.RegisterPrimary(n.PrivateIP); err != nil {

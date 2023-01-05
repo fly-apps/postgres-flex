@@ -3,6 +3,7 @@ package supervisor
 import (
 	"context"
 	"fmt"
+	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -126,8 +127,8 @@ func (h *Supervisor) waitForExit(ctx context.Context) {
 	}
 }
 
-func (h *Supervisor) StartHttpListener() {
-	go api.StartHttpServer()
+func (h *Supervisor) StartHttpListener(node *flypg.Node) {
+	go api.StartHttpServer(node)
 }
 
 func (h *Supervisor) Run() error {

@@ -13,16 +13,21 @@ import (
 
 const Port = 5500
 
-func StartHttpServer() {
+type Server struct {
+	node *flypg.Node
+}
+
+func StartHttpServer(node *flypg.Node) {
+	server := &Server{node: node}
 	r := chi.NewMux()
 
 	r.Mount("/flycheck", flycheck.Handler())
-	r.Mount("/commands", Handler())
+	r.Mount("/commands", server.Handler())
 
 	http.ListenAndServe(fmt.Sprintf(":%d", Port), r)
 }
 
-func Handler() http.Handler {
+func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/users", func(r chi.Router) {
@@ -42,7 +47,9 @@ func Handler() http.Handler {
 	r.Route("/admin", func(r chi.Router) {
 		r.Get("/role", handleRole)
 		// r.Get("/failover/trigger", handleFailoverTrigger)
-		// r.Get("/settings/view", handleViewSettings)
+		r.Get("/settings/view/postgres", s.handleViewPostgresSettings)
+		r.Get("/settings/view/pgbouncer", s.handleViewBouncerSettings)
+		r.Get("/settings/view/repmgr", s.handleViewRepmgrSettings)
 		// r.Post("/settings/update", handleUpdateSettings)
 	})
 
