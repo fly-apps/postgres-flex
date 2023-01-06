@@ -224,3 +224,45 @@ func SetConfigurationSetting(ctx context.Context, conn *pgx.Conn, key string, va
 	_, err := conn.Exec(ctx, sql)
 	return err
 }
+
+func SetReadOnly(ctx context.Context, conn *pgx.Conn) error {
+	databases, err := ListDatabases(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	for _, db := range databases {
+		if db.Name == "repmgr" || db.Name == "postgres" {
+			continue
+		}
+
+		sql := fmt.Sprintf("ALTER DATABASE %s set default_transaction_read_only = true;", db.Name)
+		_, err := conn.Exec(ctx, sql)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func UnsetReadOnly(ctx context.Context, conn *pgx.Conn) error {
+	databases, err := ListDatabases(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	for _, db := range databases {
+		if db.Name == "repmgr" || db.Name == "postgres" {
+			continue
+		}
+
+		sql := fmt.Sprintf("ALTER DATABASE %s set default_transaction_read_only = false;", db.Name)
+		_, err := conn.Exec(ctx, sql)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
