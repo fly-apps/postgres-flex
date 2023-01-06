@@ -133,6 +133,11 @@ func (n *Node) Init(ctx context.Context) error {
 		fmt.Printf("Failed to initialize repmgr: %s\n", err.Error())
 	}
 
+	err = SyncUserConfig(&repmgr, consul)
+	if err != nil {
+		fmt.Printf("Failed to sync user config from consul for repmgr: %s\n", err.Error())
+	}
+
 	err = WriteConfigFiles(&repmgr)
 	if err != nil {
 		fmt.Printf("Failed to write config files for repmgr: %s\n", err.Error())
@@ -141,6 +146,11 @@ func (n *Node) Init(ctx context.Context) error {
 	fmt.Println("Initializing pgbouncer")
 	if err := pgbouncer.initialize(); err != nil {
 		return err
+	}
+
+	err = SyncUserConfig(&pgbouncer, consul)
+	if err != nil {
+		fmt.Printf("Failed to sync user config from consul for pgbouncer: %s\n", err.Error())
 	}
 
 	err = WriteConfigFiles(&pgbouncer)
@@ -194,6 +204,12 @@ func (n *Node) Init(ctx context.Context) error {
 
 	fmt.Println("Resolving PG configuration settings.")
 	PGConfig.Setup()
+
+	err = SyncUserConfig(PGConfig, consul)
+	if err != nil {
+		fmt.Printf("Failed to sync user config from consul for pgbouncer: %s\n", err.Error())
+	}
+
 	WriteConfigFiles(PGConfig)
 
 	PGConfig.Print(os.Stdout)

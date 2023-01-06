@@ -2,9 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 	"golang.org/x/exp/slices"
 	"net/http"
+	"strings"
 )
 
 func handleRole(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +41,79 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := &Response{Result: alteredRole}
+
+	renderJSON(w, res, http.StatusOK)
+}
+
+func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
+	//TODO: @DAlperin verify using pg_config
+	conn, close, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer close()
+
+	consul, err := state.NewConsulClient()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	user := s.node.PGConfig.UserConfig()
+
+	var in map[string]interface{}
+
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	for k, v := range in {
+		exists, err := admin.SettingExists(r.Context(), conn, k)
+		if err != nil {
+			renderErr(w, err)
+			return
+		}
+		if !exists {
+			renderErr(w, fmt.Errorf("invalid config option: %s", k))
+			return
+		}
+		user[k] = v
+	}
+
+	s.node.PGConfig.SetUserConfig(user)
+
+	err = flypg.WriteUserConfig(s.node.PGConfig, consul)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	err = admin.ReloadPostgresConfig(r.Context(), conn)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	var requiresRestart []string
+
+	for k, _ := range user {
+		restart, err := admin.SettingRequiresRestart(r.Context(), conn, k)
+		if err != nil {
+			renderErr(w, err)
+			return
+		}
+		if restart {
+			requiresRestart = append(requiresRestart, k)
+		}
+	}
+
+	res := &Response{Result: "Updated"}
+
+	if len(requiresRestart) > 0 {
+		res = &Response{Result: fmt.Sprintf("Updated, but settings %s need a restart to apply", strings.Join(requiresRestart, ", "))}
+	}
 
 	renderJSON(w, res, http.StatusOK)
 }

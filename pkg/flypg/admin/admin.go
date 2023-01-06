@@ -224,3 +224,29 @@ func SetConfigurationSetting(ctx context.Context, conn *pgx.Conn, key string, va
 	_, err := conn.Exec(ctx, sql)
 	return err
 }
+
+func ReloadPostgresConfig(ctx context.Context, pg *pgx.Conn) error {
+	sql := "SELECT pg_reload_conf()"
+
+	_, err := pg.Exec(ctx, sql)
+	return err
+}
+
+func SettingExists(ctx context.Context, pg *pgx.Conn, setting string) (bool, error) {
+	sql := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_settings WHERE name='%s')", setting)
+	var out bool
+	if err := pg.QueryRow(ctx, sql).Scan(&out); err != nil {
+		return false, err
+	}
+	return out, nil
+}
+
+func SettingRequiresRestart(ctx context.Context, pg *pgx.Conn, setting string) (bool, error) {
+	sql := fmt.Sprintf("SELECT pending_restart FROM pg_settings WHERE name='%s'", setting)
+	row := pg.QueryRow(ctx, sql)
+	var out bool
+	if err := row.Scan(&out); err != nil {
+		return false, nil
+	}
+	return out, nil
+}
