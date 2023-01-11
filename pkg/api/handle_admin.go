@@ -45,20 +45,18 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, res, http.StatusOK)
 }
 
+type SettingsUpdate struct {
+	Message         string `json:"message"`
+	RestartRequired bool   `json:"restart_required"`
+}
+
 func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
-	//TODO: @DAlperin verify using pg_config
 	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer close()
-
-	consul, err := state.NewConsulClient()
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
 
 	user := s.node.PGConfig.UserConfig()
 
@@ -84,18 +82,6 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 
 	s.node.PGConfig.SetUserConfig(user)
 
-	err = flypg.WriteUserConfig(s.node.PGConfig, consul)
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	err = admin.ReloadPostgresConfig(r.Context(), conn)
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
 	var requiresRestart []string
 
 	for k, _ := range user {
@@ -109,16 +95,60 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	res := &Response{Result: "Updated"}
+	res := &Response{Result: SettingsUpdate{
+		Message:         "Updated",
+		RestartRequired: false,
+	}}
 
 	if len(requiresRestart) > 0 {
-		res = &Response{Result: fmt.Sprintf("Updated, but settings %s need a restart to apply", strings.Join(requiresRestart, ", "))}
+		res = &Response{Result: SettingsUpdate{
+			Message:         fmt.Sprintf("Updated, but settings %s need a restart to apply", strings.Join(requiresRestart, ", ")),
+			RestartRequired: true,
+		}}
 	}
 
 	renderJSON(w, res, http.StatusOK)
 }
 
+func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
+	conn, close, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer close()
+
+	consul, err := state.NewConsulClient()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	err = flypg.WriteUserConfig(s.node.PGConfig, consul)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	err = admin.ReloadPostgresConfig(r.Context(), conn)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+}
+
+type PGSettingsResponse struct {
+	Settings []admin.PGSetting `json:"settings"`
+}
+
 func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
+	conn, close, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	defer close()
 	internal := s.node.PGConfig.InternalConfig()
 	user := s.node.PGConfig.UserConfig()
 
@@ -138,16 +168,20 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	out := map[string]interface{}{}
+	var out []admin.PGSetting
 
 	for key, _ := range all {
-		val, _ := all[key]
 		if slices.Contains(in, key) {
-			out[key] = val
+			setting, err := admin.GetSetting(r.Context(), conn, key)
+			if err != nil {
+				renderErr(w, err)
+				return
+			}
+			out = append(out, *setting)
 		}
 	}
 
-	resp := &Response{Result: out}
+	resp := &Response{Result: PGSettingsResponse{Settings: out}}
 	renderJSON(w, resp, http.StatusOK)
 }
 

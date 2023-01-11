@@ -246,7 +246,31 @@ func SettingRequiresRestart(ctx context.Context, pg *pgx.Conn, setting string) (
 	row := pg.QueryRow(ctx, sql)
 	var out bool
 	if err := row.Scan(&out); err != nil {
-		return false, nil
+		return false, err
 	}
 	return out, nil
+}
+
+type PGSetting struct {
+	Name           string    `json:"name,omitempty"`
+	Setting        string    `json:"setting,omitempty"`
+	VarType        *string   `json:"vartype,omitempty"`
+	MinVal         *string   `json:"min_val,omitempty"`
+	MaxVal         *string   `json:"max_val,omitempty"`
+	EnumVals       *[]string `json:"enumvals,omitempty"`
+	Context        *string   `json:"context,omitempty"`
+	Unit           *string   `json:"unit,omitempty"`
+	Desc           *string   `json:"short_desc,omitempty"`
+	PendingChange  *string   `json:"pending_change,omitempty"`
+	PendingRestart *bool     `json:"pending_restart,omitempty"`
+}
+
+func GetSetting(ctx context.Context, pg *pgx.Conn, setting string) (*PGSetting, error) {
+	sql := fmt.Sprintf("SELECT name, setting, vartype, min_val, max_val, enumvals, context, unit, short_desc, pending_restart FROM pg_settings WHERE name='%s'", setting)
+	row := pg.QueryRow(ctx, sql)
+	out := PGSetting{}
+	if err := row.Scan(&out.Name, &out.Setting, &out.VarType, &out.MinVal, &out.MaxVal, &out.EnumVals, &out.Context, &out.Unit, &out.Desc, &out.PendingRestart); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
