@@ -299,7 +299,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
-		fmt.Println("Registering Node with Consul")
 		if err := state.RegisterMember(consul, repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}

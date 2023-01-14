@@ -58,19 +58,19 @@ func main() {
 			fmt.Printf("failed to initialize consul client: %s", err)
 		}
 
-		newNodeID, err := strconv.Atoi(*newPrimary)
+		newMemberID, err := strconv.Atoi(*newPrimary)
 		if err != nil {
-			fmt.Printf("failed to parse new node id: %s", err)
+			fmt.Printf("failed to parse new member id: %s", err)
 		}
 
-		member, err := state.FindMember(consul, int32(newNodeID))
+		member, err := state.FindMember(consul, int32(newMemberID))
 		if err != nil {
-			fmt.Printf("failed to find node in consul: %s", err)
+			fmt.Printf("failed to find member in consul: %s", err)
 		}
 
 		flypgNode, err := flypg.NewNode()
 		if err != nil {
-			fmt.Printf("failed to reference node: %s\n", err)
+			fmt.Printf("failed to reference member: %s\n", err)
 		}
 
 		fmt.Println("Reconfiguring pgbouncer primary")
