@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"os"
 	"time"
+
+	"github.com/fly-apps/postgres-flex/pkg/flypg"
+	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 )
 
 var Minute int64 = 60
@@ -47,12 +49,23 @@ func main() {
 			newConn, err := flypgNode.RepMgr.NewRemoteConnection(ctx, standby.Ip)
 			if err != nil {
 				if time.Now().Unix()-seenAt[standby.Id] >= 10*Minute {
-					err := flypgNode.RepMgr.UnregisterStandby(standby.Id)
+					consul, err := state.NewConsulClient()
+					if err != nil {
+						fmt.Printf("Failed to establish connection with consul.")
+						continue
+					}
+
+					err = flypgNode.RepMgr.UnregisterStandby(standby.Id)
 					if err != nil {
 						fmt.Printf("Failed to unregister %d: %s", standby.Id, err)
 						continue
 					}
 					delete(seenAt, standby.Id)
+
+					// Remove from Consul
+					if err = state.UnregisterMember(consul, int32(standby.Id)); err != nil {
+						fmt.Printf("Failed to unregister %d from consul: %s", standby.Id, err)
+					}
 				}
 			} else {
 				seenAt[standby.Id] = time.Now().Unix()

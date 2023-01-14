@@ -34,12 +34,12 @@ func main() {
 			fmt.Printf("failed to initialize consul client: %s", err)
 		}
 
-		node, err := consul.Node(int32(*nodeID))
+		member, err := state.FindMember(consul, int32(*nodeID))
 		if err != nil {
-			fmt.Printf("failed to find node: %s", err)
+			fmt.Printf("failed to find member %v: %s", *nodeID, err)
 		}
 
-		if err := consul.RegisterPrimary(string(node.Value)); err != nil {
+		if err := state.AssignPrimary(consul, member.ID); err != nil {
 			fmt.Printf("failed to register primary with consul: %s", err)
 		}
 
@@ -49,7 +49,7 @@ func main() {
 		}
 
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	case "standby_follow":
@@ -57,20 +57,24 @@ func main() {
 		if err != nil {
 			fmt.Printf("failed to initialize consul client: %s", err)
 		}
+
 		newNodeID, err := strconv.Atoi(*newPrimary)
 		if err != nil {
 			fmt.Printf("failed to parse new node id: %s", err)
 		}
-		node, err := consul.Node(int32(newNodeID))
+
+		member, err := state.FindMember(consul, int32(newNodeID))
 		if err != nil {
 			fmt.Printf("failed to find node in consul: %s", err)
 		}
+
 		flypgNode, err := flypg.NewNode()
 		if err != nil {
 			fmt.Printf("failed to reference node: %s\n", err)
 		}
+
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	default:

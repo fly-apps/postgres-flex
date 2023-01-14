@@ -119,7 +119,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
 	}
 
-	primaryIP, err := consul.CurrentPrimary()
+	primary, err := state.CurrentPrimary(consul)
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
@@ -158,10 +158,8 @@ func (n *Node) Init(ctx context.Context) error {
 		fmt.Printf("Failed to write config files for pgbouncer: %s\n", err.Error())
 	}
 
-	switch primaryIP {
-	case n.PrivateIP:
-		// noop
-	case "":
+	switch {
+	case primary == nil:
 		// Initialize ourselves as the primary.
 		fmt.Println("Initializing postgres")
 		if err := n.initialize(); err != nil {
@@ -172,12 +170,14 @@ func (n *Node) Init(ctx context.Context) error {
 		if err := n.setDefaultHBA(); err != nil {
 			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 		}
+	case primary.Hostname == n.PrivateIP:
+		// noop
 	default:
 		// If we are here we are either a standby, new node or primary coming back from the dead.
 		clonePrimary := true
 		if n.isInitialized() {
 			// Attempt to resolve our role by querying the primary.
-			remoteConn, err := repmgr.NewRemoteConnection(ctx, primaryIP)
+			remoteConn, err := repmgr.NewRemoteConnection(ctx, primary.Hostname)
 			if err != nil {
 				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
 			}
@@ -185,7 +185,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 			role, err := repmgr.memberRoleByHostname(ctx, remoteConn, n.PrivateIP)
 			if err != nil {
-				return fmt.Errorf("failed to resolve role for %s: %s", primaryIP, err)
+				return fmt.Errorf("failed to resolve role for %s: %s", primary.Hostname, err)
 			}
 
 			fmt.Printf("My role is: %s\n", role)
@@ -196,7 +196,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 		if clonePrimary {
 			fmt.Println("Cloning from primary")
-			if err := repmgr.clonePrimary(primaryIP); err != nil {
+			if err := repmgr.clonePrimary(primary.Hostname); err != nil {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
@@ -231,7 +231,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("failed to establish connection with consul: %s", err)
 	}
 
-	primaryIP, err := consul.CurrentPrimary()
+	primary, err := state.CurrentPrimary(consul)
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
@@ -239,14 +239,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
 
-	switch primaryIP {
-	case n.PrivateIP:
-		// Re-register the primary in order to pick up any changes made to the configuration file.
-		fmt.Println("Updating primary record")
-		if err := repmgr.registerPrimary(); err != nil {
-			fmt.Printf("failed to register primary with repmgr: %s", err)
-		}
-	case "":
+	switch {
+	case primary == nil:
 		// Check if we can be a primary
 		if !repmgr.eligiblePrimary() {
 			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", os.Getenv("PRIMARY_REGION"), repmgr.Region)
@@ -263,12 +257,16 @@ func (n *Node) PostInit(ctx context.Context) error {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
-		if err := consul.RegisterPrimary(n.PrivateIP); err != nil {
-			return fmt.Errorf("failed to register primary with consul: %s", err)
+		// Register Primary
+		if err := state.RegisterMember(consul, repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
+			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 
-		if err := consul.RegisterNode(repmgr.ID, n.PrivateIP); err != nil {
-			return fmt.Errorf("failed to register member with consul: %s", err)
+	case primary.Hostname == n.PrivateIP:
+		// Re-register the primary in order to pick up any changes made to the configuration file.
+		fmt.Println("Updating primary record")
+		if err := repmgr.registerPrimary(); err != nil {
+			fmt.Printf("failed to register primary with repmgr: %s", err)
 		}
 	default:
 		// If we are here we are a new node, standby or a demoted primary who needs to be reconfigured as a standby.
@@ -302,18 +300,18 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 
 		fmt.Println("Registering Node with Consul")
-		if err := consul.RegisterNode(repmgr.ID, n.PrivateIP); err != nil {
+		if err := state.RegisterMember(consul, repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
 
 	// Requery the primaryIP in case a new primary was assigned above.
-	primaryIP, err = consul.CurrentPrimary()
+	primary, err = state.CurrentPrimary(consul)
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
 
-	if err := pgbouncer.ConfigurePrimary(ctx, primaryIP, true); err != nil {
+	if err := pgbouncer.ConfigurePrimary(ctx, primary.Hostname, true); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 
