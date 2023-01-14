@@ -21,8 +21,12 @@ type Member struct {
 
 const ClusterKey string = "Cluster"
 
-// ErrCAS represents a check-and-set error
-var ErrCAS = errors.New("Key has changed since we last read it. Operation needs to be retried")
+var (
+	// ErrCAS represents a check-and-set error
+	ErrCAS = errors.New("Key has changed since we last read it. Operation needs to be retried")
+	// ErrMemberNotFound indicates that the target member is not currently registered in Consul
+	ErrMemberNotFound = errors.New("Member not found")
+)
 
 func RegisterMember(consul *ConsulClient, id int32, hostname string, region string, primary bool) error {
 	cluster, modifyIndex, err := clusterState(consul)
@@ -88,7 +92,7 @@ func AssignPrimary(consul *ConsulClient, id int32) error {
 	}
 
 	if !primaryAssigned {
-		// TODO - Throw error
+		return ErrMemberNotFound
 	}
 
 	if err := updateClusterState(consul, modifyIndex, cluster); err != nil {
