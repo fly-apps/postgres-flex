@@ -35,6 +35,13 @@ func RegisterMember(consul *ConsulClient, id int32, hostname string, region stri
 		return err
 	}
 
+	// Short circuit if we are already registered.
+	for _, members := range cluster.Members {
+		if members.ID == id {
+			return nil
+		}
+	}
+
 	cluster.Members = append(cluster.Members, &Member{
 		ID:       id,
 		Hostname: hostname,
