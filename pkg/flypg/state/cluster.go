@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -23,9 +24,9 @@ const ClusterKey string = "Cluster"
 
 var (
 	// ErrCAS represents a check-and-set error
-	ErrCAS = errors.New("Key has changed since we last read it. Operation needs to be retried")
+	ErrCAS = errors.New("cluster state has changed and state update will be retried")
 	// ErrMemberNotFound indicates that the target member is not currently registered in Consul
-	ErrMemberNotFound = errors.New("Member not found")
+	ErrMemberNotFound = errors.New("member not found")
 )
 
 func RegisterMember(consul *ConsulClient, id int32, hostname string, region string, primary bool) error {
@@ -85,10 +86,11 @@ func AssignPrimary(consul *ConsulClient, id int32) error {
 
 	for _, member := range cluster.Members {
 		if member.ID == id {
-			member.Primary = true
 			primaryAssigned = true
-			break
+			member.Primary = true
+			continue
 		}
+		member.Primary = false
 	}
 
 	if !primaryAssigned {
@@ -173,6 +175,7 @@ func updateClusterState(consul *ConsulClient, modifyIndex uint64, c *Cluster) er
 	}
 
 	if !succ {
+		fmt.Println(ErrCAS.Error())
 		return ErrCAS
 	}
 
