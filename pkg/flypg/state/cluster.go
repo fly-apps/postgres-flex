@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -20,32 +21,39 @@ type Member struct {
 
 const ClusterKey string = "Cluster"
 
+// ErrCAS represents a check-and-set error
+var ErrCAS = errors.New("Key has changed since we last read it. Operation needs to be retried")
+
 func RegisterMember(consul *ConsulClient, id int32, hostname string, region string, primary bool) error {
-	cluster, err := clusterState(consul)
+	cluster, modifyIndex, err := clusterState(consul)
 	if err != nil {
 		return err
 	}
 
-	member := &Member{
+	cluster.Members = append(cluster.Members, &Member{
 		ID:       id,
 		Hostname: hostname,
 		Region:   region,
 		Primary:  primary,
+	})
+
+	if err := updateClusterState(consul, modifyIndex, cluster); err != nil {
+		if errors.Is(err, ErrCAS) {
+			RegisterMember(consul, id, hostname, region, primary)
+		}
 	}
 
-	cluster.Members = append(cluster.Members, member)
-
-	return updateClusterState(consul, cluster)
+	return nil
 }
 
 func UnregisterMember(consul *ConsulClient, id int32) error {
-	cluster, err := clusterState(consul)
+	cluster, modifyIndex, err := clusterState(consul)
 	if err != nil {
 		return err
 	}
 
+	// Rebuild the members slice and exclude the target member.
 	var members []*Member
-
 	for _, member := range cluster.Members {
 		if member.ID != id {
 			members = append(members, member)
@@ -54,11 +62,17 @@ func UnregisterMember(consul *ConsulClient, id int32) error {
 
 	cluster.Members = members
 
-	return updateClusterState(consul, cluster)
+	if err := updateClusterState(consul, modifyIndex, cluster); err != nil {
+		if errors.Is(err, ErrCAS) {
+			UnregisterMember(consul, id)
+		}
+	}
+
+	return nil
 }
 
-func AssignPrimary(client *ConsulClient, id int32) error {
-	cluster, err := clusterState(client)
+func AssignPrimary(consul *ConsulClient, id int32) error {
+	cluster, modifyIndex, err := clusterState(consul)
 	if err != nil {
 		return err
 	}
@@ -77,11 +91,17 @@ func AssignPrimary(client *ConsulClient, id int32) error {
 		// TODO - Throw error
 	}
 
-	return updateClusterState(client, cluster)
+	if err := updateClusterState(consul, modifyIndex, cluster); err != nil {
+		if errors.Is(err, ErrCAS) {
+			AssignPrimary(consul, id)
+		}
+	}
+
+	return nil
 }
 
 func CurrentPrimary(client *ConsulClient) (*Member, error) {
-	cluster, err := clusterState(client)
+	cluster, _, err := clusterState(client)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +116,7 @@ func CurrentPrimary(client *ConsulClient) (*Member, error) {
 }
 
 func FindMember(consul *ConsulClient, id int32) (*Member, error) {
-	cluster, err := clusterState(consul)
+	cluster, _, err := clusterState(consul)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +130,7 @@ func FindMember(consul *ConsulClient, id int32) (*Member, error) {
 	return nil, nil
 }
 
-func clusterState(consul *ConsulClient) (*Cluster, error) {
+func clusterState(consul *ConsulClient) (*Cluster, uint64, error) {
 	var (
 		cluster Cluster
 		key     = consul.targetKey(ClusterKey)
@@ -118,30 +138,38 @@ func clusterState(consul *ConsulClient) (*Cluster, error) {
 
 	result, _, err := consul.client.KV().Get(key, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if result == nil {
-		return &Cluster{}, nil
+		return &Cluster{}, 0, nil
 	}
 
 	if err := json.Unmarshal(result.Value, &cluster); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return &cluster, nil
+	return &cluster, result.ModifyIndex, nil
 }
 
-func updateClusterState(consul *ConsulClient, c *Cluster) error {
+func updateClusterState(consul *ConsulClient, modifyIndex uint64, c *Cluster) error {
 	clusterJSON, err := json.Marshal(c)
 	if err != nil {
 		return err
 	}
 
-	kv := &api.KVPair{Key: consul.targetKey(ClusterKey), Value: clusterJSON}
-	_, err = consul.client.KV().Put(kv, nil)
+	kv := &api.KVPair{
+		Key:         consul.targetKey(ClusterKey),
+		Value:       clusterJSON,
+		ModifyIndex: modifyIndex,
+	}
+	succ, _, err := consul.client.KV().CAS(kv, nil)
 	if err != nil {
 		return err
+	}
+
+	if !succ {
+		return ErrCAS
 	}
 
 	return nil

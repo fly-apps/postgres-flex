@@ -52,6 +52,10 @@ func (c *ConsulClient) PullUserConfig(key string) ([]byte, error) {
 	return pair.Value, nil
 }
 
+func (c *ConsulClient) LockKey(key string) (*api.Lock, error) {
+	return c.client.LockKey(key)
+}
+
 func (c *ConsulClient) targetKey(key string) string {
 	return c.prefix + key
 }
