@@ -9,7 +9,7 @@ import (
 )
 
 type ClusterState struct {
-	store *Store
+	Store *Store
 }
 
 type ClusterData struct {
@@ -39,7 +39,7 @@ func NewClusterState() (*ClusterState, error) {
 	}
 
 	return &ClusterState{
-		store: store,
+		Store: store,
 	}, nil
 }
 
@@ -160,10 +160,10 @@ func (c *ClusterState) FindMember(id int32) (*Member, error) {
 func (c *ClusterState) clusterData() (*ClusterData, uint64, error) {
 	var (
 		cluster ClusterData
-		key     = c.store.targetKey(stateKey)
+		key     = c.Store.targetKey(stateKey)
 	)
 
-	result, _, err := c.store.Client.KV().Get(key, nil)
+	result, _, err := c.Store.Client.KV().Get(key, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -186,11 +186,11 @@ func (c *ClusterState) updateClusterState(modifyIndex uint64, cluster *ClusterDa
 	}
 
 	kv := &api.KVPair{
-		Key:         c.store.targetKey(stateKey),
+		Key:         c.Store.targetKey(stateKey),
 		Value:       clusterJSON,
 		ModifyIndex: modifyIndex,
 	}
-	succ, _, err := c.store.Client.KV().CAS(kv, nil)
+	succ, _, err := c.Store.Client.KV().CAS(kv, nil)
 	if err != nil {
 		return err
 	}
