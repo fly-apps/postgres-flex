@@ -29,17 +29,18 @@ func main() {
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
 		// TODO - Need to figure out what to do when success == 0.
-		consul, err := state.NewConsulClient()
+
+		cs, err := state.NewClusterState()
 		if err != nil {
-			fmt.Printf("failed to initialize consul client: %s", err)
+			fmt.Printf("failed initialize cluster state store. %v", err)
 		}
 
-		node, err := consul.Node(int32(*nodeID))
+		member, err := cs.FindMember(int32(*nodeID))
 		if err != nil {
-			fmt.Printf("failed to find node: %s", err)
+			fmt.Printf("failed to find member %v: %s", *nodeID, err)
 		}
 
-		if err := consul.RegisterPrimary(string(node.Value)); err != nil {
+		if err := cs.AssignPrimary(member.ID); err != nil {
 			fmt.Printf("failed to register primary with consul: %s", err)
 		}
 
@@ -49,28 +50,32 @@ func main() {
 		}
 
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	case "standby_follow":
-		consul, err := state.NewConsulClient()
+		cs, err := state.NewClusterState()
 		if err != nil {
-			fmt.Printf("failed to initialize consul client: %s", err)
+			fmt.Printf("failed initialize cluster state store. %v", err)
 		}
-		newNodeID, err := strconv.Atoi(*newPrimary)
+
+		newMemberID, err := strconv.Atoi(*newPrimary)
 		if err != nil {
-			fmt.Printf("failed to parse new node id: %s", err)
+			fmt.Printf("failed to parse new member id: %s", err)
 		}
-		node, err := consul.Node(int32(newNodeID))
+
+		member, err := cs.FindMember(int32(newMemberID))
 		if err != nil {
-			fmt.Printf("failed to find node in consul: %s", err)
+			fmt.Printf("failed to find member in consul: %s", err)
 		}
+
 		flypgNode, err := flypg.NewNode()
 		if err != nil {
-			fmt.Printf("failed to reference node: %s\n", err)
+			fmt.Printf("failed to reference member: %s\n", err)
 		}
+
 		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), string(node.Value), true); err != nil {
+		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	default:

@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 	"os"
 	"strings"
+
+	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 )
 
 type ConfigMap map[string]interface{}
@@ -20,7 +21,7 @@ type Config interface {
 	ConsulKey() string
 }
 
-func WriteUserConfig(c Config, consul *state.ConsulClient) error {
+func WriteUserConfig(c Config, consul *state.Store) error {
 	if c.UserConfig() != nil {
 		if err := pushToConsul(c, consul); err != nil {
 			return fmt.Errorf("failed to write to consul: %s", err)
@@ -34,7 +35,7 @@ func WriteUserConfig(c Config, consul *state.ConsulClient) error {
 	return nil
 }
 
-func SyncUserConfig(c Config, consul *state.ConsulClient) error {
+func SyncUserConfig(c Config, consul *state.Store) error {
 	cfg, err := pullFromConsul(c, consul)
 	if err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
@@ -51,7 +52,7 @@ func SyncUserConfig(c Config, consul *state.ConsulClient) error {
 	return nil
 }
 
-func pushToConsul(c Config, consul *state.ConsulClient) error {
+func pushToConsul(c Config, consul *state.Store) error {
 	if c.UserConfig() == nil {
 		return nil
 	}
@@ -68,7 +69,7 @@ func pushToConsul(c Config, consul *state.ConsulClient) error {
 	return nil
 }
 
-func pullFromConsul(c Config, consul *state.ConsulClient) (ConfigMap, error) {
+func pullFromConsul(c Config, consul *state.Store) (ConfigMap, error) {
 	configBytes, err := consul.PullUserConfig(c.ConsulKey())
 	if err != nil {
 		return nil, err

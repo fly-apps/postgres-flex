@@ -3,12 +3,13 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 	"golang.org/x/exp/slices"
-	"net/http"
-	"strings"
 )
 
 func handleRole(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +119,7 @@ func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	defer close()
 
-	consul, err := state.NewConsulClient()
+	consul, err := state.NewStore()
 	if err != nil {
 		renderErr(w, err)
 		return
