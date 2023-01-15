@@ -46,6 +46,11 @@ func (c *Store) PullUserConfig(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if pair == nil {
+		return nil, nil
+	}
+
 	return pair.Value, nil
 }
 
