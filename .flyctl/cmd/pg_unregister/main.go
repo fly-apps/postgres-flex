@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
-	"github.com/fly-examples/postgres-ha/pkg/utils"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 )
 
 func main() {
