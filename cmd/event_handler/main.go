@@ -30,17 +30,17 @@ func main() {
 	case "repmgrd_failover_promote", "standby_promote":
 		// TODO - Need to figure out what to do when success == 0.
 
-		consul, err := state.NewStore()
+		cs, err := state.NewClusterState()
 		if err != nil {
-			fmt.Printf("failed to initialize consul client: %s", err)
+			fmt.Printf("failed initialize cluster state store. %v", err)
 		}
 
-		member, err := consul.FindMember(int32(*nodeID))
+		member, err := cs.FindMember(int32(*nodeID))
 		if err != nil {
 			fmt.Printf("failed to find member %v: %s", *nodeID, err)
 		}
 
-		if err := consul.AssignPrimary(member.ID); err != nil {
+		if err := cs.AssignPrimary(member.ID); err != nil {
 			fmt.Printf("failed to register primary with consul: %s", err)
 		}
 
@@ -54,9 +54,9 @@ func main() {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	case "standby_follow":
-		consul, err := state.NewStore()
+		cs, err := state.NewClusterState()
 		if err != nil {
-			fmt.Printf("failed to initialize consul client: %s", err)
+			fmt.Printf("failed initialize cluster state store. %v", err)
 		}
 
 		newMemberID, err := strconv.Atoi(*newPrimary)
@@ -64,7 +64,7 @@ func main() {
 			fmt.Printf("failed to parse new member id: %s", err)
 		}
 
-		member, err := consul.FindMember(int32(newMemberID))
+		member, err := cs.FindMember(int32(newMemberID))
 		if err != nil {
 			fmt.Printf("failed to find member in consul: %s", err)
 		}

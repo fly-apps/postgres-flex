@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
 
 	"github.com/hashicorp/consul/api"
 )
+
+type ClusterState struct {
+	store *Store
+}
 
 type ClusterData struct {
 	Members []*Member `json:"members"`
@@ -30,34 +32,18 @@ var (
 	ErrMemberNotFound = errors.New("member not found")
 )
 
-type Store struct {
-	client *api.Client
-	prefix string
-}
-
-func NewStore() (*Store, error) {
-	conf, err := clientConfig()
+func NewClusterState() (*ClusterState, error) {
+	store, err := NewStore()
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := api.NewClient(conf)
-	if err != nil {
-		return nil, err
-	}
-
-	prefix, err := pathPrefix()
-	if err != nil {
-		return nil, err
-	}
-
-	return &Store{
-		client: client,
-		prefix: prefix,
+	return &ClusterState{
+		store: store,
 	}, nil
 }
 
-func (c *Store) RegisterMember(id int32, hostname string, region string, primary bool) error {
+func (c *ClusterState) RegisterMember(id int32, hostname string, region string, primary bool) error {
 	cluster, modifyIndex, err := c.clusterData()
 	if err != nil {
 		return err
@@ -86,7 +72,7 @@ func (c *Store) RegisterMember(id int32, hostname string, region string, primary
 	return nil
 }
 
-func (c *Store) UnregisterMember(id int32) error {
+func (c *ClusterState) UnregisterMember(id int32) error {
 	cluster, modifyIndex, err := c.clusterData()
 	if err != nil {
 		return err
@@ -111,7 +97,7 @@ func (c *Store) UnregisterMember(id int32) error {
 	return nil
 }
 
-func (c *Store) AssignPrimary(id int32) error {
+func (c *ClusterState) AssignPrimary(id int32) error {
 	cluster, modifyIndex, err := c.clusterData()
 	if err != nil {
 		return err
@@ -141,7 +127,7 @@ func (c *Store) AssignPrimary(id int32) error {
 	return nil
 }
 
-func (c *Store) PrimaryMember() (*Member, error) {
+func (c *ClusterState) PrimaryMember() (*Member, error) {
 	cluster, _, err := c.clusterData()
 	if err != nil {
 		return nil, err
@@ -156,7 +142,7 @@ func (c *Store) PrimaryMember() (*Member, error) {
 	return nil, nil
 }
 
-func (c *Store) FindMember(id int32) (*Member, error) {
+func (c *ClusterState) FindMember(id int32) (*Member, error) {
 	cluster, _, err := c.clusterData()
 	if err != nil {
 		return nil, err
@@ -171,13 +157,13 @@ func (c *Store) FindMember(id int32) (*Member, error) {
 	return nil, nil
 }
 
-func (c *Store) clusterData() (*ClusterData, uint64, error) {
+func (c *ClusterState) clusterData() (*ClusterData, uint64, error) {
 	var (
 		cluster ClusterData
-		key     = c.targetKey(stateKey)
+		key     = c.store.targetKey(stateKey)
 	)
 
-	result, _, err := c.client.KV().Get(key, nil)
+	result, _, err := c.store.Client.KV().Get(key, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -193,18 +179,18 @@ func (c *Store) clusterData() (*ClusterData, uint64, error) {
 	return &cluster, result.ModifyIndex, nil
 }
 
-func (c *Store) updateClusterState(modifyIndex uint64, cluster *ClusterData) error {
+func (c *ClusterState) updateClusterState(modifyIndex uint64, cluster *ClusterData) error {
 	clusterJSON, err := json.Marshal(c)
 	if err != nil {
 		return err
 	}
 
 	kv := &api.KVPair{
-		Key:         c.targetKey(stateKey),
+		Key:         c.store.targetKey(stateKey),
 		Value:       clusterJSON,
 		ModifyIndex: modifyIndex,
 	}
-	succ, _, err := c.client.KV().CAS(kv, nil)
+	succ, _, err := c.store.Client.KV().CAS(kv, nil)
 	if err != nil {
 		return err
 	}
@@ -215,51 +201,4 @@ func (c *Store) updateClusterState(modifyIndex uint64, cluster *ClusterData) err
 	}
 
 	return nil
-}
-
-func (c *Store) PushUserConfig(key string, config []byte) error {
-	kv := &api.KVPair{Key: c.targetKey(key), Value: config}
-	_, err := c.client.KV().Put(kv, nil)
-	return err
-}
-
-func (c *Store) PullUserConfig(key string) ([]byte, error) {
-	pair, _, err := c.client.KV().Get(c.targetKey(key), nil)
-	if err != nil {
-		return nil, err
-	}
-	return pair.Value, nil
-}
-
-func (c *Store) targetKey(key string) string {
-	return c.prefix + key
-}
-
-func clientConfig() (*api.Config, error) {
-	u, err := url.Parse(os.Getenv("FLY_CONSUL_URL"))
-	if err != nil {
-		panic(err)
-	}
-
-	token, set := u.User.Password()
-	if !set {
-		return nil, fmt.Errorf("token not set")
-	}
-
-	u.User = nil
-
-	return &api.Config{
-		Token:   token,
-		Scheme:  u.Scheme,
-		Address: u.Hostname(),
-	}, nil
-}
-
-func pathPrefix() (string, error) {
-	u, err := url.Parse(os.Getenv("FLY_CONSUL_URL"))
-	if err != nil {
-		return "", err
-	}
-
-	return u.Path[1:], nil
 }

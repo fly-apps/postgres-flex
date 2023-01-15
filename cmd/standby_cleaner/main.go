@@ -49,10 +49,9 @@ func main() {
 			newConn, err := flypgNode.RepMgr.NewRemoteConnection(ctx, standby.Ip)
 			if err != nil {
 				if time.Now().Unix()-seenAt[standby.Id] >= 10*Minute {
-					consul, err := state.NewStore()
+					cs, err := state.NewClusterState()
 					if err != nil {
-						fmt.Printf("Failed to establish connection with consul.")
-						continue
+						fmt.Printf("failed initialize cluster state store. %v", err)
 					}
 
 					err = flypgNode.RepMgr.UnregisterStandby(standby.Id)
@@ -63,7 +62,7 @@ func main() {
 					delete(seenAt, standby.Id)
 
 					// Remove from Consul
-					if err = consul.UnregisterMember(int32(standby.Id)); err != nil {
+					if err = cs.UnregisterMember(int32(standby.Id)); err != nil {
 						fmt.Printf("Failed to unregister %d from consul: %s", standby.Id, err)
 					}
 				}

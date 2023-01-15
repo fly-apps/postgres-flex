@@ -114,12 +114,12 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	consul, err := state.NewStore()
+	cs, err := state.NewClusterState()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed initialize cluster state store. %v", err)
 	}
 
-	primary, err := consul.PrimaryMember()
+	primary, err := cs.PrimaryMember()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
@@ -226,12 +226,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 	defer conn.Close(ctx)
 
-	consul, err := state.NewStore()
+	cs, err := state.NewClusterState()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed initialize cluster state store. %v", err)
 	}
 
-	primary, err := consul.PrimaryMember()
+	primary, err := cs.PrimaryMember()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
@@ -258,7 +258,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 
 		// Register primary member with consul
-		if err := consul.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
+		if err := cs.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 
@@ -300,13 +300,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 
 		// Register member with consul if it hasn't been already
-		if err := consul.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
+		if err := cs.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
 
 	// Requery the primaryIP from consul in case the primary was assigned above.
-	primary, err = consul.PrimaryMember()
+	primary, err = cs.PrimaryMember()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
