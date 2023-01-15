@@ -67,6 +67,8 @@ func (c *ClusterState) RegisterMember(id int32, hostname string, region string, 
 		if errors.Is(err, ErrCAS) {
 			c.RegisterMember(id, hostname, region, primary)
 		}
+
+		return err
 	}
 
 	return nil
@@ -92,6 +94,8 @@ func (c *ClusterState) UnregisterMember(id int32) error {
 		if errors.Is(err, ErrCAS) {
 			c.UnregisterMember(id)
 		}
+
+		return err
 	}
 
 	return nil
@@ -122,6 +126,8 @@ func (c *ClusterState) AssignPrimary(id int32) error {
 		if errors.Is(err, ErrCAS) {
 			c.AssignPrimary(id)
 		}
+
+		return err
 	}
 
 	return nil
