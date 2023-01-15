@@ -39,6 +39,9 @@ func SyncUserConfig(c Config, consul *state.ConsulClient) error {
 	if err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)
 	}
+	if cfg == nil {
+		return nil
+	}
 	c.SetUserConfig(cfg)
 
 	if err := WriteConfigFiles(c); err != nil {
@@ -70,6 +73,9 @@ func pullFromConsul(c Config, consul *state.ConsulClient) (ConfigMap, error) {
 	if err != nil {
 		return nil, err
 	}
+	if configBytes == nil {
+		return nil, nil
+	}
 
 	var storeCfg ConfigMap
 	if err = json.Unmarshal(configBytes, &storeCfg); err != nil {
@@ -91,14 +97,19 @@ func WriteConfigFiles(c Config) error {
 	}
 	defer userFile.Close()
 
-	for key, value := range c.InternalConfig() {
-		entry := fmt.Sprintf("%s = %v\n", key, value)
-		internalFile.Write([]byte(entry))
-	}
+	internal := c.InternalConfig()
 
 	for key, value := range c.UserConfig() {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
+		if _, ok := internal[key]; ok {
+			delete(internal, key)
+		}
 		userFile.Write([]byte(entry))
+	}
+
+	for key, value := range internal {
+		entry := fmt.Sprintf("%s = %v\n", key, value)
+		internalFile.Write([]byte(entry))
 	}
 
 	return nil
