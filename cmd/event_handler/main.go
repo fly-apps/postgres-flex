@@ -35,7 +35,7 @@ func main() {
 			fmt.Printf("failed initialize cluster state store. %v", err)
 		}
 
-		member, err := cs.FindMember(int32(*nodeID))
+		member, err := cs.FindMemberByID(int32(*nodeID))
 		if err != nil {
 			fmt.Printf("failed to find member %v: %s", *nodeID, err)
 		}
@@ -64,7 +64,7 @@ func main() {
 			fmt.Printf("failed to parse new member id: %s", err)
 		}
 
-		member, err := cs.FindMember(int32(newMemberID))
+		member, err := cs.FindMemberByID(int32(newMemberID))
 		if err != nil {
 			fmt.Printf("failed to find member in consul: %s", err)
 		}

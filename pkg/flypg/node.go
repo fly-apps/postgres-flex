@@ -305,7 +305,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
-
 	// Requery the primaryIP from consul in case the primary was assigned above.
 	primary, err = cs.PrimaryMember()
 	if err != nil {
@@ -460,6 +459,75 @@ func (n *Node) setDefaultHBA() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func UnregisterMemberByHostname(ctx context.Context, hostname string) error {
+	cs, err := state.NewClusterState()
+	if err != nil {
+		fmt.Printf("failed initialize cluster state store. %v", err)
+	}
+
+	member, err := cs.FindMemberByHostname(hostname)
+	if err != nil {
+		return err
+	}
+
+	if member == nil {
+		return state.ErrMemberNotFound
+	}
+
+	node, err := NewNode()
+	if err != nil {
+		return err
+	}
+
+	// Unregister from repmgr
+	err = node.RepMgr.UnregisterStandby(int(member.ID))
+	if err != nil {
+		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
+	}
+
+	// Unregister from consul
+	if err := cs.UnregisterMember(member.ID); err != nil {
+		return fmt.Errorf("failed to unregister member %d from consul: %v", member.ID, err)
+	}
+
+	return nil
+}
+
+func UnregisterMemberByID(ctx context.Context, id int32) error {
+
+	cs, err := state.NewClusterState()
+	if err != nil {
+		fmt.Printf("failed initialize cluster state store. %v", err)
+	}
+
+	member, err := cs.FindMemberByID(id)
+	if err != nil {
+		return err
+	}
+
+	if member == nil {
+		return state.ErrMemberNotFound
+	}
+
+	node, err := NewNode()
+	if err != nil {
+		return err
+	}
+
+	// Unregister from repmgr
+	err = node.RepMgr.UnregisterStandby(int(member.ID))
+	if err != nil {
+		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
+	}
+
+	// Unregister from consul
+	if err := cs.UnregisterMember(member.ID); err != nil {
+		return fmt.Errorf("failed to unregister member %d from consul: %v", member.ID, err)
 	}
 
 	return nil

@@ -148,7 +148,7 @@ func (c *ClusterState) PrimaryMember() (*Member, error) {
 	return nil, nil
 }
 
-func (c *ClusterState) FindMember(id int32) (*Member, error) {
+func (c *ClusterState) FindMemberByID(id int32) (*Member, error) {
 	cluster, _, err := c.clusterData()
 	if err != nil {
 		return nil, err
@@ -156,6 +156,21 @@ func (c *ClusterState) FindMember(id int32) (*Member, error) {
 
 	for _, member := range cluster.Members {
 		if member.ID == id {
+			return member, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (c *ClusterState) FindMemberByHostname(hostname string) (*Member, error) {
+	cluster, _, err := c.clusterData()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, member := range cluster.Members {
+		if member.Hostname == hostname {
 			return member, nil
 		}
 	}

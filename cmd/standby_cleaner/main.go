@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 )
 
 var Minute int64 = 60
@@ -49,22 +48,11 @@ func main() {
 			newConn, err := flypgNode.RepMgr.NewRemoteConnection(ctx, standby.Ip)
 			if err != nil {
 				if time.Now().Unix()-seenAt[standby.Id] >= 10*Minute {
-					cs, err := state.NewClusterState()
-					if err != nil {
-						fmt.Printf("failed initialize cluster state store. %v", err)
+					if err := flypg.UnregisterMemberByID(ctx, int32(standby.Id)); err != nil {
+						fmt.Println(err.Error())
 					}
 
-					err = flypgNode.RepMgr.UnregisterStandby(standby.Id)
-					if err != nil {
-						fmt.Printf("Failed to unregister %d: %s", standby.Id, err)
-						continue
-					}
 					delete(seenAt, standby.Id)
-
-					// Remove from Consul
-					if err = cs.UnregisterMember(int32(standby.Id)); err != nil {
-						fmt.Printf("Failed to unregister %d from consul: %s", standby.Id, err)
-					}
 				}
 			} else {
 				seenAt[standby.Id] = time.Now().Unix()
