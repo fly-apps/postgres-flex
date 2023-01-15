@@ -114,12 +114,12 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	consul, err := state.NewConsulClient()
+	consul, err := state.NewStore()
 	if err != nil {
-		return fmt.Errorf("failed to establish connection with consul: %s", err)
+		return err
 	}
 
-	primary, err := state.CurrentPrimary(consul)
+	primary, err := consul.PrimaryMember()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
@@ -226,12 +226,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 	defer conn.Close(ctx)
 
-	consul, err := state.NewConsulClient()
+	consul, err := state.NewStore()
 	if err != nil {
-		return fmt.Errorf("failed to establish connection with consul: %s", err)
+		return err
 	}
 
-	primary, err := state.CurrentPrimary(consul)
+	primary, err := consul.PrimaryMember()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}
@@ -257,8 +257,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
-		// Register Primary
-		if err := state.RegisterMember(consul, repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
+		// Register primary member with consul
+		if err := consul.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 
@@ -299,13 +299,14 @@ func (n *Node) PostInit(ctx context.Context) error {
 			fmt.Printf("failed to register standby: %s\n", err)
 		}
 
-		if err := state.RegisterMember(consul, repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
+		// Register member with consul if it hasn't been already
+		if err := consul.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
 
-	// Requery the primaryIP in case a new primary was assigned above.
-	primary, err = state.CurrentPrimary(consul)
+	// Requery the primaryIP from consul in case the primary was assigned above.
+	primary, err = consul.PrimaryMember()
 	if err != nil {
 		return fmt.Errorf("failed to query current primary: %s", err)
 	}

@@ -29,17 +29,18 @@ func main() {
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
 		// TODO - Need to figure out what to do when success == 0.
-		consul, err := state.NewConsulClient()
+
+		consul, err := state.NewStore()
 		if err != nil {
 			fmt.Printf("failed to initialize consul client: %s", err)
 		}
 
-		member, err := state.FindMember(consul, int32(*nodeID))
+		member, err := consul.FindMember(int32(*nodeID))
 		if err != nil {
 			fmt.Printf("failed to find member %v: %s", *nodeID, err)
 		}
 
-		if err := state.AssignPrimary(consul, member.ID); err != nil {
+		if err := consul.AssignPrimary(member.ID); err != nil {
 			fmt.Printf("failed to register primary with consul: %s", err)
 		}
 
@@ -53,7 +54,7 @@ func main() {
 			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
 		}
 	case "standby_follow":
-		consul, err := state.NewConsulClient()
+		consul, err := state.NewStore()
 		if err != nil {
 			fmt.Printf("failed to initialize consul client: %s", err)
 		}
@@ -63,7 +64,7 @@ func main() {
 			fmt.Printf("failed to parse new member id: %s", err)
 		}
 
-		member, err := state.FindMember(consul, int32(newMemberID))
+		member, err := consul.FindMember(int32(newMemberID))
 		if err != nil {
 			fmt.Printf("failed to find member in consul: %s", err)
 		}
