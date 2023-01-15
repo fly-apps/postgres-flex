@@ -185,8 +185,8 @@ func (c *ClusterState) clusterData() (*ClusterData, uint64, error) {
 	return &cluster, result.ModifyIndex, nil
 }
 
-func (c *ClusterState) updateClusterState(modifyIndex uint64, cluster *ClusterData) error {
-	clusterJSON, err := json.Marshal(c)
+func (c *ClusterState) updateClusterState(modifyIndex uint64, cd *ClusterData) error {
+	clusterJSON, err := json.Marshal(cd)
 	if err != nil {
 		return err
 	}

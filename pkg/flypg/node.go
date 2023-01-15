@@ -252,12 +252,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 
 		// Setup repmgr database, extension, and register ourselves as the primary
-		fmt.Println("Perform Repmgr setup")
+		fmt.Println("Performing Repmgr setup")
 		if err := repmgr.setup(ctx, conn); err != nil {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
 		// Register primary member with consul
+		fmt.Println("Registering member")
 		if err := cs.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
