@@ -101,10 +101,10 @@ func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot,
 			return nil, err
 		}
 
+		// Extract the repmgr member id from the slot name.
+		// Slot name has the following format: repmgr_slot_<member-id>
 		slotArr := strings.Split(slot.Name, "_")
-		// Only look at repmgr replication slots.
 		if slotArr[0] == "repmgr" {
-			// Resolve member id from slot name.
 			idStr := slotArr[2]
 
 			num, err := strconv.ParseInt(idStr, 10, 32)
