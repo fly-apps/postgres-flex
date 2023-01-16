@@ -109,8 +109,7 @@ func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot,
 
 			num, err := strconv.ParseInt(idStr, 10, 32)
 			if err != nil {
-				fmt.Printf("failed to parse member id %s", idStr)
-				continue
+				return nil, err
 			}
 
 			slot.MemberID = int32(num)

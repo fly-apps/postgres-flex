@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	monitorFrequency           = time.Minute * 5
-	deadMemberRemovalThreshold = time.Hour * 24
+	monitorFrequency = time.Minute * 5
+	// TODO - Make this configurable and/or extend this to 12-24 hours.
+	deadMemberRemovalThreshold = time.Hour * 1
 )
 
 func main() {
@@ -37,44 +38,47 @@ func main() {
 	ticker := time.NewTicker(monitorFrequency)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		role, err := flypgNode.RepMgr.CurrentRole(ctx, conn)
-		if err != nil {
-			fmt.Printf("Failed to check role: %s\n", err)
-			continue
-		}
-
-		if role != flypg.PrimaryRoleName {
-			continue
-		}
-
-		standbys, err := flypgNode.RepMgr.Standbys(ctx, conn)
-		if err != nil {
-			fmt.Printf("Failed to query standbys: %s\n", err)
-			continue
-		}
-
-		for _, standby := range standbys {
-			newConn, err := flypgNode.RepMgr.NewRemoteConnection(ctx, standby.Ip)
-			defer newConn.Close(ctx)
+	for {
+		select {
+		case <-ticker.C:
+			role, err := flypgNode.RepMgr.CurrentRole(ctx, conn)
 			if err != nil {
-				// TODO - Verify the exception that's getting thrown.
-				if time.Now().Sub(seenAt[standby.Id]) >= deadMemberRemovalThreshold {
-					if err := flypgNode.UnregisterMemberByID(ctx, int32(standby.Id)); err != nil {
-						fmt.Printf("failed to unregister member %d: %v\n", standby.Id, err.Error())
-						continue
-					}
-
-					delete(seenAt, standby.Id)
-				}
-
+				fmt.Printf("Failed to check role: %s\n", err)
 				continue
 			}
 
-			seenAt[standby.Id] = time.Now()
-		}
+			if role != flypg.PrimaryRoleName {
+				continue
+			}
 
-		removeOrphanedReplicationSlots(ctx, conn, standbys)
+			standbys, err := flypgNode.RepMgr.Standbys(ctx, conn)
+			if err != nil {
+				fmt.Printf("Failed to query standbys: %s\n", err)
+				continue
+			}
+
+			for _, standby := range standbys {
+				newConn, err := flypgNode.RepMgr.NewRemoteConnection(ctx, standby.Ip)
+				defer newConn.Close(ctx)
+				if err != nil {
+					// TODO - Verify the exception that's getting thrown.
+					if time.Now().Sub(seenAt[standby.Id]) >= deadMemberRemovalThreshold {
+						if err := flypgNode.UnregisterMemberByID(ctx, int32(standby.Id)); err != nil {
+							fmt.Printf("failed to unregister member %d: %v\n", standby.Id, err.Error())
+							continue
+						}
+
+						delete(seenAt, standby.Id)
+					}
+
+					continue
+				}
+
+				seenAt[standby.Id] = time.Now()
+			}
+
+			removeOrphanedReplicationSlots(ctx, conn, standbys)
+		}
 	}
 }
 
@@ -102,13 +106,13 @@ func removeOrphanedReplicationSlots(ctx context.Context, conn *pgx.Conn, standby
 	}
 
 	if len(orphanedSlots) > 0 {
-		fmt.Printf("%d orphaned replication slots detected", len(orphanedSlots))
+		fmt.Printf("%d orphaned replication slot(s) detected\n", len(orphanedSlots))
 
 		for _, slot := range orphanedSlots {
-			fmt.Printf("dropping replication slot: %s", slot.Name)
+			fmt.Printf("Dropping replication slot: %s\n", slot.Name)
 
 			if err := admin.DropReplicationSlot(ctx, conn, slot.Name); err != nil {
-				fmt.Printf("failed to drop replication slot %s: %v", slot.Name, err)
+				fmt.Printf("failed to drop replication slot %s: %v\n", slot.Name, err)
 				continue
 			}
 		}
