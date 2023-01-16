@@ -75,6 +75,17 @@ func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 	return nil
 }
 
+func DropReplicationSlot(ctx context.Context, pg *pgx.Conn, name string) error {
+	sql := fmt.Sprintf("SELECT pg_drop_replication_slot('%s');", name)
+
+	_, err := pg.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func EnableExtension(ctx context.Context, pg *pgx.Conn, extension string) error {
 	sql := fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s;", extension)
 	_, err := pg.Exec(context.Background(), sql)

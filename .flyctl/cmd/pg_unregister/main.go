@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
@@ -12,14 +14,16 @@ func main() {
 	encodedArg := os.Args[1]
 	hostnameBytes, err := base64.StdEncoding.DecodeString(encodedArg)
 	if err != nil {
-		utils.WriteError(err)
-		sys.Exit(1)
+		utils.WriteError(fmt.Errorf("failed to decode hostname: %v", err))
+		os.Exit(1)
+		return
 	}
 
-	if err := flypg.UnregisterMemberByHostname(ctx, string(hostnameBytes)); err != nil {
+	if err := flypg.UnregisterMemberByHostname(context.Background(), string(hostnameBytes)); err != nil {
 		utils.WriteError(err)
-		sys.Exit(1)
+		os.Exit(1)
+		return
 	}
 
-	utils.WriteOutput("Member has been succesfully unregistered")
+	utils.WriteOutput("Member has been succesfully unregistered", "")
 }

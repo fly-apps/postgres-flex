@@ -491,8 +491,8 @@ func UnregisterMemberByHostname(ctx context.Context, hostname string) error {
 	}
 
 	// Unregister from consul
-	if err := cs.UnregisterMember(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from consul: %v", member.ID, err)
+	if err := cs.UnregisterMember(int32(member.ID)); err != nil {
+		fmt.Printf("failed to unregister member %d from consul: %v", member.ID, err)
 	}
 
 	return nil

@@ -9,6 +9,13 @@ import (
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 )
 
+// We need to adjust this to look at replication slots.
+// Pull ids from repmgr.show_nodes
+// Pull replication_slot ids that are inactive.
+
+// Remove replication slot if the slot_name id is inactive and is not
+// present as a repmgr node.
+
 var Minute int64 = 60
 
 func main() {
@@ -36,7 +43,7 @@ func main() {
 			fmt.Printf("Failed to check role: %s", err)
 			continue
 		}
-		if role != "primary" {
+		if role != flypg.PrimaryRoleName {
 			continue
 		}
 		standbys, err := flypgNode.RepMgr.Standbys(ctx, conn)
