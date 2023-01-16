@@ -3,6 +3,8 @@ package admin
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v4"
 )
@@ -75,6 +77,14 @@ func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 	return nil
 }
 
+type ReplicationSlot struct {
+	MemberID  int32
+	Name      string
+	Type      string
+	Active    bool
+	WalStatus string
+}
+
 func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
 	sql := fmt.Sprintf("SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;")
 	rows, err := pg.Query(ctx, sql)
@@ -91,7 +101,21 @@ func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot,
 			return nil, err
 		}
 
-		slots = append(slots, slot)
+		slotArr := strings.Split(slot.Name, "_")
+		// Only look at repmgr replication slots.
+		if slotArr[0] == "repmgr" {
+			// Resolve member id from slot name.
+			idStr := slotArr[2]
+
+			num, err := strconv.ParseInt(idStr, 10, 32)
+			if err != nil {
+				fmt.Printf("failed to parse member id %s", idStr)
+				continue
+			}
+
+			slot.MemberID = int32(num)
+			slots = append(slots, slot)
+		}
 	}
 
 	return slots, nil
@@ -172,13 +196,6 @@ type UserInfo struct {
 type DbInfo struct {
 	Name  string   `json:"name"`
 	Users []string `json:"users"`
-}
-
-type ReplicationSlot struct {
-	Name      string
-	Type      string
-	Active    bool
-	WalStatus string
 }
 
 func ListUsers(ctx context.Context, pg *pgx.Conn) ([]UserInfo, error) {
