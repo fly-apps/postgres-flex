@@ -60,7 +60,7 @@ func main() {
 			if err != nil {
 				// TODO - Verify the exception that's getting thrown.
 				if time.Now().Sub(seenAt[standby.Id]) >= deadMemberRemovalThreshold {
-					if err := flypg.UnregisterMemberByID(ctx, int32(standby.Id)); err != nil {
+					if err := flypgNode.UnregisterMemberByID(ctx, int32(standby.Id)); err != nil {
 						fmt.Printf("failed to unregister member %d: %v\n", standby.Id, err.Error())
 						continue
 					}

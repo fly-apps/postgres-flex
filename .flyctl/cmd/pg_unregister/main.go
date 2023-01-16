@@ -19,7 +19,9 @@ func main() {
 		return
 	}
 
-	if err := flypg.UnregisterMemberByHostname(context.Background(), string(hostnameBytes)); err != nil {
+	node := flypg.NewNode()
+
+	if err := node.UnregisterMemberByHostname(context.Background(), string(hostnameBytes)); err != nil {
 		utils.WriteError(err)
 		os.Exit(1)
 		return
