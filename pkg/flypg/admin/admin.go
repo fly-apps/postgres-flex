@@ -75,6 +75,28 @@ func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 	return nil
 }
 
+func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
+	sql := fmt.Sprintf("SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;")
+	rows, err := pg.Query(ctx, sql)
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var slots []ReplicationSlot
+
+	for rows.Next() {
+		var slot ReplicationSlot
+		if err := rows.Scan(&slot.Name, &slot.Type, &slot.Active, &slot.WalStatus); err != nil {
+			return nil, err
+		}
+
+		slots = append(slots, slot)
+	}
+
+	return slots, nil
+}
+
 func DropReplicationSlot(ctx context.Context, pg *pgx.Conn, name string) error {
 	sql := fmt.Sprintf("SELECT pg_drop_replication_slot('%s');", name)
 
@@ -150,6 +172,13 @@ type UserInfo struct {
 type DbInfo struct {
 	Name  string   `json:"name"`
 	Users []string `json:"users"`
+}
+
+type ReplicationSlot struct {
+	Name      string
+	Type      string
+	Active    bool
+	WalStatus string
 }
 
 func ListUsers(ctx context.Context, pg *pgx.Conn) ([]UserInfo, error) {
