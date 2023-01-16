@@ -19,10 +19,15 @@ func main() {
 		return
 	}
 
-	node := flypg.NewNode()
+	node, err := flypg.NewNode()
+	if err != nil {
+		utils.WriteError(err)
+		os.Exit(1)
+		return
+	}
 
 	if err := node.UnregisterMemberByHostname(context.Background(), string(hostnameBytes)); err != nil {
-		utils.WriteError(err)
+		utils.WriteError(fmt.Errorf("failed to unregister member: %v", err))
 		os.Exit(1)
 		return
 	}
