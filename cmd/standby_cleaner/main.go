@@ -86,7 +86,8 @@ func removeOrphanedReplicationSlots(ctx context.Context, conn *pgx.Conn, standby
 		fmt.Printf("failed to list replication slots: %s", err)
 	}
 
-	// Identify orphaned replication slots.  active replication slots with the listed standbys
+	// An orphaned replication slot is defined as an inactive replication slot that is no longer tied to
+	// and existing repmgr member.
 	for _, slot := range slots {
 		matchFound := false
 		for _, standby := range standbys {
