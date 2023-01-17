@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
@@ -48,18 +47,18 @@ func main() {
 
 	maps.Copy(user, internal)
 
-	interval, err := strconv.Atoi(fmt.Sprintf("%v", internal["standby_clean_interval"]))
+	deadMemberRemovalThreshold, err := time.ParseDuration(fmt.Sprintf("%v", internal["standby_clean_interval"]))
 	if err != nil {
 		fmt.Printf(fmt.Sprintf("Failed to parse config: %s", err))
 		os.Exit(1)
 	}
 
-	deadMemberRemovalThreshold := time.Duration(interval) * time.Minute
-
 	seenAt := map[int]time.Time{}
 
 	ticker := time.NewTicker(monitorFrequency)
 	defer ticker.Stop()
+
+	fmt.Printf("Pruning every %s...\n", deadMemberRemovalThreshold)
 
 	for {
 		select {

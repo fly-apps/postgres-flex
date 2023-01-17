@@ -3,6 +3,7 @@ package flypg
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 type FlyPGConfig struct {
@@ -17,8 +18,7 @@ type FlyPGConfig struct {
 
 func (c *FlyPGConfig) SetDefaults() {
 	c.internalConfig = ConfigMap{
-		// 24 hours in minutes
-		"standby_clean_interval": 1440,
+		"standby_clean_interval": fmt.Sprintf("%s", time.Hour*24),
 	}
 }
 
