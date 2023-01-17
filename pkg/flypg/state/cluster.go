@@ -81,11 +81,19 @@ func (c *ClusterState) UnregisterMember(id int32) error {
 	}
 
 	// Rebuild the members slice and exclude the target member.
+	exists := false
 	var members []*Member
 	for _, member := range cluster.Members {
-		if member.ID != id {
-			members = append(members, member)
+		if member.ID == id {
+			exists = true
+			continue
 		}
+
+		members = append(members, member)
+	}
+
+	if !exists {
+		return nil
 	}
 
 	cluster.Members = members
