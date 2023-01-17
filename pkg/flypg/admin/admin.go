@@ -3,6 +3,8 @@ package admin
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v4"
 )
@@ -66,6 +68,60 @@ func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 
 func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 	sql := fmt.Sprintf("DROP DATABASE %s;", name)
+
+	_, err := pg.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ReplicationSlot struct {
+	MemberID  int32
+	Name      string
+	Type      string
+	Active    bool
+	WalStatus string
+}
+
+func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
+	sql := fmt.Sprintf("SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;")
+	rows, err := pg.Query(ctx, sql)
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var slots []ReplicationSlot
+
+	for rows.Next() {
+		var slot ReplicationSlot
+		if err := rows.Scan(&slot.Name, &slot.Type, &slot.Active, &slot.WalStatus); err != nil {
+			return nil, err
+		}
+
+		// Extract the repmgr member id from the slot name.
+		// Slot name has the following format: repmgr_slot_<member-id>
+		slotArr := strings.Split(slot.Name, "_")
+		if slotArr[0] == "repmgr" {
+			idStr := slotArr[2]
+
+			num, err := strconv.ParseInt(idStr, 10, 32)
+			if err != nil {
+				return nil, err
+			}
+
+			slot.MemberID = int32(num)
+			slots = append(slots, slot)
+		}
+	}
+
+	return slots, nil
+}
+
+func DropReplicationSlot(ctx context.Context, pg *pgx.Conn, name string) error {
+	sql := fmt.Sprintf("SELECT pg_drop_replication_slot('%s');", name)
 
 	_, err := pg.Exec(ctx, sql)
 	if err != nil {

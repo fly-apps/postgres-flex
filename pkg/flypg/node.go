@@ -305,7 +305,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to register member with consul: %s", err)
 		}
 	}
-
 	// Requery the primaryIP from consul in case the primary was assigned above.
 	primary, err = cs.PrimaryMember()
 	if err != nil {
@@ -322,6 +321,34 @@ func (n *Node) PostInit(ctx context.Context) error {
 func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
 	return openConnection(ctx, host, database, n.OperatorCredentials)
+}
+
+func (n *Node) UnregisterMemberByHostname(ctx context.Context, hostname string) error {
+	cs, err := state.NewClusterState()
+	if err != nil {
+		fmt.Printf("failed initialize cluster state store. %v", err)
+	}
+
+	member, err := cs.FindMemberByHostname(hostname)
+	if err != nil {
+		return err
+	}
+
+	return n.unregisterNode(ctx, cs, member)
+}
+
+func (n *Node) UnregisterMemberByID(ctx context.Context, id int32) error {
+	cs, err := state.NewClusterState()
+	if err != nil {
+		fmt.Printf("failed initialize cluster state store. %v", err)
+	}
+
+	member, err := cs.FindMemberByID(id)
+	if err != nil {
+		return err
+	}
+
+	return n.unregisterNode(ctx, cs, member)
 }
 
 func (n *Node) isInitialized() bool {
@@ -379,6 +406,25 @@ func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
 				return fmt.Errorf("failed to grant superuser privileges to user %s: %s", user, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (n *Node) unregisterNode(ctx context.Context, cs *state.ClusterState, member *state.Member) error {
+	if member == nil {
+		return state.ErrMemberNotFound
+	}
+
+	// Unregister from repmgr
+	err := n.RepMgr.UnregisterStandby(int(member.ID))
+	if err != nil {
+		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
+	}
+
+	// Unregister from consul
+	if err := cs.UnregisterMember(member.ID); err != nil {
+		return fmt.Errorf("failed to unregister member %d from consul: %v", member.ID, err)
 	}
 
 	return nil
