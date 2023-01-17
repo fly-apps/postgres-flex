@@ -35,8 +35,9 @@ type Node struct {
 	OperatorCredentials Credentials
 	ReplCredentials     Credentials
 
-	PGBouncer PGBouncer
-	RepMgr    RepMgr
+	PGBouncer      PGBouncer
+	RepMgr         RepMgr
+	InternalConfig FlyPGConfig
 }
 
 func NewNode() (*Node, error) {
@@ -106,6 +107,8 @@ func NewNode() (*Node, error) {
 		Credentials:        node.ReplCredentials,
 	}
 
+	node.InternalConfig = *NewInternalConfig("/data")
+
 	return node, nil
 }
 
@@ -127,6 +130,22 @@ func (n *Node) Init(ctx context.Context) error {
 	repmgr := n.RepMgr
 	pgbouncer := n.PGBouncer
 	PGConfig := n.PGConfig
+	InternalConfig := n.InternalConfig
+
+	fmt.Println("Initializing internal config")
+	if err := InternalConfig.initialize(); err != nil {
+		fmt.Printf("Failed to initialize internal config: %s\n", err.Error())
+	}
+
+	err = SyncUserConfig(&InternalConfig, cs.Store)
+	if err != nil {
+		fmt.Printf("Failed to sync user config from consul for internal config: %s\n", err.Error())
+	}
+
+	err = WriteConfigFiles(&InternalConfig)
+	if err != nil {
+		fmt.Printf("Failed to write config files for internal config: %s\n", err.Error())
+	}
 
 	fmt.Println("Initializing replication manager")
 	if err := repmgr.initialize(); err != nil {
