@@ -80,7 +80,7 @@ func (c *ClusterState) UnregisterMember(id int32) error {
 		return err
 	}
 
-	// Rebuild the members slice and exclude the target member.
+	// Rebuild member slice without the target member
 	exists := false
 	var members []*Member
 	for _, member := range cluster.Members {
