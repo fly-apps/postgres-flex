@@ -72,7 +72,7 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 func (r *RepMgr) initialize() error {
 	r.setDefaults()
 
-	f, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return nil
 	}
