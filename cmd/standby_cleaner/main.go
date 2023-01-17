@@ -47,7 +47,7 @@ func main() {
 
 	maps.Copy(user, internal)
 
-	deadMemberRemovalThreshold, err := time.ParseDuration(fmt.Sprintf("%v", internal["standby_clean_interval"]))
+	deadMemberRemovalThreshold, err := time.ParseDuration(fmt.Sprint(internal["standby_clean_interval"]))
 	if err != nil {
 		fmt.Printf(fmt.Sprintf("Failed to parse config: %s", err))
 		os.Exit(1)

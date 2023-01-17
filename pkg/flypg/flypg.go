@@ -18,7 +18,7 @@ type FlyPGConfig struct {
 
 func (c *FlyPGConfig) SetDefaults() {
 	c.internalConfig = ConfigMap{
-		"standby_clean_interval": fmt.Sprintf("%s", time.Hour*24),
+		"standby_clean_interval": time.Hour * 24,
 	}
 }
 
