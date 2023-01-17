@@ -9,12 +9,12 @@ import (
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/jackc/pgx/v4"
+
+	"golang.org/x/exp/maps"
 )
 
 var (
 	monitorFrequency = time.Minute * 5
-	// TODO - Make this configurable and/or extend this to 12-24 hours.
-	deadMemberRemovalThreshold = time.Hour * 1
 )
 
 func main() {
@@ -33,10 +33,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	internal, err := flypg.ReadFromFile("/data/flypg.internal.conf")
+	if err != nil {
+		fmt.Printf("failed to open config: %s\n", err)
+		os.Exit(1)
+	}
+
+	user, err := flypg.ReadFromFile("/data/flypg.user.conf")
+	if err != nil {
+		fmt.Printf("failed to open config: %s\n", err)
+		os.Exit(1)
+	}
+
+	maps.Copy(user, internal)
+
+	deadMemberRemovalThreshold, err := time.ParseDuration(fmt.Sprint(internal["standby_clean_interval"]))
+	if err != nil {
+		fmt.Printf(fmt.Sprintf("Failed to parse config: %s", err))
+		os.Exit(1)
+	}
+
 	seenAt := map[int]time.Time{}
 
 	ticker := time.NewTicker(monitorFrequency)
 	defer ticker.Stop()
+
+	fmt.Printf("Pruning every %s...\n", deadMemberRemovalThreshold)
 
 	for {
 		select {
