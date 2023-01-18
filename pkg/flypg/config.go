@@ -35,6 +35,15 @@ func WriteUserConfig(c Config, consul *state.Store) error {
 	return nil
 }
 
+func PushUserConfig(c Config, consul *state.Store) error {
+	if c.UserConfig() != nil {
+		if err := pushToConsul(c, consul); err != nil {
+			return fmt.Errorf("failed to write to consul: %s", err)
+		}
+	}
+	return nil
+}
+
 func SyncUserConfig(c Config, consul *state.Store) error {
 	cfg, err := pullFromConsul(c, consul)
 	if err != nil {

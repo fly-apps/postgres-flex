@@ -59,6 +59,12 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 	}
 	defer close()
 
+	consul, err := state.NewStore()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
 	user := s.node.PGConfig.UserConfig()
 
 	var in map[string]interface{}
@@ -108,6 +114,12 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 		}}
 	}
 
+	err = flypg.PushUserConfig(s.node.PGConfig, consul)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
 	renderJSON(w, res, http.StatusOK)
 }
 
@@ -125,7 +137,7 @@ func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = flypg.WriteUserConfig(s.node.PGConfig, consul)
+	err = flypg.SyncUserConfig(s.node.PGConfig, consul)
 	if err != nil {
 		renderErr(w, err)
 		return
