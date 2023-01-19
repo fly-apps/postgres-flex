@@ -32,6 +32,7 @@ func main() {
 		fmt.Printf("failed to open local connection: %s\n", err)
 		os.Exit(1)
 	}
+	defer conn.Close(ctx)
 
 	internal, err := flypg.ReadFromFile("/data/flypg.internal.conf")
 	if err != nil {
