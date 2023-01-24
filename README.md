@@ -3,24 +3,25 @@
 This repo contains all the code and configuration necessary to run a [highly available Postgres cluster](https://fly.io/docs/postgres/) in a Fly.io organization's private network. This source is packaged into [Docker images](https://hub.docker.com/r/flyio/postgres-flex/tags) which allow you to track and upgrade versions cleanly as new features are added.
 
 
-## Pre-release
-This project is currently a pre-release and should not yet be used for production use.
-
-To install the pre-release cli, run the following:
-```
-curl -L https://fly.io/install.sh | sh -s -- prerelease
-```
-
 ## Getting started
 
 To get started, run the following:
 ```bash
-fly pg create --name <app-name> --initial-cluster-size 3 --repmgr 
+# Be sure you're running the latest version of flyct.
+fly version update
+
+# Provision a 3 member cluster
+fly pg create --name <app-name> \
+              --initial-cluster-size 3 --region ord --repmgr 
 ```
 
+## High Availability
+To ensure High Availability, it's recommended that your cluster has at least 3 members. 
+
+Automatic failures will only consider members residing in your primary region.  The primary region is represented as an environment variable which is defined within your apps `fly.toml` file.  That being said, if you're running a 3 member setup, at least 2 of the members should reside within your primary region. 
 
 ## Horizontal scaling
-To scale up you're cluster, you can use the clone command:
+Use the clone command to scale up your cluster.
 ```
 # List your active Machines
 fly machines list --app <app-name>
@@ -28,9 +29,6 @@ fly machines list --app <app-name>
 # Clone a machine into a target region
 fly machines clone <machine-id> --region <target-region>
 ```
-
-**For HA setups, it is recommended to maintain an odd number of members within your primary region!**
-
 
 ## Staying up-to-date!
 This project is in active development so it's important to stay current with the latest changes and bug fixes. 
