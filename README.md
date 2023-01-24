@@ -11,8 +11,7 @@ To get started, run the following:
 fly version update
 
 # Provision a 3 member cluster
-fly pg create --name <app-name> \
-              --initial-cluster-size 3 --region ord --repmgr 
+fly pg create --name <app-name> --initial-cluster-size 3 --region ord --repmgr 
 ```
 
 ## High Availability
