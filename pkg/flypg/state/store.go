@@ -59,9 +59,9 @@ func (c *Store) targetKey(key string) string {
 }
 
 func clientConfig() (*api.Config, error) {
-	consulURL := os.Getenv("FLY_CONSUL_URL")
+	consulURL := os.Getenv("CONSUL_URL")
 	if consulURL == "" {
-		consulURL = os.Getenv("CONSUL_URL")
+		consulURL = os.Getenv("FLY_CONSUL_URL")
 	}
 
 	u, err := url.Parse(consulURL)
