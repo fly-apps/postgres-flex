@@ -17,7 +17,7 @@ fly pg create --name <app-name> --initial-cluster-size 3 --region ord --repmgr
 ## High Availability
 To ensure High Availability, it's recommended that your cluster has at least 3 members. 
 
-Automatic failures will only consider members residing in your primary region.  The primary region is represented as an environment variable which is defined within your apps `fly.toml` file.  That being said, if you're running a 3 member setup, at least 2 of the members should reside within your primary region. 
+Automatic failovers will only consider members residing within your primary region.  The primary region is represented as an environment variable defined within the `fly.toml` file.  That being said, if you're running a 3 member setup at least 2 of the members should reside within your primary region. 
 
 ## Horizontal scaling
 Use the clone command to scale up your cluster.
