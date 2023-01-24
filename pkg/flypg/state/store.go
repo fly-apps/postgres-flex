@@ -59,7 +59,7 @@ func (c *Store) targetKey(key string) string {
 }
 
 func clientConfig() (*api.Config, error) {
-	u, err := url.Parse(os.Getenv("FLY_CONSUL_URL"))
+	u, err := url.Parse(resolveEndpoint())
 	if err != nil {
 		panic(err)
 	}
@@ -79,10 +79,19 @@ func clientConfig() (*api.Config, error) {
 }
 
 func pathPrefix() (string, error) {
-	u, err := url.Parse(os.Getenv("FLY_CONSUL_URL"))
+	u, err := url.Parse(resolveEndpoint())
 	if err != nil {
 		return "", err
 	}
 
 	return u.Path[1:], nil
+}
+
+func resolveEndpoint() string {
+	consulURL := os.Getenv("CONSUL_URL")
+	if consulURL == "" {
+		consulURL = os.Getenv("FLY_CONSUL_URL")
+	}
+
+	return consulURL
 }
