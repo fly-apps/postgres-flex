@@ -1,10 +1,14 @@
+# fly.toml file generated for shaun-flex-stable-3 on 2023-01-24T10:42:59-06:00
+
 
 kill_signal = "SIGINT"
 kill_timeout = 5
 processes = []
 
-[checks]
+[env]
+  PRIMARY_REGION = "ord"
 
+[checks]
   [checks.pg]
     grace_period = "30s"
     interval = "15s"
@@ -19,6 +23,15 @@ processes = []
     interval = "1m"
     method = "get"
     path = "/flycheck/vm"
+    port = 5500
+    timeout = "10s"
+    type = "http"
+
+  [checks.role]
+    grace_period = "30s"
+    interval = "15s"
+    method = "get"
+    path = "/flycheck/role"
     port = 5500
     timeout = "10s"
     type = "http"
