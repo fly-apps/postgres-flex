@@ -24,6 +24,7 @@ ARG VERSION
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
 LABEL fly.pg-version=${PG_VERSION}
+LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     ca-certificates iproute2 postgresql-14-repmgr curl bash dnsutils vim procps jq pgbouncer \
