@@ -74,7 +74,7 @@ func clientConfig() (*api.Config, error) {
 	return &api.Config{
 		Token:   token,
 		Scheme:  u.Scheme,
-		Address: u.Hostname(),
+		Address: u.Host,
 	}, nil
 }
 
