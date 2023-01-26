@@ -366,24 +366,6 @@ func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Co
 	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
-func (n *Node) UnregisterMemberByHostname(ctx context.Context, hostname string) error {
-	conn, err := n.RepMgr.NewLocalConnection(ctx)
-	if err != nil {
-		return err
-	}
-
-	member, err := n.RepMgr.ResolveMemberByHostname(ctx, conn, hostname)
-	if err != nil {
-		return err
-	}
-
-	if err := n.RepMgr.UnregisterStandby(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
-	}
-
-	return nil
-}
-
 func (n *Node) isPGInitialized() bool {
 	_, err := os.Stat(n.DataDir)
 	if os.IsNotExist(err) {
@@ -571,7 +553,7 @@ func (n *Node) resolveCloneablePeer(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	var clonablePeer string
+	var cloneTarget string
 
 	for _, ip := range ips {
 		if ip.String() == n.PrivateIP {
@@ -585,21 +567,21 @@ func (n *Node) resolveCloneablePeer(ctx context.Context) (string, error) {
 		}
 		defer conn.Close(ctx)
 
-		role, err := n.RepMgr.MemberRoleByHostname(ctx, conn, ip.String())
+		member, err := n.RepMgr.ResolveMemberByHostname(ctx, conn, ip.String())
 		if err != nil {
 			fmt.Printf("failed to resolve role from %s", ip.String())
 			continue
 		}
 
-		if role == PrimaryRoleName || role == StandbyRoleName {
-			clonablePeer = ip.String()
+		if member.Role == PrimaryRoleName || member.Role == StandbyRoleName {
+			cloneTarget = ip.String()
 			break
 		}
 	}
 
-	if clonablePeer == "" {
+	if cloneTarget == "" {
 		return "", fmt.Errorf("unable to resolve clonable peer")
 	}
 
-	return clonablePeer, nil
+	return cloneTarget, nil
 }

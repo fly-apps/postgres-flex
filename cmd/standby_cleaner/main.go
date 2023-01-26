@@ -81,7 +81,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 		return nil
 	}
 
-	standbys, err := node.RepMgr.ResolveStandbys(ctx, conn)
+	standbys, err := node.RepMgr.ResolveStandbyMembers(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to query standbys: %s", err)
 	}
@@ -92,7 +92,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 		if err != nil {
 			// TODO - Verify the exception that's getting thrown.
 			if time.Now().Sub(seenAt[standby.ID]) >= deadMemberRemovalThreshold {
-				if err := node.UnregisterMemberByHostname(ctx, standby.Hostname); err != nil {
+				if err := node.RepMgr.UnregisterMember(ctx, standby); err != nil {
 					fmt.Printf("failed to unregister member %s: %v", standby.Hostname, err)
 					continue
 				}
