@@ -26,18 +26,20 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	role, err := node.RepMgr.CurrentRole(r.Context(), conn)
+	member, err := node.RepMgr.CurrentMember(r.Context(), conn)
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 
 	var alteredRole string
-	if role == flypg.PrimaryRoleName {
+
+	switch member.Role {
+	case flypg.PrimaryRoleName:
 		alteredRole = "primary"
-	} else if role == flypg.StandbyRoleName {
+	case flypg.StandbyRoleName:
 		alteredRole = "replica"
-	} else {
+	default:
 		alteredRole = "unknown"
 	}
 

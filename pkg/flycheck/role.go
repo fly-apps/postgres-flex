@@ -26,16 +26,17 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 	}
 
 	checks.AddCheck("role", func() (string, error) {
-		role, err := node.RepMgr.CurrentRole(ctx, conn)
+		member, err := node.RepMgr.CurrentMember(ctx, conn)
 		if err != nil {
 			return "failed", errors.Wrap(err, "failed to check role")
 		}
 
-		if role == flypg.PrimaryRoleName {
+		switch member.Role {
+		case flypg.PrimaryRoleName:
 			return "primary", nil
-		} else if role == flypg.StandbyRoleName {
+		case flypg.StandbyRoleName:
 			return "replica", nil
-		} else {
+		default:
 			return "unknown", nil
 		}
 	})

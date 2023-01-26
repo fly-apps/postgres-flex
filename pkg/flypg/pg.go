@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
-	"github.com/fly-apps/postgres-flex/pkg/utils"
-	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
+	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 )
 
 type PGConfig struct {

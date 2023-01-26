@@ -106,20 +106,12 @@ func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("failed to enable repmgr extension: %s", err)
 	}
 
-	if err := r.registerPrimary(); err != nil {
-		return fmt.Errorf("failed to register repmgr primary: %s", err)
-	}
-
 	return nil
 }
 
-func (r *RepMgr) CurrentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-	return r.memberRole(ctx, pg, int(r.ID))
-}
-
-func (r *RepMgr) Standbys(ctx context.Context, pg *pgx.Conn) ([]Standby, error) {
-	return r.standbyStatuses(ctx, pg, int(r.ID))
-}
+// func (r *RepMgr) CurrentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
+// 	return r.memberRole(ctx, pg, int(r.ID))
+// }
 
 func (r *RepMgr) setDefaults() {
 	conf := ConfigMap{
@@ -266,7 +258,7 @@ func (r *RepMgr) memberRole(ctx context.Context, pg *pgx.Conn, id int) (string, 
 	return role, nil
 }
 
-func (r *RepMgr) memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (string, error) {
+func (r *RepMgr) MemberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (string, error) {
 	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id where n.connInfo LIKE '%%%s%%';", hostname)
 	var role string
 	err := pg.QueryRow(ctx, sql).Scan(&role)
@@ -277,6 +269,117 @@ func (r *RepMgr) memberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostnam
 		return "", err
 	}
 	return role, nil
+}
+
+type Member struct {
+	ID       int
+	Hostname string
+	Active   bool
+	Role     string
+}
+
+func (r *RepMgr) CurrentMember(ctx context.Context, conn *pgx.Conn) (*Member, error) {
+	members, err := ResolveMembers(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, member := range members {
+		if member.Hostname == r.PrivateIP {
+			return &member, nil
+		}
+	}
+
+	return nil, pgx.ErrNoRows
+}
+func (r *RepMgr) ResolveStandbys(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
+	members, err := ResolveMembers(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+
+	var standbys []Member
+
+	for _, member := range members {
+		if member.Role == StandbyRoleName {
+			standbys = append(standbys, member)
+		}
+	}
+
+	return standbys, nil
+}
+
+func ResolveMembers(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
+	sql := "select node_id, node_name, active, type from repmgr.nodes;"
+	rows, err := pg.Query(ctx, sql)
+	if err != nil {
+		return nil, err
+	}
+
+	var members []Member
+
+	for rows.Next() {
+		var member Member
+		if err := rows.Scan(&member.ID, &member.Hostname, &member.Active, &member.Role); err != nil {
+			return nil, err
+		}
+
+		members = append(members, member)
+	}
+
+	return members, err
+}
+
+func (r *RepMgr) ResolveMemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
+	var member Member
+	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_id = %d;", id)
+
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &member, nil
+}
+
+func (r *RepMgr) ResolveMemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
+	var member Member
+	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_name = %s;", hostname)
+
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &member, nil
+}
+
+func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (string, error) {
+	sql := "select node_id, node_name, active, type from repmgr.nodes;"
+	rows, err := pg.Query(ctx, sql)
+	if err != nil {
+		return "", err
+	}
+
+	var members []Member
+
+	for rows.Next() {
+		var member Member
+		if err := rows.Scan(&member.ID, &member.Hostname, &member.Active, &member.Role); err != nil {
+			return "", err
+		}
+
+		members = append(members, member)
+	}
+
+	// TODO - Evaluate connected nodes and determine if we are a zombie or legit primary
+	for _, member := range members {
+		if member.Role == PrimaryRoleName {
+			return member.Hostname, nil
+		}
+	}
+
+	return "", pgx.ErrNoRows
 }
 
 func (r *RepMgr) eligiblePrimary() bool {
