@@ -114,7 +114,6 @@ func NewNode() (*Node, error) {
 }
 
 func (n *Node) Init(ctx context.Context) error {
-
 	if err := setDirOwnership(); err != nil {
 		return err
 	}
@@ -259,20 +258,20 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 	defer repConn.Close(ctx)
 
-	if err := n.reconfigurePGBouncerTarget(ctx, repConn); err != nil {
+	if err := n.ReconfigurePGBouncerPrimary(ctx, repConn); err != nil {
 		return fmt.Errorf("failed to configure PGBouncer: %s", err)
 	}
 
 	return nil
 }
 
-func (n *Node) reconfigurePGBouncerTarget(ctx context.Context, conn *pgx.Conn) error {
-	primary, err := n.RepMgr.PrimaryMember(ctx, conn)
+func (n *Node) ReconfigurePGBouncerPrimary(ctx context.Context, conn *pgx.Conn) error {
+	member, err := n.RepMgr.PrimaryMember(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to find primary: %s", err)
 	}
 
-	if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+	if err := n.PGBouncer.ConfigurePrimary(ctx, member.Hostname, true); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 

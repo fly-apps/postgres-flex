@@ -354,32 +354,15 @@ func (r *RepMgr) ResolveMemberByHostname(ctx context.Context, pg *pgx.Conn, host
 	return &member, nil
 }
 
-func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (string, error) {
-	sql := "select node_id, node_name, active, type from repmgr.nodes;"
-	rows, err := pg.Query(ctx, sql)
+func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
+	var member Member
+	sql := "select node_id, node_name, active, type from repmgr.nodes where type = 'primary';"
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var members []Member
-
-	for rows.Next() {
-		var member Member
-		if err := rows.Scan(&member.ID, &member.Hostname, &member.Active, &member.Role); err != nil {
-			return "", err
-		}
-
-		members = append(members, member)
-	}
-
-	// TODO - Evaluate connected nodes and determine if we are a zombie or legit primary
-	for _, member := range members {
-		if member.Role == PrimaryRoleName {
-			return member.Hostname, nil
-		}
-	}
-
-	return "", pgx.ErrNoRows
+	return &member, nil
 }
 
 func (r *RepMgr) eligiblePrimary() bool {

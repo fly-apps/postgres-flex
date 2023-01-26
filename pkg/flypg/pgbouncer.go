@@ -3,10 +3,11 @@ package flypg
 import (
 	"context"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"net"
 	"os"
 	"strconv"
+
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 
 	"github.com/jackc/pgx/v4"
 )
