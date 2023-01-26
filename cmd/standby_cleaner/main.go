@@ -97,7 +97,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 					continue
 				}
 
-				delete(seenAt, int(standby.ID))
+				delete(seenAt, standby.ID)
 			}
 
 			continue
