@@ -343,7 +343,7 @@ func (n *Node) configureInternal(store *state.Store) error {
 
 func (n *Node) configureRepmgr(store *state.Store) error {
 	if err := n.RepMgr.initialize(); err != nil {
-		return fmt.Errorf("failed to initialize repmgr: %s", err)
+		return fmt.Errorf("failed to initialize repmgr config: %s", err)
 	}
 
 	if err := SyncUserConfig(&n.RepMgr, store); err != nil {
@@ -359,7 +359,7 @@ func (n *Node) configureRepmgr(store *state.Store) error {
 
 func (n *Node) configurePGBouncer(store *state.Store) error {
 	if err := n.PGBouncer.initialize(); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize PGBouncer config: %s", err)
 	}
 
 	if err := SyncUserConfig(&n.PGBouncer, store); err != nil {
@@ -374,12 +374,12 @@ func (n *Node) configurePGBouncer(store *state.Store) error {
 }
 
 func (n *Node) configurePostgres(store *state.Store) error {
-	// Postgres config
-	n.PGConfig.Setup()
+	if err := n.PGConfig.initialize(); err != nil {
+		return fmt.Errorf("failed to initialize pg config: %s", err)
+	}
 
 	if err := SyncUserConfig(n.PGConfig, store); err != nil {
 		return fmt.Errorf("failed to sync user config from consul for pgbouncer: %s", err.Error())
-
 	}
 
 	if err := WriteConfigFiles(n.PGConfig); err != nil {

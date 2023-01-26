@@ -19,6 +19,8 @@ func main() {
 		return
 	}
 
+	ctx := context.Background()
+
 	node, err := flypg.NewNode()
 	if err != nil {
 		utils.WriteError(err)
@@ -26,7 +28,14 @@ func main() {
 		return
 	}
 
-	if err := node.UnregisterMemberByHostname(context.Background(), string(hostnameBytes)); err != nil {
+	conn, err := node.RepMgr.NewLocalConnection(ctx)
+	if err != nil {
+		utils.WriteError(fmt.Errorf("failed to connect to local db: %s", err))
+		os.Exit(1)
+		return
+	}
+
+	if err := node.RepMgr.UnregisterMemberByHostname(ctx, conn, string(hostnameBytes)); err != nil {
 		utils.WriteError(fmt.Errorf("failed to unregister member: %v", err))
 		os.Exit(1)
 		return
