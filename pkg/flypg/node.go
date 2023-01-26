@@ -97,6 +97,7 @@ func NewNode() (*Node, error) {
 
 	node.RepMgr = RepMgr{
 		ID:                 rand.Int31(),
+		AppName:            node.AppName,
 		Region:             os.Getenv("FLY_REGION"),
 		ConfigPath:         "/data/repmgr.conf",
 		InternalConfigPath: "/data/repmgr.internal.conf",
@@ -137,7 +138,7 @@ func (n *Node) Init(ctx context.Context) error {
 		if !clusterInitialized {
 			// Initialize ourselves as the primary.
 			fmt.Println("Initializing postgres")
-			if err := n.initialize(); err != nil {
+			if err := n.initializePG(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
 
@@ -147,12 +148,12 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 		} else {
-			cloneTarget, err := n.resolveCloneablePeer(ctx)
+			cloneTarget, err := n.RepMgr.ResolveCloneableMember(ctx)
 			if err != nil {
 				return err
 			}
 
-			if err := n.RepMgr.clonePrimary(cloneTarget); err != nil {
+			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
@@ -265,6 +266,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 	return nil
 }
 
+func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
+	return openConnection(ctx, host, database, n.OperatorCredentials)
+}
+
 func (n *Node) ReconfigurePGBouncerPrimary(ctx context.Context, conn *pgx.Conn) error {
 	member, err := n.RepMgr.PrimaryMember(ctx, conn)
 	if err != nil {
@@ -276,6 +282,28 @@ func (n *Node) ReconfigurePGBouncerPrimary(ctx context.Context, conn *pgx.Conn) 
 	}
 
 	return nil
+}
+
+func (n *Node) initializePG() error {
+	if n.isPGInitialized() {
+		return nil
+	}
+
+	if err := ioutil.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
+		return err
+	}
+	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
+	_, err := cmd.CombinedOutput()
+
+	return err
+}
+
+func (n *Node) isPGInitialized() bool {
+	_, err := os.Stat(n.DataDir)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 func (n *Node) configure(store *state.Store) error {
@@ -359,33 +387,6 @@ func (n *Node) configurePostgres(store *state.Store) error {
 	}
 
 	return nil
-}
-
-func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, database, n.OperatorCredentials)
-}
-
-func (n *Node) isPGInitialized() bool {
-	_, err := os.Stat(n.DataDir)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (n *Node) initialize() error {
-	if n.isPGInitialized() {
-		return nil
-	}
-
-	if err := ioutil.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
-		return err
-	}
-	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-	_, err := cmd.CombinedOutput()
-
-	return err
 }
 
 func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
@@ -542,46 +543,4 @@ func setDirOwnership() error {
 	cmd := exec.Command("sh", "-c", cmdStr)
 	_, err = cmd.Output()
 	return err
-}
-
-func (n *Node) resolveCloneablePeer(ctx context.Context) (string, error) {
-	primaryRegion := os.Getenv("PRIMARY_REGION")
-
-	targets := fmt.Sprintf("%s.%s", primaryRegion, n.AppName)
-	ips, err := privnet.AllPeers(ctx, targets)
-	if err != nil {
-		return "", err
-	}
-
-	var cloneTarget string
-
-	for _, ip := range ips {
-		if ip.String() == n.PrivateIP {
-			continue
-		}
-
-		conn, err := n.RepMgr.NewRemoteConnection(ctx, ip.String())
-		if err != nil {
-			fmt.Printf("failed to connect to %s", ip.String())
-			continue
-		}
-		defer conn.Close(ctx)
-
-		member, err := n.RepMgr.ResolveMemberByHostname(ctx, conn, ip.String())
-		if err != nil {
-			fmt.Printf("failed to resolve role from %s", ip.String())
-			continue
-		}
-
-		if member.Role == PrimaryRoleName || member.Role == StandbyRoleName {
-			cloneTarget = ip.String()
-			break
-		}
-	}
-
-	if cloneTarget == "" {
-		return "", fmt.Errorf("unable to resolve clonable peer")
-	}
-
-	return cloneTarget, nil
 }

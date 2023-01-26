@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/fly-apps/postgres-flex/pkg/privnet"
 	"github.com/fly-apps/postgres-flex/pkg/utils"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
@@ -21,6 +22,7 @@ const (
 
 type RepMgr struct {
 	ID                 int32
+	AppName            string
 	Region             string
 	PrivateIP          string
 	DataDir            string
@@ -384,6 +386,48 @@ func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, erro
 	}
 
 	return &member, nil
+}
+
+func (r *RepMgr) ResolveCloneableMember(ctx context.Context) (*Member, error) {
+	primaryRegion := os.Getenv("PRIMARY_REGION")
+
+	targets := fmt.Sprintf("%s.%s", primaryRegion, r.AppName)
+	ips, err := privnet.AllPeers(ctx, targets)
+	if err != nil {
+		return nil, err
+	}
+
+	var cloneTarget *Member
+
+	for _, ip := range ips {
+		if ip.String() == r.PrivateIP {
+			continue
+		}
+
+		conn, err := r.NewRemoteConnection(ctx, ip.String())
+		if err != nil {
+			fmt.Printf("failed to connect to %s", ip.String())
+			continue
+		}
+		defer conn.Close(ctx)
+
+		member, err := r.ResolveMemberByHostname(ctx, conn, ip.String())
+		if err != nil {
+			fmt.Printf("failed to resolve role from %s", ip.String())
+			continue
+		}
+
+		if member.Role == PrimaryRoleName || member.Role == StandbyRoleName {
+			cloneTarget = member
+			break
+		}
+	}
+
+	if cloneTarget == nil {
+		return nil, fmt.Errorf("unable to resolve cloneable member")
+	}
+
+	return cloneTarget, nil
 }
 
 func (r *RepMgr) eligiblePrimary() bool {
