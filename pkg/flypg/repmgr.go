@@ -224,55 +224,6 @@ func (r *RepMgr) writePasswdConf() error {
 	return nil
 }
 
-// type Standby struct {
-// 	Id int
-// 	Ip string
-// }
-
-// func (r *RepMgr) standbyStatuses(ctx context.Context, pg *pgx.Conn, id int) ([]Standby, error) {
-// 	sql := fmt.Sprintf("select node_id, node_name from repmgr.show_nodes where type = 'standby' and upstream_node_id = '%d';", id)
-// 	var standbys []Standby
-// 	rows, err := pg.Query(ctx, sql)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	for rows.Next() {
-// 		var s Standby
-// 		err := rows.Scan(&s.Id, &s.Ip)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		standbys = append(standbys, s)
-// 	}
-// 	return standbys, nil
-// }
-
-// func (r *RepMgr) memberRole(ctx context.Context, pg *pgx.Conn, id int) (string, error) {
-// 	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id WHERE n.node_id = '%d';", id)
-// 	var role string
-// 	err := pg.QueryRow(ctx, sql).Scan(&role)
-// 	if err != nil {
-// 		if err == pgx.ErrNoRows {
-// 			return "", nil
-// 		}
-// 		return "", err
-// 	}
-// 	return role, nil
-// }
-
-// func (r *RepMgr) MemberRoleByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (string, error) {
-// 	sql := fmt.Sprintf("select n.type from repmgr.nodes n LEFT JOIN repmgr.nodes un ON un.node_id = n.upstream_node_id where n.connInfo LIKE '%%%s%%';", hostname)
-// 	var role string
-// 	err := pg.QueryRow(ctx, sql).Scan(&role)
-// 	if err != nil {
-// 		if err == pgx.ErrNoRows {
-// 			return "", nil
-// 		}
-// 		return "", err
-// 	}
-// 	return role, nil
-// }
-
 type Member struct {
 	ID       int
 	Hostname string
@@ -280,59 +231,7 @@ type Member struct {
 	Role     string
 }
 
-func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
-	if err := r.unregisterStandby(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
-	}
-
-	return nil
-}
-
-func (r *RepMgr) UnregisterMemberByHostname(ctx context.Context, conn *pgx.Conn, hostname string) error {
-	member, err := r.ResolveMemberByHostname(ctx, conn, hostname)
-	if err != nil {
-		return fmt.Errorf("failed to resolve member %s: %s", hostname, err)
-	}
-
-	if err := r.unregisterStandby(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
-	}
-
-	return nil
-}
-
-func (r *RepMgr) CurrentMember(ctx context.Context, conn *pgx.Conn) (*Member, error) {
-	members, err := ResolveMembers(ctx, conn)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, member := range members {
-		if member.Hostname == r.PrivateIP {
-			return &member, nil
-		}
-	}
-
-	return nil, pgx.ErrNoRows
-}
-func (r *RepMgr) ResolveStandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
-	members, err := ResolveMembers(ctx, conn)
-	if err != nil {
-		return nil, err
-	}
-
-	var standbys []Member
-
-	for _, member := range members {
-		if member.Role == StandbyRoleName {
-			standbys = append(standbys, member)
-		}
-	}
-
-	return standbys, nil
-}
-
-func ResolveMembers(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
+func Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	sql := "select node_id, node_name, active, type from repmgr.nodes;"
 	rows, err := pg.Query(ctx, sql)
 	if err != nil {
@@ -353,28 +252,19 @@ func ResolveMembers(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	return members, err
 }
 
-func (r *RepMgr) ResolveMemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
-	var member Member
-	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_id = %d;", id)
-
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
+	members, err := Members(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
 
-	return &member, nil
-}
-
-func (r *RepMgr) ResolveMemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
-	var member Member
-	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_name = %s;", hostname)
-
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
-	if err != nil {
-		return nil, err
+	for _, member := range members {
+		if member.Hostname == r.PrivateIP {
+			return &member, nil
+		}
 	}
 
-	return &member, nil
+	return nil, pgx.ErrNoRows
 }
 
 func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
@@ -388,7 +278,48 @@ func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, erro
 	return &member, nil
 }
 
-func (r *RepMgr) ResolveCloneableMember(ctx context.Context) (*Member, error) {
+func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
+	members, err := Members(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+
+	var standbys []Member
+
+	for _, member := range members {
+		if member.Role == StandbyRoleName {
+			standbys = append(standbys, member)
+		}
+	}
+
+	return standbys, nil
+}
+
+func (r *RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
+	var member Member
+	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_id = %d;", id)
+
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &member, nil
+}
+
+func (r *RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
+	var member Member
+	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_name = '%s';", hostname)
+
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &member, nil
+}
+
+func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 	primaryRegion := os.Getenv("PRIMARY_REGION")
 
 	targets := fmt.Sprintf("%s.%s", primaryRegion, r.AppName)
@@ -411,7 +342,7 @@ func (r *RepMgr) ResolveCloneableMember(ctx context.Context) (*Member, error) {
 		}
 		defer conn.Close(ctx)
 
-		member, err := r.ResolveMemberByHostname(ctx, conn, ip.String())
+		member, err := r.MemberByHostname(ctx, conn, ip.String())
 		if err != nil {
 			fmt.Printf("failed to resolve role from %s", ip.String())
 			continue
@@ -428,6 +359,27 @@ func (r *RepMgr) ResolveCloneableMember(ctx context.Context) (*Member, error) {
 	}
 
 	return cloneTarget, nil
+}
+
+func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
+	if err := r.unregisterStandby(member.ID); err != nil {
+		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
+	}
+
+	return nil
+}
+
+func (r *RepMgr) UnregisterMemberByHostname(ctx context.Context, conn *pgx.Conn, hostname string) error {
+	member, err := r.MemberByHostname(ctx, conn, hostname)
+	if err != nil {
+		return fmt.Errorf("failed to resolve member %s: %s", hostname, err)
+	}
+
+	if err := r.unregisterStandby(member.ID); err != nil {
+		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
+	}
+
+	return nil
 }
 
 func (r *RepMgr) eligiblePrimary() bool {

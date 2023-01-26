@@ -72,7 +72,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 	}
 	defer conn.Close(ctx)
 
-	member, err := node.RepMgr.ResolveMemberByID(ctx, conn, int(node.RepMgr.ID))
+	member, err := node.RepMgr.MemberByID(ctx, conn, int(node.RepMgr.ID))
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 		return nil
 	}
 
-	standbys, err := node.RepMgr.ResolveStandbyMembers(ctx, conn)
+	standbys, err := node.RepMgr.StandbyMembers(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to query standbys: %s", err)
 	}

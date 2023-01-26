@@ -58,7 +58,7 @@ func reconfigurePGBouncer(id int) error {
 		return fmt.Errorf("failed to establish connection with local pg: %s", err)
 	}
 
-	member, err := node.RepMgr.ResolveMemberByID(context.TODO(), conn, id)
+	member, err := node.RepMgr.MemberByID(context.TODO(), conn, id)
 	if err != nil {
 		return err
 	}

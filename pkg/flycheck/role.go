@@ -26,7 +26,7 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 	}
 
 	checks.AddCheck("role", func() (string, error) {
-		member, err := node.RepMgr.CurrentMember(ctx, conn)
+		member, err := node.RepMgr.Member(ctx, conn)
 		if err != nil {
 			return "failed", errors.Wrap(err, "failed to check role")
 		}

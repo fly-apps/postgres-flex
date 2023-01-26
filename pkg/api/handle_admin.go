@@ -26,7 +26,7 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	member, err := node.RepMgr.CurrentMember(r.Context(), conn)
+	member, err := node.RepMgr.Member(r.Context(), conn)
 	if err != nil {
 		renderErr(w, err)
 		return

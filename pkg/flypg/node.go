@@ -148,7 +148,7 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 		} else {
-			cloneTarget, err := n.RepMgr.ResolveCloneableMember(ctx)
+			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
 				return err
 			}
@@ -222,7 +222,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 		defer conn.Close(ctx)
 
-		member, err := repmgr.CurrentMember(ctx, conn)
+		member, err := repmgr.Member(ctx, conn)
 		if err != nil {
 			// member will not be resolveable if the member has not yet been registered
 			if !errors.Is(err, pgx.ErrNoRows) {
