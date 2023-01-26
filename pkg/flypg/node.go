@@ -130,7 +130,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	if !n.isPGInitialized() {
 		// Check to see if repmgr cluster has been initialized.
-		clusterInitialized, err := store.IsClusterInitialized()
+		clusterInitialized, err := store.IsInitializationFlagSet()
 		if err != nil {
 			return fmt.Errorf("failed to verify cluster state %s", err)
 		}
@@ -181,7 +181,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store. %v", err)
 	}
 
-	clusterInitialized, err := store.IsClusterInitialized()
+	clusterInitialized, err := store.IsInitializationFlagSet()
 	if err != nil {
 		return fmt.Errorf("failed to verify cluster state: %s", err)
 	}

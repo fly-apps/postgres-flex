@@ -41,7 +41,7 @@ func (c *Store) SetInitializationFlag() error {
 	return err
 }
 
-func (c *Store) IsClusterInitialized() (bool, error) {
+func (c *Store) IsInitializationFlagSet() (bool, error) {
 	result, _, err := c.Client.KV().Get(c.targetKey("INITIALIZED"), nil)
 	if err != nil {
 		return false, err
