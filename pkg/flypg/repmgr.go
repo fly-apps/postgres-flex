@@ -160,7 +160,23 @@ func (r *RepMgr) unregisterPrimary() error {
 func (r *RepMgr) followPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s standby follow", r.ConfigPath)
 	if err := utils.RunCommand(cmdStr); err != nil {
-		fmt.Printf("failed to register standby: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *RepMgr) rejoinCluster(hostname string) error {
+	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind -W",
+		r.ConfigPath,
+		hostname,
+		r.Port,
+		r.Credentials.Username,
+		r.DatabaseName,
+	)
+
+	if err := utils.RunCommand(cmdStr); err != nil {
+		return err
 	}
 
 	return nil
@@ -269,7 +285,7 @@ func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
 
 func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
 	var member Member
-	sql := "select node_id, node_name, active, type from repmgr.nodes where type = 'primary';"
+	sql := "select node_id, node_name, active, type from repmgr.nodes where type = 'primary' and active = true;"
 	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
@@ -328,7 +344,7 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 		return nil, err
 	}
 
-	var cloneTarget *Member
+	var target *Member
 
 	for _, ip := range ips {
 		if ip.String() == r.PrivateIP {
@@ -349,16 +365,16 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 		}
 
 		if member.Role == PrimaryRoleName || member.Role == StandbyRoleName {
-			cloneTarget = member
+			target = member
 			break
 		}
 	}
 
-	if cloneTarget == nil {
+	if target == nil {
 		return nil, fmt.Errorf("unable to resolve cloneable member")
 	}
 
-	return cloneTarget, nil
+	return target, nil
 }
 
 func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {

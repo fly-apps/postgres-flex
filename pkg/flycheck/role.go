@@ -26,6 +26,10 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 	}
 
 	checks.AddCheck("role", func() (string, error) {
+		if node.ZombieLockExists() {
+			return "zombie", nil
+		}
+
 		member, err := node.RepMgr.Member(ctx, conn)
 		if err != nil {
 			return "failed", errors.Wrap(err, "failed to check role")

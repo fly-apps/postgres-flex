@@ -20,6 +20,8 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
+var ErrForceRestart = errors.New("full restart triggered")
+
 type Credentials struct {
 	Username string
 	Password string
@@ -124,7 +126,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	if err := n.configure(store); err != nil {
+	if err := n.configure(ctx, store); err != nil {
 		return fmt.Errorf("failed to configure node: %s", err)
 	}
 
@@ -156,6 +158,31 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
+		}
+	}
+
+	if n.ZombieLockExists() {
+		fmt.Println("Zombie lock file detected, attempting to rejoin cluster")
+		pid, err := os.Stat("/data/postgresql/postmaster.pid")
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to verify postgres state")
+		}
+
+		if pid != nil {
+			return fmt.Errorf("please restart your machine. postgres is still running or shutdown uncleanly")
+		}
+
+		zHostname, err := n.readZombieLock()
+		if err != nil {
+			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
+		}
+
+		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
+			fmt.Printf("failed to rejoin cluster: %s", err)
+		}
+
+		if err := n.removeZombieLock(); err != nil {
+			return fmt.Errorf("failed to remove zombie lock: %s", err)
 		}
 	}
 
@@ -234,10 +261,55 @@ func (n *Node) PostInit(ctx context.Context) error {
 		if member != nil && member.Role != "" {
 			role = member.Role
 		}
+		fmt.Printf("My current role is: %s", role)
 
 		switch role {
 		case PrimaryRoleName:
-			// TODO - This is where we need to fence the primary if it's no longer valid.
+			// Query standbys associated with the primary.
+			standbys, err := repmgr.StandbyMembers(ctx, conn)
+			if err != nil {
+				if !errors.Is(err, pgx.ErrNoRows) {
+					return fmt.Errorf("failed to query standbys")
+				}
+			}
+
+			fmt.Printf("%d standbys to evaluate\n", len(standbys))
+
+			var zMember *Member
+			// Verify that the standbys recongize us as its primary.
+			fmt.Println("Checking with standby's to verify i'm still the leader.")
+			for _, standby := range standbys {
+				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
+				if err != nil {
+					fmt.Printf("failed to connect to %s", standby.Hostname)
+				}
+
+				primary, err := repmgr.PrimaryMember(ctx, mConn)
+				if err != nil {
+					fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
+				}
+
+				fmt.Printf("Member %s, thinks %s is the primary\n", standby.Hostname, primary.Hostname)
+
+				// Verify that the standby agree's about our relationship
+				if primary.Hostname != n.PrivateIP {
+					if zMember == nil {
+						zMember = primary
+					}
+
+					if zMember != nil && zMember.Hostname != primary.Hostname {
+						// If we are here, we have multiple standby's that have different
+						// primaries.  Not good...
+						return fmt.Errorf("standbys do not agree on who's primary. manual intervention is required")
+					}
+				}
+			}
+
+			if zMember != nil {
+				fmt.Println("Writing zombie lock")
+				n.writeZombieLock(zMember)
+				return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
+			}
 
 		default:
 			if role != "" {
@@ -298,6 +370,39 @@ func (n *Node) initializePG() error {
 	return err
 }
 
+func (n *Node) writeZombieLock(primary *Member) error {
+	if err := ioutil.WriteFile("/data/zombie.lock", []byte(primary.Hostname), 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *Node) ZombieLockExists() bool {
+	_, err := os.Stat("/data/zombie.lock")
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func (n *Node) removeZombieLock() error {
+	if err := os.Remove("/data/zombie.lock"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *Node) readZombieLock() (string, error) {
+	body, err := ioutil.ReadFile("/data/zombie.lock")
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
 func (n *Node) isPGInitialized() bool {
 	_, err := os.Stat(n.DataDir)
 	if os.IsNotExist(err) {
@@ -306,7 +411,7 @@ func (n *Node) isPGInitialized() bool {
 	return true
 }
 
-func (n *Node) configure(store *state.Store) error {
+func (n *Node) configure(ctx context.Context, store *state.Store) error {
 	fmt.Println("Initializing internal config")
 	if err := n.configureInternal(store); err != nil {
 		fmt.Println(err.Error())
@@ -319,6 +424,11 @@ func (n *Node) configure(store *state.Store) error {
 
 	fmt.Println("Initializing pgbouncer")
 	if err := n.configurePGBouncer(store); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	// Reset PG Primary and wait for primary resolution
+	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
 		fmt.Println(err.Error())
 	}
 
