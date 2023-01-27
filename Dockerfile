@@ -1,4 +1,5 @@
-ARG PG_VERSION=14.6
+ARG PG_VERSION=15.1
+ARG PG_MAJOR_VERSION=15
 ARG VERSION=custom
 
 FROM golang:1.19 as flyutil
@@ -20,6 +21,7 @@ FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/postgresql
 ARG VERSION 
+ARG PG_MAJOR_VERSION
 
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
@@ -27,7 +29,7 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-14-repmgr curl bash dnsutils vim procps jq pgbouncer \
+    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim procps jq pgbouncer \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
