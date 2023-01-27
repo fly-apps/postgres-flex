@@ -35,6 +35,25 @@ func NewStore() (*Store, error) {
 	}, nil
 }
 
+func (c *Store) SetInitializationFlag() error {
+	kv := &api.KVPair{Key: c.targetKey("INITIALIZED"), Value: []byte("true")}
+	_, err := c.Client.KV().Put(kv, nil)
+	return err
+}
+
+func (c *Store) IsInitializationFlagSet() (bool, error) {
+	result, _, err := c.Client.KV().Get(c.targetKey("INITIALIZED"), nil)
+	if err != nil {
+		return false, err
+	}
+
+	if result == nil {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (c *Store) PushUserConfig(key string, config []byte) error {
 	kv := &api.KVPair{Key: c.targetKey(key), Value: config}
 	_, err := c.Client.KV().Put(kv, nil)

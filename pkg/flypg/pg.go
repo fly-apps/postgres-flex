@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
-	"github.com/fly-apps/postgres-flex/pkg/utils"
-	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
+	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 )
 
 type PGConfig struct {
@@ -96,7 +97,7 @@ func (c *PGConfig) Print(w io.Writer) error {
 
 // Setup will ensure the required configuration files are stubbed and the parent
 // postgresql.conf file includes them.
-func (c *PGConfig) Setup() error {
+func (c *PGConfig) initialize() error {
 	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
 			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath)); err != nil {

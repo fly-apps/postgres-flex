@@ -7,8 +7,6 @@ import (
 	"strconv"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
-
-	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 )
 
 func main() {
@@ -29,56 +27,46 @@ func main() {
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
 		// TODO - Need to figure out what to do when success == 0.
-
-		cs, err := state.NewClusterState()
-		if err != nil {
-			fmt.Printf("failed initialize cluster state store. %v", err)
+		if err := reconfigurePGBouncer(*nodeID); err != nil {
+			fmt.Println(err.Error())
+			return
 		}
 
-		member, err := cs.FindMemberByID(int32(*nodeID))
-		if err != nil {
-			fmt.Printf("failed to find member %v: %s", *nodeID, err)
-		}
-
-		if err := cs.AssignPrimary(member.ID); err != nil {
-			fmt.Printf("failed to register primary with consul: %s", err)
-		}
-
-		flypgNode, err := flypg.NewNode()
-		if err != nil {
-			fmt.Printf("failed to reference node: %s\n", err)
-		}
-
-		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
-			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
-		}
 	case "standby_follow":
-		cs, err := state.NewClusterState()
-		if err != nil {
-			fmt.Printf("failed initialize cluster state store. %v", err)
-		}
-
 		newMemberID, err := strconv.Atoi(*newPrimary)
 		if err != nil {
 			fmt.Printf("failed to parse new member id: %s", err)
 		}
 
-		member, err := cs.FindMemberByID(int32(newMemberID))
-		if err != nil {
-			fmt.Printf("failed to find member in consul: %s", err)
-		}
-
-		flypgNode, err := flypg.NewNode()
-		if err != nil {
-			fmt.Printf("failed to reference member: %s\n", err)
-		}
-
-		fmt.Println("Reconfiguring pgbouncer primary")
-		if err := flypgNode.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
-			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
+		if err := reconfigurePGBouncer(newMemberID); err != nil {
+			fmt.Println(err.Error())
+			return
 		}
 	default:
 		// noop
 	}
+}
+
+func reconfigurePGBouncer(id int) error {
+	node, err := flypg.NewNode()
+	if err != nil {
+		return fmt.Errorf("failed to reference node: %s", err)
+	}
+
+	conn, err := node.RepMgr.NewLocalConnection(context.TODO())
+	if err != nil {
+		return fmt.Errorf("failed to establish connection with local pg: %s", err)
+	}
+
+	member, err := node.RepMgr.MemberByID(context.TODO(), conn, id)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Reconfiguring pgbouncer primary")
+	if err := node.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
+		return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
+	}
+
+	return nil
 }

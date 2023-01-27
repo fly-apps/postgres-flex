@@ -46,5 +46,22 @@ jobs:
             flyio/postgres-flex:14
             flyio/postgres-flex:14.6
       -
+        name: Build and push Postgres 15
+        id: docker_build_15
+        uses: docker/build-push-action@v3
+        with:
+          build-args: |
+            PG_VERSION=15.1
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            flyio/postgres-flex:15
+            flyio/postgres-flex:15.1
+      -
         name: Postgres 14 Image digest
         run: echo ${{ steps.docker_build_14.outputs.digest }}
+      -
+        name: Postgres 15 Image digest
+        run: echo ${{ steps.docker_build_15.outputs.digest }}

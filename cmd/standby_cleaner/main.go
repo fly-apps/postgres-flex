@@ -72,39 +72,39 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 	}
 	defer conn.Close(ctx)
 
-	role, err := node.RepMgr.CurrentRole(ctx, conn)
+	member, err := node.RepMgr.MemberByID(ctx, conn, int(node.RepMgr.ID))
 	if err != nil {
-		return fmt.Errorf("failed to check role: %s", err)
+		return err
 	}
 
-	if role != flypg.PrimaryRoleName {
+	if member.Role != flypg.PrimaryRoleName {
 		return nil
 	}
 
-	standbys, err := node.RepMgr.Standbys(ctx, conn)
+	standbys, err := node.RepMgr.StandbyMembers(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to query standbys: %s", err)
 	}
 
 	for _, standby := range standbys {
 		// Wrap this in a function so connections are properly closed.
-		sConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Ip)
+		sConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
 		if err != nil {
 			// TODO - Verify the exception that's getting thrown.
-			if time.Now().Sub(seenAt[standby.Id]) >= deadMemberRemovalThreshold {
-				if err := node.UnregisterMemberByID(ctx, int32(standby.Id)); err != nil {
-					fmt.Printf("failed to unregister member %d: %v", standby.Id, err)
+			if time.Now().Sub(seenAt[standby.ID]) >= deadMemberRemovalThreshold {
+				if err := node.RepMgr.UnregisterMember(ctx, standby); err != nil {
+					fmt.Printf("failed to unregister member %s: %v", standby.Hostname, err)
 					continue
 				}
 
-				delete(seenAt, standby.Id)
+				delete(seenAt, standby.ID)
 			}
 
 			continue
 		}
 		defer sConn.Close(ctx)
 
-		seenAt[standby.Id] = time.Now()
+		seenAt[standby.ID] = time.Now()
 	}
 
 	removeOrphanedReplicationSlots(ctx, conn, standbys)
@@ -112,7 +112,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 	return nil
 }
 
-func removeOrphanedReplicationSlots(ctx context.Context, conn *pgx.Conn, standbys []flypg.Standby) {
+func removeOrphanedReplicationSlots(ctx context.Context, conn *pgx.Conn, standbys []flypg.Member) {
 	var orphanedSlots []admin.ReplicationSlot
 
 	slots, err := admin.ListReplicationSlots(ctx, conn)
@@ -125,7 +125,7 @@ func removeOrphanedReplicationSlots(ctx context.Context, conn *pgx.Conn, standby
 	for _, slot := range slots {
 		matchFound := false
 		for _, standby := range standbys {
-			if slot.MemberID == int32(standby.Id) {
+			if slot.MemberID == int32(standby.ID) {
 				matchFound = true
 			}
 		}

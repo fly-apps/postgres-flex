@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -96,6 +97,7 @@ func NewNode() (*Node, error) {
 
 	node.RepMgr = RepMgr{
 		ID:                 rand.Int31(),
+		AppName:            node.AppName,
 		Region:             os.Getenv("FLY_REGION"),
 		ConfigPath:         "/data/repmgr.conf",
 		InternalConfigPath: "/data/repmgr.internal.conf",
@@ -117,121 +119,50 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	cs, err := state.NewClusterState()
+	store, err := state.NewStore()
 	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store. %v", err)
+		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	primary, err := cs.PrimaryMember()
-	if err != nil {
-		return fmt.Errorf("failed to query current primary: %s", err)
+	if err := n.configure(store); err != nil {
+		return fmt.Errorf("failed to configure node: %s", err)
 	}
 
-	repmgr := n.RepMgr
-	pgbouncer := n.PGBouncer
-	PGConfig := n.PGConfig
-	InternalConfig := n.InternalConfig
-
-	fmt.Println("Initializing internal config")
-	if err := InternalConfig.initialize(); err != nil {
-		fmt.Printf("Failed to initialize internal config: %s\n", err.Error())
-	}
-
-	err = SyncUserConfig(&InternalConfig, cs.Store)
-	if err != nil {
-		fmt.Printf("Failed to sync user config from consul for internal config: %s\n", err.Error())
-	}
-
-	err = WriteConfigFiles(&InternalConfig)
-	if err != nil {
-		fmt.Printf("Failed to write config files for internal config: %s\n", err.Error())
-	}
-
-	fmt.Println("Initializing replication manager")
-	if err := repmgr.initialize(); err != nil {
-		fmt.Printf("Failed to initialize repmgr: %s\n", err.Error())
-	}
-
-	err = SyncUserConfig(&repmgr, cs.Store)
-	if err != nil {
-		fmt.Printf("Failed to sync user config from consul for repmgr: %s\n", err.Error())
-	}
-
-	err = WriteConfigFiles(&repmgr)
-	if err != nil {
-		fmt.Printf("Failed to write config files for repmgr: %s\n", err.Error())
-	}
-
-	fmt.Println("Initializing pgbouncer")
-	if err := pgbouncer.initialize(); err != nil {
-		return err
-	}
-
-	err = SyncUserConfig(&pgbouncer, cs.Store)
-	if err != nil {
-		fmt.Printf("Failed to sync user config from consul for pgbouncer: %s\n", err.Error())
-	}
-
-	err = WriteConfigFiles(&pgbouncer)
-	if err != nil {
-		fmt.Printf("Failed to write config files for pgbouncer: %s\n", err.Error())
-	}
-
-	switch {
-	case primary == nil:
-		// Initialize ourselves as the primary.
-		fmt.Println("Initializing postgres")
-		if err := n.initialize(); err != nil {
-			return fmt.Errorf("failed to initialize postgres %s", err)
+	if !n.isPGInitialized() {
+		// Check to see if repmgr cluster has been initialized.
+		clusterInitialized, err := store.IsInitializationFlagSet()
+		if err != nil {
+			return fmt.Errorf("failed to verify cluster state %s", err)
 		}
 
-		fmt.Println("Setting default HBA")
-		if err := n.setDefaultHBA(); err != nil {
-			return fmt.Errorf("failed updating pg_hba.conf: %s", err)
-		}
-	case primary.Hostname == n.PrivateIP:
-		// noop
-	default:
-		// If we are here we are either a standby, new node or primary coming back from the dead.
-		clonePrimary := true
-		if n.isInitialized() {
-			// Attempt to resolve our role by querying the primary.
-			remoteConn, err := repmgr.NewRemoteConnection(ctx, primary.Hostname)
+		if !clusterInitialized {
+			// Initialize ourselves as the primary.
+			fmt.Println("Initializing postgres")
+			if err := n.initializePG(); err != nil {
+				return fmt.Errorf("failed to initialize postgres %s", err)
+			}
+
+			fmt.Println("Setting default HBA")
+			if err := n.setDefaultHBA(); err != nil {
+				return fmt.Errorf("failed updating pg_hba.conf: %s", err)
+			}
+
+		} else {
+			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to resolve my role according to the primary: %s", err)
-			}
-			defer remoteConn.Close(ctx)
-
-			role, err := repmgr.memberRoleByHostname(ctx, remoteConn, n.PrivateIP)
-			if err != nil {
-				return fmt.Errorf("failed to resolve role for %s: %s", primary.Hostname, err)
+				return err
 			}
 
-			fmt.Printf("My role is: %s\n", role)
-			if role == StandbyRoleName {
-				clonePrimary = false
-			}
-		}
-
-		if clonePrimary {
-			fmt.Println("Cloning from primary")
-			if err := repmgr.clonePrimary(primary.Hostname); err != nil {
+			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
 	}
 
-	fmt.Println("Resolving PG configuration settings.")
-	PGConfig.Setup()
-
-	err = SyncUserConfig(PGConfig, cs.Store)
-	if err != nil {
-		fmt.Printf("Failed to sync user config from consul for pgbouncer: %s\n", err.Error())
+	fmt.Println("Initializing Postgres configuration")
+	if err := n.configurePostgres(store); err != nil {
+		return fmt.Errorf("failed to configure postgres: %s", err)
 	}
-
-	WriteConfigFiles(PGConfig)
-
-	PGConfig.Print(os.Stdout)
 
 	return nil
 }
@@ -239,99 +170,97 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	// Ensure local PG is up before establishing connection with consul.
-	conn, err := n.NewLocalConnection(ctx, "postgres")
+	pgConn, err := n.NewLocalConnection(ctx, "postgres")
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer pgConn.Close(ctx)
 
-	cs, err := state.NewClusterState()
+	store, err := state.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed initialize cluster state store. %v", err)
 	}
 
-	primary, err := cs.PrimaryMember()
+	clusterInitialized, err := store.IsInitializationFlagSet()
 	if err != nil {
-		return fmt.Errorf("failed to query current primary: %s", err)
+		return fmt.Errorf("failed to verify cluster state: %s", err)
 	}
 
 	repmgr := n.RepMgr
-	pgbouncer := n.PGBouncer
 
-	switch {
-	case primary == nil:
+	// If the cluster has not yet been initialized we should initialize ourself as the primary
+	if !clusterInitialized {
 		// Check if we can be a primary
 		if !repmgr.eligiblePrimary() {
 			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", os.Getenv("PRIMARY_REGION"), repmgr.Region)
 		}
 
 		// Create required users
-		if err := n.createRequiredUsers(ctx, conn); err != nil {
+		if err := n.createRequiredUsers(ctx, pgConn); err != nil {
 			return fmt.Errorf("failed to create required users: %s", err)
 		}
 
-		// Setup repmgr database, extension, and register ourselves as the primary
-		fmt.Println("Performing Repmgr setup")
-		if err := repmgr.setup(ctx, conn); err != nil {
+		// Setup repmgr database and extension
+		if err := repmgr.setup(ctx, pgConn); err != nil {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
-		// Register primary member with consul
-		fmt.Println("Registering member")
-		if err := cs.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, true); err != nil {
-			return fmt.Errorf("failed to register member with consul: %s", err)
+		// Register ourselves as the primary
+		if err := repmgr.registerPrimary(); err != nil {
+			return fmt.Errorf("failed to register repmgr primary: %s", err)
 		}
 
-	case primary.Hostname == n.PrivateIP:
-		// Re-register the primary in order to pick up any changes made to the configuration file.
-		fmt.Println("Updating primary record")
-		if err := repmgr.registerPrimary(); err != nil {
-			fmt.Printf("failed to register primary with repmgr: %s", err)
+		// Set flag within consul to let future new members that the cluster exists
+		if err := store.SetInitializationFlag(); err != nil {
+			return fmt.Errorf("failed to register cluster with consul")
 		}
-	default:
-		// If we are here we are a new node, standby or a demoted primary who needs to be reconfigured as a standby.
-		// Attempt to resolve our role from repmgr
+
+	} else {
 		conn, err := repmgr.NewLocalConnection(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
 		}
 		defer conn.Close(ctx)
 
-		role, err := repmgr.CurrentRole(ctx, conn)
+		member, err := repmgr.Member(ctx, conn)
 		if err != nil {
-			return err
-		}
-
-		// If we are a primary coming back from the dead, make sure we unregister ourselves as primary.
-		if role == PrimaryRoleName {
-			fmt.Println("Unregistering primary")
-			if err := repmgr.unregisterPrimary(); err != nil {
-				fmt.Printf("failed to unregister primary: %s\n", err)
+			// member will not be resolveable if the member has not yet been registered
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("failed to resolve member role: %s", err)
 			}
 		}
 
-		fmt.Println("Registering standby")
-		if err := repmgr.registerStandby(); err != nil {
-			fmt.Printf("failed to register standby: %s\n", err)
+		role := ""
+		if member != nil && member.Role != "" {
+			role = member.Role
 		}
 
-		if err := repmgr.followPrimary(); err != nil {
-			fmt.Printf("failed to register standby: %s\n", err)
-		}
+		switch role {
+		case PrimaryRoleName:
+			// TODO - This is where we need to fence the primary if it's no longer valid.
 
-		// Register member with consul if it hasn't been already
-		if err := cs.RegisterMember(repmgr.ID, n.PrivateIP, repmgr.Region, false); err != nil {
-			return fmt.Errorf("failed to register member with consul: %s", err)
+		default:
+			if role != "" {
+				fmt.Println("Updating existing standby")
+			} else {
+				fmt.Println("Registering a new standby")
+			}
+
+			if err := repmgr.registerStandby(); err != nil {
+				fmt.Printf("failed to register standby: %s\n", err)
+			}
 		}
 	}
-	// Requery the primaryIP from consul in case the primary was assigned above.
-	primary, err = cs.PrimaryMember()
+
+	// Reconfigure PGBouncer
+	repConn, err := repmgr.NewLocalConnection(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to query current primary: %s", err)
+		return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
 	}
+	defer repConn.Close(ctx)
 
-	if err := pgbouncer.ConfigurePrimary(ctx, primary.Hostname, true); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
+	if err := n.ReconfigurePGBouncerPrimary(ctx, repConn); err != nil {
+		return fmt.Errorf("failed to configure PGBouncer: %s", err)
 	}
 
 	return nil
@@ -342,44 +271,21 @@ func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Co
 	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
-func (n *Node) UnregisterMemberByHostname(ctx context.Context, hostname string) error {
-	cs, err := state.NewClusterState()
+func (n *Node) ReconfigurePGBouncerPrimary(ctx context.Context, conn *pgx.Conn) error {
+	member, err := n.RepMgr.PrimaryMember(ctx, conn)
 	if err != nil {
-		fmt.Printf("failed initialize cluster state store. %v", err)
+		return fmt.Errorf("failed to find primary: %s", err)
 	}
 
-	member, err := cs.FindMemberByHostname(hostname)
-	if err != nil {
-		return err
+	if err := n.PGBouncer.ConfigurePrimary(ctx, member.Hostname, true); err != nil {
+		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
 	}
 
-	return n.unregisterNode(ctx, cs, member)
+	return nil
 }
 
-func (n *Node) UnregisterMemberByID(ctx context.Context, id int32) error {
-	cs, err := state.NewClusterState()
-	if err != nil {
-		fmt.Printf("failed initialize cluster state store. %v", err)
-	}
-
-	member, err := cs.FindMemberByID(id)
-	if err != nil {
-		return err
-	}
-
-	return n.unregisterNode(ctx, cs, member)
-}
-
-func (n *Node) isInitialized() bool {
-	_, err := os.Stat(n.DataDir)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (n *Node) initialize() error {
-	if n.isInitialized() {
+func (n *Node) initializePG() error {
+	if n.isPGInitialized() {
 		return nil
 	}
 
@@ -390,6 +296,97 @@ func (n *Node) initialize() error {
 	_, err := cmd.CombinedOutput()
 
 	return err
+}
+
+func (n *Node) isPGInitialized() bool {
+	_, err := os.Stat(n.DataDir)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func (n *Node) configure(store *state.Store) error {
+	fmt.Println("Initializing internal config")
+	if err := n.configureInternal(store); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	fmt.Println("Initializing replication manager")
+	if err := n.configureRepmgr(store); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	fmt.Println("Initializing pgbouncer")
+	if err := n.configurePGBouncer(store); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return nil
+}
+
+func (n *Node) configureInternal(store *state.Store) error {
+	if err := n.InternalConfig.initialize(); err != nil {
+		return fmt.Errorf("failed to initialize internal config: %s", err)
+	}
+
+	if err := SyncUserConfig(&n.InternalConfig, store); err != nil {
+		return fmt.Errorf("failed to sync user config from consul for internal config: %s", err)
+	}
+
+	if err := WriteConfigFiles(&n.InternalConfig); err != nil {
+		return fmt.Errorf("failed to write config files for internal config: %s", err)
+	}
+
+	return nil
+}
+
+func (n *Node) configureRepmgr(store *state.Store) error {
+	if err := n.RepMgr.initialize(); err != nil {
+		return fmt.Errorf("failed to initialize repmgr config: %s", err)
+	}
+
+	if err := SyncUserConfig(&n.RepMgr, store); err != nil {
+		return fmt.Errorf("failed to sync user config from consul for repmgr: %s", err)
+	}
+
+	if err := WriteConfigFiles(&n.RepMgr); err != nil {
+		return fmt.Errorf("failed to write config files for repmgr: %s", err)
+	}
+
+	return nil
+}
+
+func (n *Node) configurePGBouncer(store *state.Store) error {
+	if err := n.PGBouncer.initialize(); err != nil {
+		return fmt.Errorf("failed to initialize PGBouncer config: %s", err)
+	}
+
+	if err := SyncUserConfig(&n.PGBouncer, store); err != nil {
+		return fmt.Errorf("failed to sync user config from consul for pgbouncer: %s", err)
+	}
+
+	if err := WriteConfigFiles(&n.PGBouncer); err != nil {
+		return fmt.Errorf("failed to write config files for pgbouncer: %s", err)
+	}
+
+	return nil
+}
+
+func (n *Node) configurePostgres(store *state.Store) error {
+	if err := n.PGConfig.initialize(); err != nil {
+		return fmt.Errorf("failed to initialize pg config: %s", err)
+	}
+
+	if err := SyncUserConfig(n.PGConfig, store); err != nil {
+		return fmt.Errorf("failed to sync user config from consul for pgbouncer: %s", err.Error())
+	}
+
+	if err := WriteConfigFiles(n.PGConfig); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
@@ -425,25 +422,6 @@ func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
 				return fmt.Errorf("failed to grant superuser privileges to user %s: %s", user, err)
 			}
 		}
-	}
-
-	return nil
-}
-
-func (n *Node) unregisterNode(ctx context.Context, cs *state.ClusterState, member *state.Member) error {
-	if member == nil {
-		return state.ErrMemberNotFound
-	}
-
-	// Unregister from repmgr
-	err := n.RepMgr.UnregisterStandby(int(member.ID))
-	if err != nil {
-		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
-	}
-
-	// Unregister from consul
-	if err := cs.UnregisterMember(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from consul: %v", member.ID, err)
 	}
 
 	return nil
