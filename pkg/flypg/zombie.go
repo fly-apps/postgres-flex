@@ -43,14 +43,14 @@ var ErrZombieDiscovered = errors.New("Zombie")
 
 // ZombieDiagnosis takes information about the current cluster state and determines whether it is safe to boot ourself as the primary.
 func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
-	// Single node cluster
+	// We can short-circuit a single node cluster.
 	if total == 1 {
 		return myHostname, nil
 	}
 
 	quorum := total/2 + 1
 
-	// Active members must at least equal quorum in order for primary resolution to be succcessful.
+	// Active members must meet quorum.
 	if active < quorum {
 		return "", ErrZombieDiscovered
 	}
@@ -59,7 +59,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	highestTotal := 0
 	totalConflicts := 0
 
-	// Evaluate conflicts to calculate the highest referrenced primary
+	// Evaluate conflicts and calculate top referenced primary
 	for hostname, total := range conflictMap {
 		totalConflicts += total
 
@@ -69,6 +69,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		}
 	}
 
+	// Calculate our references
 	myCount := total - inactive - totalConflicts
 
 	if myCount >= quorum {
