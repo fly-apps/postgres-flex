@@ -129,7 +129,8 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if zHostname == "" {
-			return fmt.Errorf("zombie lock present with no primary specified. If you think this is by mistake, remove the zombie.lock file")
+			fmt.Println("Zombie lock does not contain a valid hostname. This means that we were unable to build a consensus on who the real primary is.")
+			return fmt.Errorf("unrecoverable zombie state")
 		}
 
 		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
