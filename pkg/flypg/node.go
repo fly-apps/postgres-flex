@@ -324,8 +324,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 					fmt.Println("Identifying ourself as a Zombie")
 
-					// if primary is non-empty we were able to build a consensus on who the real primary and should
-					// be recoverable on reboot.
+					// If primary is non-empty we were able to build a consensus on who the real primary is.
 					if primary != "" {
 						fmt.Printf("Majority of members agree that %s is the real primary\n", primary)
 						fmt.Println("Reconfiguring PGBouncer to point to the real primary")
@@ -334,17 +333,17 @@ func (n *Node) PostInit(ctx context.Context) error {
 						}
 					}
 					// Create a zombie.lock file containing the resolved primary.
-					// This will be an empty string if we are unable to resolve the real primary.
+					// Note: This will be an empty string if we are unable to resolve the real primary.
 					if err := writeZombieLock(primary); err != nil {
 						return fmt.Errorf("failed to set zombie lock: %s", err)
 					}
 
-					fmt.Println("Setting all existing tables to read-only")
+					fmt.Println("User-created databases are being made readonly")
 					if err := admin.SetReadOnly(ctx, conn); err != nil {
 						return fmt.Errorf("failed to set read-only: %s", err)
 					}
 
-					return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
+					panic("zombie primary detected.")
 				}
 
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
