@@ -41,9 +41,9 @@ func readZombieLock() (string, error) {
 
 var ErrZombieDiscovered = errors.New("Zombie")
 
-// ZombieDiagnosis takes information about the current cluster state and does two things:
-//  1. Determines whether or not it's safe to boot ourself as the primary.
-//  2. Try and build a consensus around who the real primary is.
+// ZombieDiagnosis takes information about the current cluster state and determines two things:
+//  1. Is it safe to boot ourself as the primary.
+//  2. Can we build a consensus on who the real primary is.
 func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
 	// Single node cluster
 	if total == 1 {
@@ -64,7 +64,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		return "", ErrZombieDiscovered
 	}
 
-	quorum := ((total)/2 + 1)
+	quorum := (total/2 + 1)
 
 	// if we have enough active nodes to meet quorum and there are no conflicts
 	// we can assume we are the primary.
@@ -81,7 +81,6 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	highestCount := 0
 	totalConflicts := 0
 
-	// Calculate total conflicts + hightest reported primary
 	for hostname, total := range conflictMap {
 		totalConflicts += total
 
