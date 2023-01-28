@@ -279,9 +279,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 			totalMembers := len(standbys) + 1 // include self
 			totalActive := 1                  // include self
 			totalInactive := 0
+			totalConflicts := 0
 			conflictMap := map[string]int{}
 
-			// Iterate through each registered standby
+			// Iterate through each registered standby to confirm that they are up and agree that we
+			// are indeed the primary.
 			for _, standby := range standbys {
 				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
 				if err != nil {
@@ -300,27 +302,36 @@ func (n *Node) PostInit(ctx context.Context) error {
 				totalActive++
 
 				if primary.Hostname != n.PrivateIP {
+					totalConflicts++
 					conflictMap[primary.Hostname]++
 				}
 			}
 
-			fmt.Printf("Running ZombieDiagnosis with: %s, %d, %d, %d, %v\n", n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
+			// Using the resolved state metrics, determine if its safe to boot ourself as the primary.
 			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
 			if err != nil {
 				if errors.Is(err, ErrZombieDiscovered) {
-					// if primary is not empty we were able to identify the real primary
-					// and should be able to recover on reboot.
-					if primary != "" {
-						fmt.Printf("Majority of members agree that member %s is the primary\n", primary)
+					fmt.Println("Unable to confirm we are the real primary!")
+					fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
+						totalMembers,
+						totalActive,
+						totalInactive,
+						totalConflicts,
+					)
 
+					fmt.Println("Identifying ourself as a Zombie")
+
+					// if primary is non-empty we were able to identify the real primary and should be
+					// able to recover on reboot.
+					if primary != "" {
+						fmt.Printf("Majority of members agree that %s is the real primary\n", primary)
 						fmt.Println("Reconfiguring PGBouncer to point to the real primary")
 						if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
 							return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
 						}
 					}
-
-					fmt.Println("Identifying self as a Zombie")
-					// Zombie lock will contain an empty string if we were unable to resolve the real primary.
+					// Create a zombie.lock file containing the resolved primary.
+					// This will be an empty string if we are unable to resolve the real primary.
 					if err := writeZombieLock(primary); err != nil {
 						return fmt.Errorf("failed to set zombie lock: %s", err)
 					}
@@ -333,18 +344,20 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
 				}
 
-				return fmt.Errorf("failed to run zombie diagnosis:: %s", err)
+				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}
 
-			//
+			// This should never happen, but protect against it just in case.
 			if primary != n.PrivateIP {
-				if err := n.fencePrimary(ctx, conn, primary); err != nil {
-					return fmt.Errorf("failed to fence primary: %s", err)
-				}
+				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen", primary, n.PrivateIP)
+			}
+
+			if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+				return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
 			}
 
 			if err := admin.UnsetReadOnly(ctx, conn); err != nil {
-				return fmt.Errorf("failed to set read-only")
+				return fmt.Errorf("failed to unset read-only")
 			}
 
 		default:
@@ -372,27 +385,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (n *Node) fencePrimary(ctx context.Context, conn *pgx.Conn, primary string) error {
-	fmt.Printf("Majority of members agree that member %s is the primary\n", primary)
-
-	fmt.Println("Identifying self as a Zombie")
-	if err := writeZombieLock(primary); err != nil {
-		return fmt.Errorf("failed to set zombie lock: %s", err)
-	}
-
-	fmt.Println("Setting all existing tables to read-only")
-	if err := admin.SetReadOnly(ctx, conn); err != nil {
-		return fmt.Errorf("failed to set read-only: %s", err)
-	}
-
-	fmt.Println("Reconfiguring PGBouncer to point to the real primary")
-	if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-		return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
-	}
-
-	return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
 }
 
 func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
