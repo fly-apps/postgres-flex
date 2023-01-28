@@ -2,7 +2,6 @@ package flypg
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 )
@@ -52,10 +51,8 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		return myHostname, nil
 	}
 
-	// Two node setup
+	// Two node cluster
 	if total == 2 {
-		// If the one standby is inactive we can will not be able to determine a down node from a net-split.
-		// If the standby reports a different primary we have diverged
 		if len(conflictMap) > 0 || inactive == 1 {
 			return "", ErrZombieDiscovered
 		}
@@ -70,25 +67,22 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 
 	quorum := ((total)/2 + 1)
 
-	// We can safely say we are primary if we have enough active nodes
-	// to meet quorum and there are no conflicts.
+	// if we have enough active nodes to meet quorum and there are no conflicts
+	// we can assume we are the primary.
 	if len(conflictMap) == 0 && active >= quorum {
 		return myHostname, nil
 	}
 
-	// If there's not enough active nodes to meet quorum we have to assume
-	// we are a zombie.
+	// If there are not enough active nodes to meet quorum we have to assume we are a zombie.
 	if active < quorum {
-		fmt.Printf("Active: %d, Quorum: %d\n", active, quorum)
 		return "", ErrZombieDiscovered
 	}
 
 	topCandidate := ""
 	highestCount := 0
-
 	totalConflicts := 0
 
-	// Calculate total conflicts + hgh reported primary
+	// Calculate total conflicts + hightest reported primary
 	for hostname, total := range conflictMap {
 		totalConflicts += total
 
@@ -98,7 +92,8 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		}
 	}
 
-	// We can infer our count by subtracting inactive members and total conficts.
+	// We can infer our count by subtracting inactive members and total conficts from
+	// the total members.
 	myCount := total - inactive - totalConflicts
 
 	if myCount > highestCount {
@@ -106,8 +101,8 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		topCandidate = myHostname
 	}
 
+	// verify our highest count against quorum.
 	if highestCount < quorum {
-		// Unable to reach quorum
 		return "", ErrZombieDiscovered
 	}
 
