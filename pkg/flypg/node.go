@@ -21,8 +21,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-var ErrForceRestart = errors.New("full restart triggered")
-
 type Credentials struct {
 	Username string
 	Password string
