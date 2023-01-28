@@ -43,8 +43,9 @@ func readZombieLock() (string, error) {
 var ErrZombieDiscovered = errors.New("Zombie")
 
 // ZombieDiagnosis takes information about the current cluster state and does two things.
-// 1. Determines whether or not we are a primary coming back from the dead.
-// 2. If we are indeed a zombie, we want to see if we can resolve who the real primary is.
+//  1. Determines whether or not we are a primary coming back from the dead.
+//  2. If we are indeed a zombie, we want to see if we can resolve who the real primary is so
+//     we can attempt to rejoin the cluster on reboot.
 func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
 	// Single node cluster
 	if total == 1 {
@@ -54,7 +55,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	// Two node setup
 	if total == 2 {
 		// If the one standby is inactive we can will not be able to determine a down node from a net-split.
-		// If the standby reports a different primary we have diverged greatly.
+		// If the standby reports a different primary we have diverged
 		if len(conflictMap) > 0 || inactive == 1 {
 			return "", ErrZombieDiscovered
 		}
@@ -69,17 +70,17 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 
 	quorum := ((total)/2 + 1)
 
+	// We can safely say we are primary if we have enough active nodes
+	// to meet quorum and there are no conflicts.
+	if len(conflictMap) == 0 && active >= quorum {
+		return myHostname, nil
+	}
+
 	// If there's not enough active nodes to meet quorum we have to assume
 	// we are a zombie.
 	if active < quorum {
 		fmt.Printf("Active: %d, Quorum: %d\n", active, quorum)
 		return "", ErrZombieDiscovered
-	}
-
-	// We can safely say we are primary if we have enough active nodes
-	// to meet quorum and there are no conflicts.
-	if len(conflictMap) == 0 && active >= quorum {
-		return myHostname, nil
 	}
 
 	topCandidate := ""
@@ -110,5 +111,5 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		return "", ErrZombieDiscovered
 	}
 
-	return topCandidate, nil
+	return topCandidate, ErrZombieDiscovered
 }

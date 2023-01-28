@@ -128,6 +128,10 @@ func (n *Node) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
 		}
 
+		if zHostname == "" {
+			return fmt.Errorf("zombie lock present with no primary specified. If you think this is by mistake, remove the zombie.lock file")
+		}
+
 		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
 			return fmt.Errorf("failed to rejoin cluster: %s", err)
 		}
@@ -304,20 +308,39 @@ func (n *Node) PostInit(ctx context.Context) error {
 			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
 			if err != nil {
 				if errors.Is(err, ErrZombieDiscovered) {
-					if err := n.fencePrimary(ctx, conn, primary); err != nil {
-						return fmt.Errorf("failed to fence primary: %s", err)
+					// if primary is not empty we were able to identify the real primary
+					// and should be able to recover on reboot.
+					if primary != "" {
+						fmt.Printf("Majority of members agree that member %s is the primary\n", primary)
+
+						fmt.Println("Reconfiguring PGBouncer to point to the real primary")
+						if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+							return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+						}
 					}
+
+					fmt.Println("Identifying self as a Zombie")
+					// Zombie lock will contain an empty string if we were unable to resolve the real primary.
+					if err := writeZombieLock(primary); err != nil {
+						return fmt.Errorf("failed to set zombie lock: %s", err)
+					}
+
+					fmt.Println("Setting all existing tables to read-only")
+					if err := admin.SetReadOnly(ctx, conn); err != nil {
+						return fmt.Errorf("failed to set read-only: %s", err)
+					}
+
 					return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
 				}
 
 				return fmt.Errorf("failed to run zombie diagnosis:: %s", err)
 			}
 
+			//
 			if primary != n.PrivateIP {
 				if err := n.fencePrimary(ctx, conn, primary); err != nil {
 					return fmt.Errorf("failed to fence primary: %s", err)
 				}
-				return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
 			}
 
 			if err := admin.UnsetReadOnly(ctx, conn); err != nil {

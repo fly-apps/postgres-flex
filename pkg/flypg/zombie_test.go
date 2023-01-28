@@ -53,7 +53,7 @@ func TestZombieEval(t *testing.T) {
 				TotalActive:      1,
 				TotalInactive:    1,
 				ConflictMap:      map[string]int{},
-				ExpectedHostname: "zombie",
+				ExpectedHostname: "",
 			},
 			// 2 member setup with the standby reporting different primary
 			{
@@ -64,7 +64,7 @@ func TestZombieEval(t *testing.T) {
 				ConflictMap: map[string]int{
 					"host-1": 1,
 				},
-				ExpectedHostname: "zombie",
+				ExpectedHostname: "",
 			},
 			// 3 member setup with 1 standby offline
 			{
@@ -82,7 +82,7 @@ func TestZombieEval(t *testing.T) {
 				TotalActive:      1,
 				TotalInactive:    2,
 				ConflictMap:      map[string]int{},
-				ExpectedHostname: "zombie",
+				ExpectedHostname: "",
 			},
 			// 3 member setup where both standbys agree that i'm not the primary.
 			{
@@ -116,7 +116,7 @@ func TestZombieEval(t *testing.T) {
 					"secret-primary":   1,
 					"secret-primary-2": 1,
 				},
-				ExpectedHostname: "zombie",
+				ExpectedHostname: "",
 			},
 		},
 	}
@@ -127,8 +127,8 @@ func TestZombieEval(t *testing.T) {
 		fmt.Println(hostname)
 		if err != nil {
 			if errors.Is(err, ErrZombieDiscovered) {
-				if c.ExpectedHostname != "zombie" {
-					t.Logf("test case %d failed: %+v . Result: zombie", i, c)
+				if c.ExpectedHostname != hostname {
+					t.Logf("test case %d failed: %+v . Result: %s", i, c, hostname)
 					t.Fail()
 					return
 				}
