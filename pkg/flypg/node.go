@@ -446,7 +446,7 @@ func (n *Node) configure(ctx context.Context, store *state.Store) error {
 		fmt.Println(err.Error())
 	}
 
-	// Reset PG Primary and wait for primary resolution
+	// Clear target and wait for primary resolution
 	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
 		fmt.Println(err.Error())
 	}
