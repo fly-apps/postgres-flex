@@ -122,15 +122,18 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Attempt to re-introduce zombie node back into the cluster.
 	if ZombieLockExists() {
-		fmt.Println("Zombie lock file detected. Attempting to rejoin active cluster.")
+		fmt.Println("Zombie lock detected")
 		zHostname, err := readZombieLock()
 		if err != nil {
 			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
 		}
 
 		if zHostname == "" {
-			fmt.Println("Zombie lock does not contain a valid hostname. This means that we were unable to build a consensus on who the real primary is.")
-			return fmt.Errorf("unrecoverable zombie state")
+			// TODO - Provide link to documention on how to address this
+			fmt.Println("Zombie lock does not contain a valid hostname!")
+			fmt.Println("This likely means that we were unable to build a consensus who the real primary is")
+			fmt.Println("If you feel like this is a mistake, force a retry by deleting the zombie.lock file")
+			return fmt.Errorf("unrecoverable zombie")
 		}
 
 		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
@@ -141,8 +144,7 @@ func (n *Node) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to remove zombie lock: %s", err)
 		}
 
-		// Ensure the single instance created with the --force-rewind process
-		// is cleaned up properly.
+		// Ensure the single instance created with the --force-rewind process is cleaned up properly.
 		utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
 	}
 
@@ -283,8 +285,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			totalConflicts := 0
 			conflictMap := map[string]int{}
 
-			// Iterate through each registered standby to confirm that they are up and agree that we
-			// are indeed the primary.
 			for _, standby := range standbys {
 				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
 				if err != nil {
@@ -308,7 +308,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 
-			// Using the resolved state metrics, determine if its safe to boot ourself as the primary.
+			// Using the cluster state metrics, determine whether it's safe to boot as a primary.
 			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
 			if err != nil {
 				if errors.Is(err, ErrZombieDiscovered) {
@@ -322,8 +322,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 					fmt.Println("Identifying ourself as a Zombie")
 
-					// if primary is non-empty we were able to identify the real primary and should be
-					// able to recover on reboot.
+					// if primary is non-empty we were able to build a consensus on who the real primary and should
+					// be recoverable on reboot.
 					if primary != "" {
 						fmt.Printf("Majority of members agree that %s is the real primary\n", primary)
 						fmt.Println("Reconfiguring PGBouncer to point to the real primary")

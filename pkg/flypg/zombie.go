@@ -41,9 +41,7 @@ func readZombieLock() (string, error) {
 
 var ErrZombieDiscovered = errors.New("Zombie")
 
-// ZombieDiagnosis takes information about the current cluster state and determines two things:
-//  1. Is it safe to boot ourself as the primary.
-//  2. Can we build a consensus on who the real primary is.
+// ZombieDiagnosis takes information about the current cluster state and determines whether it is safe to boot ourself as the primary.
 func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
 	// Single node cluster
 	if total == 1 {
@@ -52,6 +50,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 
 	// Two node cluster
 	if total == 2 {
+		// We can't know if we are the true primary if our only standby is inactive or has conflicts.
 		if len(conflictMap) > 0 || inactive == 1 {
 			return "", ErrZombieDiscovered
 		}
@@ -59,20 +58,18 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		return myHostname, nil
 	}
 
-	// If all standbys are inactive, then there's a possible network split.
+	// If all standbys are inactive, then we hae to assume a possible network split.
 	if total == (inactive - 1) {
 		return "", ErrZombieDiscovered
 	}
 
 	quorum := (total/2 + 1)
 
-	// if we have enough active nodes to meet quorum and there are no conflicts
-	// we can assume we are the primary.
+	// if we have enough active nodes to meet quorum and there are no conflicts we are the primary.
 	if len(conflictMap) == 0 && active >= quorum {
 		return myHostname, nil
 	}
 
-	// If there are not enough active nodes to meet quorum we have to assume we are a zombie.
 	if active < quorum {
 		return "", ErrZombieDiscovered
 	}
@@ -81,6 +78,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	highestCount := 0
 	totalConflicts := 0
 
+	// Evaluate conflicts to calculate the highest referrenced primary
 	for hostname, total := range conflictMap {
 		totalConflicts += total
 
@@ -90,14 +88,15 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		}
 	}
 
-	// Determine our count
+	// Calculate our count
 	myCount := total - inactive - totalConflicts
 
-	if myCount > highestCount && myCount >= quorum {
+	// If we meet quorum, we are done here.
+	if myCount >= quorum {
 		return myHostname, nil
 	}
 
-	// verify our highest count against quorum.
+	// If our highest
 	if highestCount < quorum {
 		return "", ErrZombieDiscovered
 	}
