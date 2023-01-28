@@ -87,7 +87,7 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 
 	totalConflicts := 0
 
-	// Calculate total conflicts + highest reported primary
+	// Calculate total conflicts + hgh reported primary
 	for hostname, total := range conflictMap {
 		totalConflicts += total
 
