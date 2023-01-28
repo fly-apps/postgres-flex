@@ -2,6 +2,7 @@ package flycheck
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 	"github.com/pkg/errors"
@@ -27,7 +28,7 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 
 	checks.AddCheck("role", func() (string, error) {
 		if flypg.ZombieLockExists() {
-			return "zombie", nil
+			return "zombie", fmt.Errorf("member is in a zombie state. see logs for more details")
 		}
 
 		member, err := node.RepMgr.Member(ctx, conn)
