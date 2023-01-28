@@ -26,7 +26,7 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 	}
 
 	checks.AddCheck("role", func() (string, error) {
-		if node.ZombieLockExists() {
+		if flypg.ZombieLockExists() {
 			return "zombie", nil
 		}
 

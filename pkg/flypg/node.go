@@ -17,6 +17,7 @@ import (
 	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
 	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
 	"github.com/fly-apps/postgres-flex/pkg/privnet"
+	"github.com/fly-apps/postgres-flex/pkg/utils"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -121,6 +122,27 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
+	// Attempt to re-introduce zombie node back into the cluster.
+	if ZombieLockExists() {
+		fmt.Println("Zombie lock file detected. Attempting to rejoin active cluster.")
+		zHostname, err := readZombieLock()
+		if err != nil {
+			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
+		}
+
+		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
+			return fmt.Errorf("failed to rejoin cluster: %s", err)
+		}
+
+		if err := removeZombieLock(); err != nil {
+			return fmt.Errorf("failed to remove zombie lock: %s", err)
+		}
+
+		// Ensure the single instance created with the --force-rewind process
+		// is cleaned up properly.
+		utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
+	}
+
 	store, err := state.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
@@ -161,31 +183,6 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	if n.ZombieLockExists() {
-		fmt.Println("Zombie lock file detected, attempting to rejoin cluster")
-		pid, err := os.Stat("/data/postgresql/postmaster.pid")
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to verify postgres state")
-		}
-
-		if pid != nil {
-			return fmt.Errorf("please restart your machine. postgres is still running or shutdown uncleanly")
-		}
-
-		zHostname, err := n.readZombieLock()
-		if err != nil {
-			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
-		}
-
-		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
-			fmt.Printf("failed to rejoin cluster: %s", err)
-		}
-
-		if err := n.removeZombieLock(); err != nil {
-			return fmt.Errorf("failed to remove zombie lock: %s", err)
-		}
-	}
-
 	fmt.Println("Initializing Postgres configuration")
 	if err := n.configurePostgres(store); err != nil {
 		return fmt.Errorf("failed to configure postgres: %s", err)
@@ -196,6 +193,11 @@ func (n *Node) Init(ctx context.Context) error {
 
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
+	if ZombieLockExists() {
+		time.Sleep(30 * time.Second)
+		return fmt.Errorf("unable to continue with PostInit while a zombie.  please restart the machine using `fly machine restart %s --app %s`", os.Getenv("FLY_ALLOC_ID"), n.AppName)
+	}
+
 	// Ensure local PG is up before establishing connection with consul.
 	pgConn, err := n.NewLocalConnection(ctx, "postgres")
 	if err != nil {
@@ -261,11 +263,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 		if member != nil && member.Role != "" {
 			role = member.Role
 		}
-		fmt.Printf("My current role is: %s", role)
+		fmt.Printf("My current role is: %s\n", role)
 
 		switch role {
 		case PrimaryRoleName:
-			// Query standbys associated with the primary.
 			standbys, err := repmgr.StandbyMembers(ctx, conn)
 			if err != nil {
 				if !errors.Is(err, pgx.ErrNoRows) {
@@ -273,42 +274,80 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 
-			fmt.Printf("%d standbys to evaluate\n", len(standbys))
+			type referral struct {
+				hostname string
+				count    int
+			}
 
-			var zMember *Member
-			// Verify that the standbys recongize us as its primary.
-			fmt.Println("Checking with standby's to verify i'm still the leader.")
+			type primaryEval struct {
+				referrals []referral
+				failed    int
+			}
+
+			// We need to know the total number of registered standbys.
+			// We need know how many of the standbys are active.
+			// Whether all standbys agree on who the primary is.
+
+			// The number of standbys that report a different primary must meet quorum.
+			// Quorum is defined as (total registered standbys / 2 + 1)
+
+			totalMembers := len(standbys) + 1 // include self
+			totalActive := 1                  // include self
+			totalInactive := 0
+			conflictMap := map[string]int{}
+
+			// Iterate through each registered standby and confirm that we are
+			// the expected primary and not a zombie.
 			for _, standby := range standbys {
 				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
 				if err != nil {
 					fmt.Printf("failed to connect to %s", standby.Hostname)
+
+					totalInactive++
+					continue
 				}
 
 				primary, err := repmgr.PrimaryMember(ctx, mConn)
 				if err != nil {
 					fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
+
+					totalInactive++
+					continue
 				}
 
-				fmt.Printf("Member %s, thinks %s is the primary\n", standby.Hostname, primary.Hostname)
+				totalActive++
 
-				// Verify that the standby agree's about our relationship
 				if primary.Hostname != n.PrivateIP {
-					if zMember == nil {
-						zMember = primary
-					}
-
-					if zMember != nil && zMember.Hostname != primary.Hostname {
-						// If we are here, we have multiple standby's that have different
-						// primaries.  Not good...
-						return fmt.Errorf("standbys do not agree on who's primary. manual intervention is required")
-					}
+					conflictMap[primary.Hostname]++
 				}
 			}
 
-			if zMember != nil {
-				fmt.Println("Writing zombie lock")
-				n.writeZombieLock(zMember)
-				return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
+			primary, err := ZombieEval(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
+			if err != nil {
+				if errors.Is(err, ErrZombieDiscovered) {
+					fmt.Printf("Majority of members agree that member %s is the primary\n", primary)
+
+					fmt.Println("Identifying self as a Zombie")
+					if err := writeZombieLock(primary); err != nil {
+						return fmt.Errorf("failed to set zombie lock: %s", err)
+					}
+
+					fmt.Println("Setting all existing tables to read-only")
+					if err := admin.SetReadOnly(ctx, conn); err != nil {
+						return fmt.Errorf("failed to set read-only: %s", err)
+					}
+
+					fmt.Println("Reconfiguring PGBouncer to point to the real primary")
+					if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+						return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+					}
+
+					return fmt.Errorf("zombie primary detected. Use `fly machines restart <machine-id>` to rejoin the cluster or consider removing this node")
+				}
+			}
+
+			if err := admin.UnsetReadOnly(ctx, conn); err != nil {
+				return fmt.Errorf("failed to set read-only")
 			}
 
 		default:
@@ -368,39 +407,6 @@ func (n *Node) initializePG() error {
 	_, err := cmd.CombinedOutput()
 
 	return err
-}
-
-func (n *Node) writeZombieLock(primary *Member) error {
-	if err := ioutil.WriteFile("/data/zombie.lock", []byte(primary.Hostname), 0644); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (n *Node) ZombieLockExists() bool {
-	_, err := os.Stat("/data/zombie.lock")
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (n *Node) removeZombieLock() error {
-	if err := os.Remove("/data/zombie.lock"); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (n *Node) readZombieLock() (string, error) {
-	body, err := ioutil.ReadFile("/data/zombie.lock")
-	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
 }
 
 func (n *Node) isPGInitialized() bool {

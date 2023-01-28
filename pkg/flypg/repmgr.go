@@ -111,10 +111,6 @@ func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// func (r *RepMgr) CurrentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-// 	return r.memberRole(ctx, pg, int(r.ID))
-// }
-
 func (r *RepMgr) setDefaults() {
 	conf := ConfigMap{
 		"node_id":                      fmt.Sprint(r.ID),
@@ -167,13 +163,15 @@ func (r *RepMgr) followPrimary() error {
 }
 
 func (r *RepMgr) rejoinCluster(hostname string) error {
-	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind -W",
+	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
 		r.ConfigPath,
 		hostname,
 		r.Port,
 		r.Credentials.Username,
 		r.DatabaseName,
 	)
+
+	fmt.Println(cmdStr)
 
 	if err := utils.RunCommand(cmdStr); err != nil {
 		return err
