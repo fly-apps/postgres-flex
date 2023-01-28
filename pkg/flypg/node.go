@@ -274,35 +274,16 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 
-			type referral struct {
-				hostname string
-				count    int
-			}
-
-			type primaryEval struct {
-				referrals []referral
-				failed    int
-			}
-
-			// We need to know the total number of registered standbys.
-			// We need know how many of the standbys are active.
-			// Whether all standbys agree on who the primary is.
-
-			// The number of standbys that report a different primary must meet quorum.
-			// Quorum is defined as (total registered standbys / 2 + 1)
-
 			totalMembers := len(standbys) + 1 // include self
 			totalActive := 1                  // include self
 			totalInactive := 0
 			conflictMap := map[string]int{}
 
-			// Iterate through each registered standby and confirm that we are
-			// the expected primary and not a zombie.
+			// Iterate through each registered standby
 			for _, standby := range standbys {
 				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
 				if err != nil {
 					fmt.Printf("failed to connect to %s", standby.Hostname)
-
 					totalInactive++
 					continue
 				}
@@ -310,7 +291,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 				primary, err := repmgr.PrimaryMember(ctx, mConn)
 				if err != nil {
 					fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
-
 					totalInactive++
 					continue
 				}
@@ -322,7 +302,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 
-			primary, err := ZombieEval(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
+			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
 			if err != nil {
 				if errors.Is(err, ErrZombieDiscovered) {
 					fmt.Printf("Majority of members agree that member %s is the primary\n", primary)

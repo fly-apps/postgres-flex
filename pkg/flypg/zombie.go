@@ -42,7 +42,7 @@ func readZombieLock() (string, error) {
 
 var ErrZombieDiscovered = errors.New("Zombie")
 
-func ZombieEval(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
+func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
 	// No standbys
 	if total == 1 {
 		return myHostname, nil

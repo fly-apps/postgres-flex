@@ -123,7 +123,7 @@ func TestZombieEval(t *testing.T) {
 
 	for i, c := range tests.Cases {
 
-		hostname, err := ZombieEval(c.MyHostname, c.totalMembers, c.TotalInactive, c.TotalActive, c.ConflictMap)
+		hostname, err := ZombieDiagnosis(c.MyHostname, c.totalMembers, c.TotalInactive, c.TotalActive, c.ConflictMap)
 		fmt.Println(hostname)
 		if err != nil {
 			if errors.Is(err, ErrZombieDiscovered) {
