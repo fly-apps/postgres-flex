@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestZombieEval(t *testing.T) {
+func TestZombieDiagnosis(t *testing.T) {
 
 	type TestCase struct {
 		MyHostname string
