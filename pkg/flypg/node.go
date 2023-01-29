@@ -131,7 +131,7 @@ func (n *Node) Init(ctx context.Context) error {
 		if zHostname == "" {
 			// TODO - Provide link to documention on how to address this
 			fmt.Println("Zombie lock does not contain a valid hostname!")
-			fmt.Println("This likely means that we were unable to build a consensus who the real primary is.")
+			fmt.Println("This likely means that we were unable to build a consensus on who the real primary is.")
 			fmt.Println("If you feel like this is a mistake, you can force a retry by deleting the zombie.lock file.")
 			fmt.Println("Sleeping for 2 minutes.")
 			time.Sleep(2 * time.Minute)
