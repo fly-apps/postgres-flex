@@ -122,13 +122,18 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Attempt to re-introduce zombie back into the cluster.
 	if ZombieLockExists() {
-		fmt.Println("Zombie lock detected")
+		fmt.Println("Zombie lock detected!")
 		zHostname, err := readZombieLock()
 		if err != nil {
 			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
 		}
 
 		if zHostname != "" {
+			ip := net.ParseIP(zHostname)
+			if ip == nil {
+				return fmt.Errorf("zombie.lock file contained an invalid ipv6 address")
+			}
+
 			if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
 				return fmt.Errorf("failed to rejoin cluster: %s", err)
 			}
@@ -141,7 +146,7 @@ func (n *Node) Init(ctx context.Context) error {
 			utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
 		} else {
 			// TODO - Provide link to documention on how to address this
-			fmt.Println("Zombie lock does not contain a valid hostname!")
+			fmt.Println("The zombie lock file does not contain a hostname.")
 			fmt.Println("This likely means that we were unable to build a consensus on who the real primary is.")
 		}
 	}
@@ -197,9 +202,9 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	if ZombieLockExists() {
-		fmt.Println("If you feel like this is a mistake, you can force a retry by deleting the zombie.lock file")
-		fmt.Println("Sleeping for 2 minutes.")
-		time.Sleep(2 * time.Minute)
+		fmt.Println("Manual intervention required. Delete the zombie.lock file and restart the machine to force a retry.")
+		fmt.Println("Sleeping for 5 minutes.")
+		time.Sleep(5 * time.Minute)
 
 		return fmt.Errorf("unrecoverable zombie")
 	}
@@ -269,7 +274,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 		if member != nil && member.Role != "" {
 			role = member.Role
 		}
-		fmt.Printf("My current role is: %s\n", role)
 
 		switch role {
 		case PrimaryRoleName:
@@ -284,6 +288,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			totalActive := 1                  // include self
 			totalInactive := 0
 			totalConflicts := 0
+
 			conflictMap := map[string]int{}
 
 			for _, standby := range standbys {
