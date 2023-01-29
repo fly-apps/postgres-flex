@@ -120,7 +120,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Attempt to re-introduce zombie node back into the cluster.
+	// Attempt to re-introduce zombie back into the cluster.
 	if ZombieLockExists() {
 		fmt.Println("Zombie lock detected")
 		zHostname, err := readZombieLock()
@@ -128,26 +128,22 @@ func (n *Node) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
 		}
 
-		if zHostname == "" {
+		if zHostname != "" {
+			if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
+				return fmt.Errorf("failed to rejoin cluster: %s", err)
+			}
+
+			if err := removeZombieLock(); err != nil {
+				return fmt.Errorf("failed to remove zombie lock: %s", err)
+			}
+
+			// Ensure the single instance created with the --force-rewind process is cleaned up properly.
+			utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
+		} else {
 			// TODO - Provide link to documention on how to address this
 			fmt.Println("Zombie lock does not contain a valid hostname!")
 			fmt.Println("This likely means that we were unable to build a consensus on who the real primary is.")
-			fmt.Println("If you feel like this is a mistake, you can force a retry by deleting the zombie.lock file.")
-			fmt.Println("Sleeping for 2 minutes.")
-			time.Sleep(2 * time.Minute)
-			return fmt.Errorf("unrecoverable zombie")
 		}
-
-		if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
-			return fmt.Errorf("failed to rejoin cluster: %s", err)
-		}
-
-		if err := removeZombieLock(); err != nil {
-			return fmt.Errorf("failed to remove zombie lock: %s", err)
-		}
-
-		// Ensure the single instance created with the --force-rewind process is cleaned up properly.
-		utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
 	}
 
 	store, err := state.NewStore()
@@ -201,8 +197,11 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that should be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	if ZombieLockExists() {
-		time.Sleep(30 * time.Second)
-		return fmt.Errorf("unable to continue with PostInit while a zombie.  please restart the machine using `fly machine restart %s --app %s`", os.Getenv("FLY_ALLOC_ID"), n.AppName)
+		fmt.Println("If you feel like this is a mistake, you can force a retry by deleting the zombie.lock file")
+		fmt.Println("Sleeping for 2 minutes.")
+		time.Sleep(2 * time.Minute)
+
+		return fmt.Errorf("unrecoverable zombie")
 	}
 
 	// Ensure local PG is up before establishing connection with consul.
