@@ -7,7 +7,7 @@ import (
 
 func TestZombieDiagnosis(t *testing.T) {
 
-	t.Run("single node cluster", func(t *testing.T) {
+	t.Run("SingleMember", func(t *testing.T) {
 		hostname := "host-1"
 
 		total := 1
@@ -25,7 +25,7 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	})
 
-	t.Run("two node cluster", func(t *testing.T) {
+	t.Run("TwoMember", func(t *testing.T) {
 		hostname := "host-1"
 		total := 2
 		inactive := 0
@@ -42,7 +42,7 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	})
 
-	t.Run("two node cluster with inactive standby", func(t *testing.T) {
+	t.Run("TwoMemberWithInactiveStandby", func(t *testing.T) {
 		hostname := "host-1"
 		total := 2
 		inactive := 1
@@ -58,7 +58,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("two node cluster with diverged primary", func(t *testing.T) {
+	t.Run("TwoNodeWithDivergedPrimary", func(t *testing.T) {
 		hostname := "host-1"
 		total := 2
 		inactive := 1
@@ -77,7 +77,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("three node cluster", func(t *testing.T) {
+	t.Run("ThreeMember", func(t *testing.T) {
 		hostname := "host-1"
 		total := 3
 		inactive := 0
@@ -94,7 +94,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("three node cluster with one offline standby", func(t *testing.T) {
+	t.Run("ThreeMemberWithOneOfflineStandby", func(t *testing.T) {
 		hostname := "host-1"
 		total := 3
 		inactive := 1
@@ -111,7 +111,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("three node cluster with both standbys offline", func(t *testing.T) {
+	t.Run("ThreeMemberWithTwoOfflineStandby", func(t *testing.T) {
 		hostname := "host-1"
 		total := 3
 		inactive := 2
@@ -128,7 +128,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("three node cluster with real primary resolved", func(t *testing.T) {
+	t.Run("ThreeMemberWithStandbyReportDiffPrimary", func(t *testing.T) {
 		hostname := "host-1"
 		total := 3
 		inactive := 0
@@ -147,7 +147,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("three node cluster with one standby in disagreement", func(t *testing.T) {
+	t.Run("ThreeMemberWithOneStandbyInDisagreement", func(t *testing.T) {
 		hostname := "host-1"
 		total := 3
 		inactive := 0
@@ -166,7 +166,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("three node cluster with two standbys reporting different primarys", func(t *testing.T) {
+	t.Run("ThreeMemberWithTwoReportingDifferentPrimaries", func(t *testing.T) {
 		hostname := "host-1"
 		total := 3
 		inactive := 0
@@ -186,7 +186,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("four node setup", func(t *testing.T) {
+	t.Run("FourMember", func(t *testing.T) {
 		hostname := "host-1"
 
 		total := 4
@@ -204,7 +204,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("four node setup with one standby inactive", func(t *testing.T) {
+	t.Run("FourMemberWithOneStandbyInactive", func(t *testing.T) {
 		hostname := "host-1"
 
 		total := 4
@@ -222,7 +222,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("four node setup with two standbys inactive", func(t *testing.T) {
+	t.Run("FourMemberWithTwoStandbyInactive", func(t *testing.T) {
 		hostname := "host-1"
 		total := 4
 		inactive := 2
@@ -239,7 +239,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("four node setup with two standbys reporting different primary", func(t *testing.T) {
+	t.Run("FourMemberWithTwoReportingDifferentPrimary", func(t *testing.T) {
 		hostname := "host-1"
 
 		total := 4
@@ -259,7 +259,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 	})
 
-	t.Run("four node setup with three standbys reporting different primary", func(t *testing.T) {
+	t.Run("FourMemberWithThreeStandbyReportingDiffPrimary", func(t *testing.T) {
 		hostname := "host-1"
 		expected := "host-99"
 
