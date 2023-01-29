@@ -2,7 +2,6 @@ package flypg
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 )
 
@@ -15,7 +14,7 @@ func ZombieLockExists() bool {
 }
 
 func writeZombieLock(hostname string) error {
-	if err := ioutil.WriteFile("/data/zombie.lock", []byte(hostname), 0644); err != nil {
+	if err := os.WriteFile("/data/zombie.lock", []byte(hostname), 0644); err != nil {
 		return err
 	}
 
@@ -31,7 +30,7 @@ func removeZombieLock() error {
 }
 
 func readZombieLock() (string, error) {
-	body, err := ioutil.ReadFile("/data/zombie.lock")
+	body, err := os.ReadFile("/data/zombie.lock")
 	if err != nil {
 		return "", err
 	}

@@ -294,6 +294,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 					totalInactive++
 					continue
 				}
+				defer mConn.Close(ctx)
 
 				primary, err := repmgr.PrimaryMember(ctx, mConn)
 				if err != nil {
@@ -312,40 +313,38 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 			// Using the cluster state metrics, determine whether it's safe to boot as a primary.
 			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
-			if err != nil {
-				if errors.Is(err, ErrZombieDiscovered) {
-					fmt.Println("Unable to confirm we are the real primary!")
-					fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
-						totalMembers,
-						totalActive,
-						totalInactive,
-						totalConflicts,
-					)
+			if errors.Is(err, ErrZombieDiscovered) {
+				fmt.Println("Unable to confirm we are the real primary!")
+				fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
+					totalMembers,
+					totalActive,
+					totalInactive,
+					totalConflicts,
+				)
 
-					fmt.Println("Identifying ourself as a Zombie")
+				fmt.Println("Identifying ourself as a Zombie")
 
-					// If primary is non-empty we were able to build a consensus on who the real primary is.
-					if primary != "" {
-						fmt.Printf("Majority of members agree that %s is the real primary\n", primary)
-						fmt.Println("Reconfiguring PGBouncer to point to the real primary")
-						if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-							return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
-						}
+				// If primary is non-empty we were able to build a consensus on who the real primary is.
+				if primary != "" {
+					fmt.Printf("Majority of members agree that %s is the real primary\n", primary)
+					fmt.Println("Reconfiguring PGBouncer to point to the real primary")
+					if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+						return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
 					}
-					// Create a zombie.lock file containing the resolved primary.
-					// Note: This will be an empty string if we are unable to resolve the real primary.
-					if err := writeZombieLock(primary); err != nil {
-						return fmt.Errorf("failed to set zombie lock: %s", err)
-					}
-
-					fmt.Println("User-created databases are being made readonly")
-					if err := admin.SetReadOnly(ctx, conn); err != nil {
-						return fmt.Errorf("failed to set read-only: %s", err)
-					}
-
-					panic("zombie primary detected.")
+				}
+				// Create a zombie.lock file containing the resolved primary.
+				// Note: This will be an empty string if we are unable to resolve the real primary.
+				if err := writeZombieLock(primary); err != nil {
+					return fmt.Errorf("failed to set zombie lock: %s", err)
 				}
 
+				fmt.Println("User-created databases are being made readonly")
+				if err := admin.SetReadOnly(ctx, conn); err != nil {
+					return fmt.Errorf("failed to set read-only: %s", err)
+				}
+
+				panic("zombie primary detected.")
+			} else if err != nil {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}
 
@@ -432,22 +431,22 @@ func (n *Node) isPGInitialized() bool {
 func (n *Node) configure(ctx context.Context, store *state.Store) error {
 	fmt.Println("Initializing internal config")
 	if err := n.configureInternal(store); err != nil {
-		fmt.Println(err.Error())
+		return fmt.Errorf("failed to set internal config: %s", err)
 	}
 
 	fmt.Println("Initializing replication manager")
 	if err := n.configureRepmgr(store); err != nil {
-		fmt.Println(err.Error())
+		return fmt.Errorf("failed to configure repmgr config: %s", err)
 	}
 
 	fmt.Println("Initializing pgbouncer")
 	if err := n.configurePGBouncer(store); err != nil {
-		fmt.Println(err.Error())
+		return fmt.Errorf("failed to configure pgbouncer: %s", err)
 	}
 
 	// Clear target and wait for primary resolution
 	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
-		fmt.Println(err.Error())
+		return fmt.Errorf("failed to set pgbouncer target: %s", err)
 	}
 
 	return nil

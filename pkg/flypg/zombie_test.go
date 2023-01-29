@@ -2,242 +2,282 @@ package flypg
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 )
 
 func TestZombieDiagnosis(t *testing.T) {
 
-	type TestCase struct {
-		MyHostname string
-		// Total number of registered members in the cluster. ( including the primary )
-		TotalMembers int
-		// Total number of members that can be reached over the network. Will never be less than 1.
-		TotalActive int
-		// Total number of members that were not reachable over the network.
-		TotalInactive int
-		// This will track each primary conveyed by standbys that is not equal to ourself and with that
-		// the total number of occurances.
-		ConflictMap map[string]int
-		// The expected hostname returned.
-		ExpectedHostname string
-		// Whether or not we are expected to be a zombie.
-		ExpectedZombie bool
-	}
+	t.Run("single node cluster", func(t *testing.T) {
+		hostname := "host-1"
 
-	type TestCases struct {
-		Cases []TestCase
-	}
+		total := 1
+		inactive := 0
+		active := 1
 
-	tests := TestCases{
-		Cases: []TestCase{
-			// Test case: 0
-			// Single node setup ( Only possible setup )
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     1,
-				TotalActive:      1,
-				TotalInactive:    0,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "host-1",
-				ExpectedZombie:   false,
-			},
-			// Test case: 1
-			// 2 member setup
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     2,
-				TotalActive:      2,
-				TotalInactive:    0,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "host-1",
-				ExpectedZombie:   false,
-			},
-			// Test case: 2
-			// 2 member setup with an inactive standby
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     2,
-				TotalActive:      1,
-				TotalInactive:    1,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "",
-				ExpectedZombie:   true,
-			},
-			// Test case: 3
-			// 2 member setup with the standby reporting different primary
-			{
-				MyHostname:    "host-1",
-				TotalMembers:  2,
-				TotalActive:   1,
-				TotalInactive: 1,
-				ConflictMap: map[string]int{
-					"host-1": 1,
-				},
-				ExpectedHostname: "",
-				ExpectedZombie:   true,
-			},
-			// Test case: 4
-			// 3 member setup with 1 standby offline
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     3,
-				TotalActive:      2,
-				TotalInactive:    1,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "host-1",
-				ExpectedZombie:   false,
-			},
-			// Test case: 5
-			// 3 member setup where both standby's are offline.
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     3,
-				TotalActive:      1,
-				TotalInactive:    2,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "",
-				ExpectedZombie:   true,
-			},
-			// Test case: 6
-			// 3 member setup where both standbys agree that i'm not the primary.
-			{
-				MyHostname:    "host-1",
-				TotalMembers:  3,
-				TotalActive:   3,
-				TotalInactive: 0,
-				ConflictMap: map[string]int{
-					"secret-primary": 2,
-				},
-				ExpectedHostname: "secret-primary",
-				ExpectedZombie:   true,
-			},
-			// Test case: 7
-			// 3 member setup where 1 standby disagrees that i'm primary.
-			{
-				MyHostname:    "host-1",
-				TotalMembers:  3,
-				TotalActive:   3,
-				TotalInactive: 0,
-				ConflictMap: map[string]int{
-					"secret-primary": 1,
-				},
-				ExpectedHostname: "host-1",
-				ExpectedZombie:   false,
-			},
-			// Test case: 8
-			// 3 member setup where both standbys report different primaries.
-			{
-				MyHostname:    "host-1",
-				TotalMembers:  3,
-				TotalActive:   3,
-				TotalInactive: 0,
-				ConflictMap: map[string]int{
-					"secret-primary":   1,
-					"secret-primary-2": 1,
-				},
-				ExpectedHostname: "",
-				ExpectedZombie:   true,
-			},
-			// Test case: 9
-			// 4 member setup
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     4,
-				TotalActive:      4,
-				TotalInactive:    0,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "host-1",
-				ExpectedZombie:   false,
-			},
-			// Test case: 10
-			// 4 member setup with 1 standby that is inactive
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     4,
-				TotalActive:      3,
-				TotalInactive:    1,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "host-1",
-				ExpectedZombie:   false,
-			},
-			// Test case: 11
-			// 4 member setup with 2 standbys that are inactive ( unable to meet quorum)
-			{
-				MyHostname:       "host-1",
-				TotalMembers:     4,
-				TotalActive:      2,
-				TotalInactive:    2,
-				ConflictMap:      map[string]int{},
-				ExpectedHostname: "",
-				ExpectedZombie:   true,
-			},
-			// Test case: 12
-			// 4 member setup with 2 standbys agreeing on a different primary.
-			{
-				MyHostname:    "host-1",
-				TotalMembers:  4,
-				TotalActive:   4,
-				TotalInactive: 0,
-				ConflictMap: map[string]int{
-					"secret-host": 2,
-				},
-				ExpectedHostname: "",
-				ExpectedZombie:   true,
-			},
-			// Test case: 13
-			// 4 member setup with 3 standbys agreeing on a different primary.
-			{
-				MyHostname:    "host-1",
-				TotalMembers:  4,
-				TotalActive:   4,
-				TotalInactive: 0,
-				ConflictMap: map[string]int{
-					"secret-host": 3,
-				},
-				ExpectedHostname: "secret-host",
-				ExpectedZombie:   true,
-			},
-		},
-	}
-
-	for i, c := range tests.Cases {
-
-		hostname, err := ZombieDiagnosis(c.MyHostname, c.TotalMembers, c.TotalInactive, c.TotalActive, c.ConflictMap)
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, map[string]int{})
 		if err != nil {
-			if errors.Is(err, ErrZombieDiscovered) {
-				if !c.ExpectedZombie {
-					fmt.Printf("Hostname: %s, Total members: %d, Total active: %d, Total inactive: %d, Conflicts: %+v\n",
-						c.MyHostname,
-						c.TotalMembers,
-						c.TotalActive,
-						c.TotalInactive,
-						c.ConflictMap,
-					)
-					t.Logf("test case: %d failed. Wasn't expecting to be a Zombie", i)
-					t.Fail()
-					return
-				}
-				if c.ExpectedHostname != hostname {
-					t.Logf("test case %d failed. Expected hostname to be %s, but got %s", i, c.ExpectedHostname, hostname)
-					t.Fail()
-					return
-				}
-			}
-		} else {
-			if c.ExpectedZombie {
-				t.Logf("Test case: %d failed. Expected to be a zombie, but wasn't", i)
-				t.Fail()
-				return
-			}
-			if c.ExpectedHostname != hostname {
-				t.Logf("test case %d failed. Expected hostname to be %s, but got %s", i, c.ExpectedHostname, hostname)
-				t.Fail()
-				return
-			}
-
+			t.Fatal(err)
 		}
 
-	}
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+
+	})
+
+	t.Run("two node cluster", func(t *testing.T) {
+		hostname := "host-1"
+		total := 2
+		inactive := 0
+		active := 2
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, map[string]int{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+
+	})
+
+	t.Run("two node cluster with inactive standby", func(t *testing.T) {
+		hostname := "host-1"
+		total := 2
+		inactive := 1
+		active := 1
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, map[string]int{})
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "" {
+			t.Fatalf("expected %s, got %q", "", primary)
+		}
+	})
+
+	t.Run("two node cluster with diverged primary", func(t *testing.T) {
+		hostname := "host-1"
+		total := 2
+		inactive := 1
+		active := 1
+		conflictMap := map[string]int{
+			"host-2": 1,
+		}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "" {
+			t.Fatalf("expected %s, got %q", "", primary)
+		}
+	})
+
+	t.Run("three node cluster", func(t *testing.T) {
+		hostname := "host-1"
+		total := 3
+		inactive := 0
+		active := 3
+		conflictMap := map[string]int{}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+	})
+
+	t.Run("three node cluster with one offline standby", func(t *testing.T) {
+		hostname := "host-1"
+		total := 3
+		inactive := 1
+		active := 2
+		conflictMap := map[string]int{}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+	})
+
+	t.Run("three node cluster with both standbys offline", func(t *testing.T) {
+		hostname := "host-1"
+		total := 3
+		inactive := 2
+		active := 1
+		conflictMap := map[string]int{}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "" {
+			t.Fatalf("expected %s, got %q", "", primary)
+		}
+	})
+
+	t.Run("three node cluster with real primary resolved", func(t *testing.T) {
+		hostname := "host-1"
+		total := 3
+		inactive := 0
+		active := 3
+		conflictMap := map[string]int{
+			"host-99": 2,
+		}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "host-99" {
+			t.Fatalf("expected %s, got %q", "host-99", primary)
+		}
+	})
+
+	t.Run("three node cluster with one standby in disagreement", func(t *testing.T) {
+		hostname := "host-1"
+		total := 3
+		inactive := 0
+		active := 3
+		conflictMap := map[string]int{
+			"host-99": 1,
+		}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+	})
+
+	t.Run("three node cluster with two standbys reporting different primarys", func(t *testing.T) {
+		hostname := "host-1"
+		total := 3
+		inactive := 0
+		active := 3
+		conflictMap := map[string]int{
+			"host-99": 1,
+			"host-33": 1,
+		}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "" {
+			t.Fatalf("expected %s, got %q", "", primary)
+		}
+	})
+
+	t.Run("four node setup", func(t *testing.T) {
+		hostname := "host-1"
+
+		total := 4
+		inactive := 0
+		active := 4
+		conflictMap := map[string]int{}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+	})
+
+	t.Run("four node setup with one standby inactive", func(t *testing.T) {
+		hostname := "host-1"
+
+		total := 4
+		inactive := 1
+		active := 3
+		conflictMap := map[string]int{}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if primary != hostname {
+			t.Fatalf("expected %s, got %q", hostname, primary)
+		}
+	})
+
+	t.Run("four node setup with two standbys inactive", func(t *testing.T) {
+		hostname := "host-1"
+		total := 4
+		inactive := 2
+		active := 2
+		conflictMap := map[string]int{}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "" {
+			t.Fatalf("expected %s, got %q", "", primary)
+		}
+	})
+
+	t.Run("four node setup with two standbys reporting different primary", func(t *testing.T) {
+		hostname := "host-1"
+
+		total := 4
+		inactive := 0
+		active := 4
+		conflictMap := map[string]int{
+			"host-99": 2,
+		}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != "" {
+			t.Fatalf("expected %s, got %q", "", primary)
+		}
+	})
+
+	t.Run("four node setup with three standbys reporting different primary", func(t *testing.T) {
+		hostname := "host-1"
+		expected := "host-99"
+
+		total := 4
+		inactive := 0
+		active := 4
+		conflictMap := map[string]int{
+			expected: 3,
+		}
+
+		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
+		if !errors.Is(err, ErrZombieDiscovered) {
+			t.Fatal(err)
+		}
+
+		if primary != expected {
+			t.Fatalf("expected %s, got %q", expected, primary)
+		}
+	})
 
 }
