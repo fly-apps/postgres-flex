@@ -29,7 +29,7 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim procps jq pgbouncer \
+    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim procps jq pgbouncer ssh \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
