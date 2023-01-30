@@ -27,11 +27,12 @@ type Credentials struct {
 }
 
 type Node struct {
-	AppName   string
-	PrivateIP string
-	DataDir   string
-	Port      int
-	PGConfig  *PGConfig
+	AppName       string
+	PrivateIP     string
+	PrimaryRegion string
+	DataDir       string
+	Port          int
+	PGConfig      *PGConfig
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
@@ -58,6 +59,11 @@ func NewNode() (*Node, error) {
 		return nil, fmt.Errorf("failed getting private ip: %s", err)
 	}
 	node.PrivateIP = ipv6.String()
+
+	node.PrimaryRegion = os.Getenv("PRIMARY_REGION")
+	if node.PrimaryRegion == "" {
+		return nil, fmt.Errorf("PRIMARY_REGION environment variable must be set")
+	}
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.Port = port
@@ -99,6 +105,7 @@ func NewNode() (*Node, error) {
 	node.RepMgr = RepMgr{
 		ID:                 rand.Int31(),
 		AppName:            node.AppName,
+		PrimaryRegion:      node.PrimaryRegion,
 		Region:             os.Getenv("FLY_REGION"),
 		ConfigPath:         "/data/repmgr.conf",
 		InternalConfigPath: "/data/repmgr.internal.conf",
@@ -120,21 +127,49 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Attempt to re-introduce zombie back into the cluster.
 	if ZombieLockExists() {
 		fmt.Println("Zombie lock detected!")
-		zHostname, err := readZombieLock()
+		primaryStr, err := readZombieLock()
 		if err != nil {
-			return fmt.Errorf("failed to read zombie lock: %s", zHostname)
+			return fmt.Errorf("failed to read zombie lock: %s", primaryStr)
 		}
 
-		if zHostname != "" {
-			ip := net.ParseIP(zHostname)
+		// If the zombie lock contains a hostname, it means we were able to resolve the real primary and
+		// will attempt to rejoin it.
+		if primaryStr != "" {
+			ip := net.ParseIP(primaryStr)
 			if ip == nil {
-				return fmt.Errorf("zombie.lock file contained an invalid ipv6 address")
+				return fmt.Errorf("zombie.lock file contains an invalid ipv6 address")
 			}
 
-			if err := n.RepMgr.rejoinCluster(zHostname); err != nil {
+			conn, err := n.RepMgr.NewRemoteConnection(ctx, ip.String())
+			if err != nil {
+				return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", ip.String(), err)
+			}
+			defer conn.Close(ctx)
+
+			primary, err := n.RepMgr.PrimaryMember(ctx, conn)
+			if err != nil {
+				return fmt.Errorf("failed to confirm primary on recover target %s: %s", ip.String(), err)
+			}
+
+			// Confirm that our rejoin target still identifies itself as the primary.
+			if primary.Hostname != ip.String() {
+				// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
+				if err := removeZombieLock(); err != nil {
+					return fmt.Errorf("failed to remove zombie lock: %s", err)
+				}
+
+				return ErrZombieLockPrimaryMismatch
+			}
+
+			// If the primary does not reside within our primary region, we cannot rejoin until it is.
+			if primary.Region != n.PrimaryRegion {
+				fmt.Printf("Primary region mismatch detected. The primary lives in '%s', while PRIMARY_REGION is set to '%s'\n", primary.Region, n.PrimaryRegion)
+				return ErrZombieLockRegionMismatch
+			}
+
+			if err := n.RepMgr.rejoinCluster(primary.Hostname); err != nil {
 				return fmt.Errorf("failed to rejoin cluster: %s", err)
 			}
 
@@ -146,8 +181,8 @@ func (n *Node) Init(ctx context.Context) error {
 			utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
 		} else {
 			// TODO - Provide link to documention on how to address this
-			fmt.Println("The zombie lock file does not contain a hostname.")
-			fmt.Println("This likely means that we were unable to build a consensus on who the real primary is.")
+			fmt.Println("Zombie lock file does not contain a hostname.")
+			fmt.Println("This likely means that we were unable to determine who the real primary is.")
 		}
 	}
 
@@ -232,7 +267,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 	if !clusterInitialized {
 		// Check if we can be a primary
 		if !repmgr.eligiblePrimary() {
-			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", os.Getenv("PRIMARY_REGION"), repmgr.Region)
+			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", n.PrimaryRegion, repmgr.Region)
 		}
 
 		// Create required users
@@ -264,14 +299,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		member, err := repmgr.Member(ctx, conn)
 		if err != nil {
-			// member will not be resolveable if the member has not yet been registered
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("failed to resolve member role: %s", err)
 			}
 		}
 
 		role := ""
-		if member != nil && member.Role != "" {
+		if member != nil {
 			role = member.Role
 		}
 
@@ -284,14 +318,15 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 
-			totalMembers := len(standbys) + 1 // include self
-			totalActive := 1                  // include self
+			totalMembers := len(standbys) + 1
+			totalActive := 1
 			totalInactive := 0
 			totalConflicts := 0
 
 			conflictMap := map[string]int{}
 
 			for _, standby := range standbys {
+				// Check for connectivity
 				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
 				if err != nil {
 					fmt.Printf("failed to connect to %s", standby.Hostname)
@@ -300,6 +335,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 				defer mConn.Close(ctx)
 
+				// Verify the primary
 				primary, err := repmgr.PrimaryMember(ctx, mConn)
 				if err != nil {
 					fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
@@ -309,16 +345,16 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 				totalActive++
 
+				// Record conflict when primary doesn't match.
 				if primary.Hostname != n.PrivateIP {
 					totalConflicts++
 					conflictMap[primary.Hostname]++
 				}
 			}
 
-			// Using the cluster state metrics, determine whether it's safe to boot as a primary.
 			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
-			if errors.Is(err, ErrZombieDiscovered) {
-				fmt.Println("Unable to confirm we are the real primary!")
+			if errors.Is(err, ErrZombieDiagnosisUndecided) {
+				fmt.Println("Unable to confirm that we are the true primary!")
 				fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
 					totalMembers,
 					totalActive,
@@ -326,28 +362,39 @@ func (n *Node) PostInit(ctx context.Context) error {
 					totalConflicts,
 				)
 
-				fmt.Println("Identifying ourself as a Zombie")
-
-				// If primary is non-empty we were able to build a consensus on who the real primary is.
-				if primary != "" {
-					fmt.Printf("Majority of members agree that %s is the real primary\n", primary)
-					fmt.Println("Reconfiguring PGBouncer to point to the real primary")
-					if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-						return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
-					}
-				}
-				// Create a zombie.lock file containing the resolved primary.
-				// Note: This will be an empty string if we are unable to resolve the real primary.
-				if err := writeZombieLock(primary); err != nil {
+				fmt.Println("Writing zombie.lock file.")
+				if err := writeZombieLock(""); err != nil {
 					return fmt.Errorf("failed to set zombie lock: %s", err)
 				}
 
-				fmt.Println("User-created databases are being made readonly")
+				fmt.Println("Turning all user-created databases readonly.")
 				if err := admin.SetReadOnly(ctx, conn); err != nil {
 					return fmt.Errorf("failed to set read-only: %s", err)
 				}
 
-				panic("zombie primary detected.")
+				// TODO - Add link to docs
+				fmt.Println("Please refer to following documentation for more information: <insert-doc-link-here>.")
+
+			} else if errors.Is(err, ErrZombieDiscovered) {
+				fmt.Println("Zombie primary discovered!")
+				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
+
+				fmt.Printf("Reconfiguring PGBouncer to point to '%s'\n", primary)
+				if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+					return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+				}
+
+				fmt.Println("Writing zombie.lock file")
+				if err := writeZombieLock(primary); err != nil {
+					return fmt.Errorf("failed to set zombie lock: %s", err)
+				}
+
+				fmt.Println("Turning user-created databases read-only")
+				if err := admin.SetReadOnly(ctx, conn); err != nil {
+					return fmt.Errorf("failed to set read-only: %s", err)
+				}
+
+				panic(err)
 			} else if err != nil {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}
@@ -385,20 +432,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 	defer repConn.Close(ctx)
 
-	if err := n.ReconfigurePGBouncerPrimary(ctx, repConn); err != nil {
-		return fmt.Errorf("failed to configure PGBouncer: %s", err)
-	}
-
-	return nil
-}
-
-func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, database, n.OperatorCredentials)
-}
-
-func (n *Node) ReconfigurePGBouncerPrimary(ctx context.Context, conn *pgx.Conn) error {
-	member, err := n.RepMgr.PrimaryMember(ctx, conn)
+	member, err := n.RepMgr.PrimaryMember(ctx, repConn)
 	if err != nil {
 		return fmt.Errorf("failed to find primary: %s", err)
 	}
@@ -408,6 +442,11 @@ func (n *Node) ReconfigurePGBouncerPrimary(ctx context.Context, conn *pgx.Conn) 
 	}
 
 	return nil
+}
+
+func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
+	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
 func (n *Node) initializePG() error {

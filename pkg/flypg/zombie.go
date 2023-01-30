@@ -5,6 +5,18 @@ import (
 	"os"
 )
 
+var (
+	// ErrZombieLockRegionMismatch - The region associated with the resolved primary does not match our PRIMARY_REGION.
+	ErrZombieLockRegionMismatch = errors.New("resolved primary does not reside within our PRIMARY_REGION")
+	// ErrZombieLockPrimaryMismatch - The primary listed within the zombie.lock file is no longer identifying
+	// itself as the primary.
+	ErrZombieLockPrimaryMismatch = errors.New("the primary listed in the zombie.lock file is no longer valid")
+	// ErrZombieDiscovered - The majority of registered members indicated a different primary.
+	ErrZombieDiscovered = errors.New("majority of registered members confirmed we are not the real primary")
+	// ErrZombieDiagnosisUndecided - We were unable to determine who the true primary is.
+	ErrZombieDiagnosisUndecided = errors.New("unable to confirm we are the true primary")
+)
+
 func ZombieLockExists() bool {
 	_, err := os.Stat("/data/zombie.lock")
 	if os.IsNotExist(err) {
@@ -38,9 +50,6 @@ func readZombieLock() (string, error) {
 	return string(body), nil
 }
 
-var ErrZombieDiscovered = errors.New("Zombie")
-
-// ZombieDiagnosis takes information about the current cluster state and determines whether it is safe to boot ourself as the primary.
 func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
 	// We can short-circuit a single node cluster.
 	if total == 1 {
@@ -49,9 +58,8 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 
 	quorum := total/2 + 1
 
-	// Active members must meet quorum.
 	if active < quorum {
-		return "", ErrZombieDiscovered
+		return "", ErrZombieDiagnosisUndecided
 	}
 
 	topCandidate := ""
@@ -79,5 +87,5 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 		return topCandidate, ErrZombieDiscovered
 	}
 
-	return "", ErrZombieDiscovered
+	return "", ErrZombieDiagnosisUndecided
 }

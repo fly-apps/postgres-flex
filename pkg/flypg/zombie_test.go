@@ -49,7 +49,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		active := 1
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, map[string]int{})
-		if !errors.Is(err, ErrZombieDiscovered) {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
@@ -68,7 +68,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
-		if !errors.Is(err, ErrZombieDiscovered) {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
@@ -119,7 +119,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		conflictMap := map[string]int{}
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
-		if !errors.Is(err, ErrZombieDiscovered) {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
@@ -177,7 +177,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
-		if !errors.Is(err, ErrZombieDiscovered) {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
@@ -230,7 +230,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		conflictMap := map[string]int{}
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
-		if !errors.Is(err, ErrZombieDiscovered) {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
@@ -250,7 +250,7 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
-		if !errors.Is(err, ErrZombieDiscovered) {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
