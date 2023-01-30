@@ -23,6 +23,7 @@ const (
 type RepMgr struct {
 	ID                 int32
 	AppName            string
+	PrimaryRegion      string
 	Region             string
 	PrivateIP          string
 	DataDir            string
@@ -111,10 +112,6 @@ func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// func (r *RepMgr) CurrentRole(ctx context.Context, pg *pgx.Conn) (string, error) {
-// 	return r.memberRole(ctx, pg, int(r.ID))
-// }
-
 func (r *RepMgr) setDefaults() {
 	conf := ConfigMap{
 		"node_id":                      fmt.Sprint(r.ID),
@@ -161,7 +158,25 @@ func (r *RepMgr) unregisterPrimary() error {
 func (r *RepMgr) followPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s standby follow", r.ConfigPath)
 	if err := utils.RunCommand(cmdStr); err != nil {
-		fmt.Printf("failed to register standby: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *RepMgr) rejoinCluster(hostname string) error {
+	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
+		r.ConfigPath,
+		hostname,
+		r.Port,
+		r.Credentials.Username,
+		r.DatabaseName,
+	)
+
+	fmt.Println(cmdStr)
+
+	if err := utils.RunCommand(cmdStr); err != nil {
+		return err
 	}
 
 	return nil
@@ -229,11 +244,12 @@ type Member struct {
 	ID       int
 	Hostname string
 	Active   bool
+	Region   string
 	Role     string
 }
 
 func Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
-	sql := "select node_id, node_name, active, type from repmgr.nodes;"
+	sql := "select node_id, node_name, location, active, type from repmgr.nodes;"
 	rows, err := pg.Query(ctx, sql)
 	if err != nil {
 		return nil, err
@@ -243,7 +259,7 @@ func Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 
 	for rows.Next() {
 		var member Member
-		if err := rows.Scan(&member.ID, &member.Hostname, &member.Active, &member.Role); err != nil {
+		if err := rows.Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role); err != nil {
 			return nil, err
 		}
 
@@ -270,8 +286,8 @@ func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
 
 func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
 	var member Member
-	sql := "select node_id, node_name, active, type from repmgr.nodes where type = 'primary';"
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	sql := "select node_id, node_name, location, active, type from repmgr.nodes where type = 'primary' and active = true;"
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -298,9 +314,9 @@ func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, 
 
 func (r *RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
 	var member Member
-	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_id = %d;", id)
+	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_id = %d;", id)
 
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -310,9 +326,9 @@ func (r *RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member,
 
 func (r *RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
 	var member Member
-	sql := fmt.Sprintf("select node_id, node_name, active, type from repmgr.nodes where node_name = '%s';", hostname)
+	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_name = '%s';", hostname)
 
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -321,15 +337,12 @@ func (r *RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname st
 }
 
 func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
-	primaryRegion := os.Getenv("PRIMARY_REGION")
-
-	targets := fmt.Sprintf("%s.%s", primaryRegion, r.AppName)
-	ips, err := privnet.AllPeers(ctx, targets)
+	ips, err := r.InRegionPeerIPs(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var cloneTarget *Member
+	var target *Member
 
 	for _, ip := range ips {
 		if ip.String() == r.PrivateIP {
@@ -350,16 +363,37 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 		}
 
 		if member.Role == PrimaryRoleName || member.Role == StandbyRoleName {
-			cloneTarget = member
+			target = member
 			break
 		}
 	}
 
-	if cloneTarget == nil {
+	if target == nil {
 		return nil, fmt.Errorf("unable to resolve cloneable member")
 	}
 
-	return cloneTarget, nil
+	return target, nil
+}
+
+func (r *RepMgr) InRegionPeerIPs(ctx context.Context) ([]net.IPAddr, error) {
+	targets := fmt.Sprintf("%s.%s", r.PrimaryRegion, r.AppName)
+
+	return privnet.AllPeers(ctx, targets)
+}
+
+func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error) {
+	ips, err := r.InRegionPeerIPs(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, ip := range ips {
+		if ip.String() == hostname {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
@@ -384,5 +418,5 @@ func (r *RepMgr) UnregisterMemberByHostname(ctx context.Context, conn *pgx.Conn,
 }
 
 func (r *RepMgr) eligiblePrimary() bool {
-	return r.Region == os.Getenv("PRIMARY_REGION")
+	return r.Region == r.PrimaryRegion
 }

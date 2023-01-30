@@ -205,6 +205,7 @@ func (c *PGConfig) SetDefaults() error {
 		"max_wal_size":             fmt.Sprintf("%dMB", int(maxWalMb)),
 		"wal_compression":          "on",
 		"wal_level":                "replica",
+		"wal_log_hints":            true,
 		"hot_standby":              true,
 		"archive_mode":             true,
 		"archive_command":          "'/bin/true'",

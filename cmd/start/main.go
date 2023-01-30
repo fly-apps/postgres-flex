@@ -22,19 +22,20 @@ func main() {
 	node, err := flypg.NewNode()
 	if err != nil {
 		panicHandler(err)
+		return
 	}
 
 	ctx := context.Background()
 
 	if err = node.Init(ctx); err != nil {
 		panicHandler(err)
+		return
 	}
 
 	go func() {
 		t := time.NewTicker(1 * time.Second)
 		defer t.Stop()
 		for range t.C {
-
 			if err := node.PostInit(ctx); err != nil {
 				fmt.Printf("failed post-init: %s. Retrying...\n", err)
 				continue
@@ -44,7 +45,8 @@ func main() {
 	}()
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
-	svisor.AddProcess("flypg", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.Port))
+
+	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.Port))
 
 	svisor.AddProcess("pgbouncer", fmt.Sprintf("pgbouncer %s/pgbouncer.ini", node.PGBouncer.ConfigPath),
 		supervisor.WithRestart(0, 1*time.Second),
