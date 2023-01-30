@@ -38,7 +38,12 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 
 		switch member.Role {
 		case flypg.PrimaryRoleName:
-			return "primary", nil
+			if member.Active {
+				return "primary", nil
+			} else {
+				return "zombie", nil
+			}
+
 		case flypg.StandbyRoleName:
 			return "replica", nil
 		default:

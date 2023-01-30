@@ -173,6 +173,8 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to rejoin cluster: %s", err)
 			}
 
+			// TODO - Wait for target cluster to register self as a standby.
+
 			if err := removeZombieLock(); err != nil {
 				return fmt.Errorf("failed to remove zombie lock: %s", err)
 			}
@@ -229,6 +231,10 @@ func (n *Node) Init(ctx context.Context) error {
 	fmt.Println("Initializing Postgres configuration")
 	if err := n.configurePostgres(store); err != nil {
 		return fmt.Errorf("failed to configure postgres: %s", err)
+	}
+
+	if err := setDirOwnership(); err != nil {
+		return err
 	}
 
 	return nil
@@ -488,6 +494,7 @@ func (n *Node) configure(ctx context.Context, store *state.Store) error {
 	}
 
 	// Clear target and wait for primary resolution
+	fmt.Println("Disabling PGBouncer until primary is resolved")
 	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
 		return fmt.Errorf("failed to set pgbouncer target: %s", err)
 	}
