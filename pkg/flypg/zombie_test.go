@@ -157,11 +157,11 @@ func TestZombieDiagnosis(t *testing.T) {
 		}
 
 		primary, err := ZombieDiagnosis(hostname, total, inactive, active, conflictMap)
-		if err != nil {
+		if !errors.Is(err, ErrZombieDiagnosisUndecided) {
 			t.Fatal(err)
 		}
 
-		if primary != hostname {
+		if primary != "" {
 			t.Fatalf("expected %s, got %q", hostname, primary)
 		}
 	})

@@ -79,7 +79,11 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	// Calculate our references
 	myCount := total - inactive - totalConflicts
 
+	// We have to fence the primary in case the active cluster is in the middle of a failover.
 	if myCount >= quorum {
+		if totalConflicts > 0 {
+			return "", ErrZombieDiagnosisUndecided
+		}
 		return myHostname, nil
 	}
 
