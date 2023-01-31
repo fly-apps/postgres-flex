@@ -33,7 +33,7 @@ func main() {
 	defer logFile.Close()
 
 	log.SetOutput(logFile)
-	log.Printf("event: %s\n node: %d\n success: %s\n details: %s\n", *event, *nodeID, *success, *details)
+	log.Printf("event: %s, node: %d, success: %s, details: %s\n", *event, *nodeID, *success, *details)
 
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
