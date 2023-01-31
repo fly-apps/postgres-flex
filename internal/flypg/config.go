@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg/state"
+	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 )
 
 type ConfigMap map[string]interface{}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
+	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/pkg/errors"
 	"github.com/superfly/fly-checks/check"
 )
