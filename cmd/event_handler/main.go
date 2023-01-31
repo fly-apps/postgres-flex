@@ -4,12 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/pkg/flypg"
 )
+
+const eventLogFile = "/data/event.log"
 
 func main() {
 	event := flag.String("event", "", "event type")
@@ -23,56 +26,45 @@ func main() {
 	details := flag.String("details", "", "details")
 	flag.Parse()
 
-	eventDetails := fmt.Sprintf("%s - Event: %s\n Node: %d\n Success: %s\n Details: %s\n", time.Now().String(), *event, *nodeID, *success, *details)
-
-	// TODO - Use an actual logging framework instead of just writing strings to a file.
-	logFile, err := os.OpenFile("/data/event.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(eventLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		fmt.Printf("failed to open event log: %s", err)
 	}
 	defer logFile.Close()
 
-	logFile.WriteString(eventDetails)
+	log.SetOutput(logFile)
+	log.Printf("Event: %s\n Node: %d\n Success: %s\n Details: %s\n", *event, *nodeID, *success, *details)
 
 	switch *event {
-
 	case "repmgrd_failover_promote", "standby_promote":
 		// TODO - Need to figure out what to do when success == 0.
-
 		retry := 0
 		maxRetries := 5
 		success := false
 
 		for retry < maxRetries {
 			if err := reconfigurePGBouncer(*nodeID); err != nil {
-				errMsg := fmt.Sprintf("%s [%s] attempt: %d - failed to reconfigure pgbouncer: %s\n", *event, time.Now().String(), retry, err)
-				logFile.WriteString(errMsg)
-
+				log.Printf("%s - attempt: %d - failed to reconfigure pgbouncer: %s\n", *event, retry, err)
 				retry++
 				time.Sleep(1 * time.Second)
 				continue
 			}
-
 			success = true
 			break
 		}
 
 		if success {
-			msg := fmt.Sprintf("%s [%s] Successfully reconfigured pgBouncer to %d\n", *event, time.Now().String(), *nodeID)
-			logFile.WriteString(msg)
+			log.Printf("%s - Successfully reconfigured pgBouncer to %d\n", *event, *nodeID)
 			os.Exit(0)
 		} else {
-			msg := fmt.Sprintf(" %s [%s] Failed ot reconfigured pgBouncer to %d\n", *event, time.Now().String(), *nodeID)
-			logFile.WriteString(msg)
+			log.Printf("%s - Failed ot reconfigured pgBouncer to %d\n", *event, *nodeID)
 			os.Exit(1)
 		}
 
 	case "standby_follow":
-
 		newMemberID, err := strconv.Atoi(*newPrimary)
 		if err != nil {
-			errMsg := fmt.Sprintf("failed to parse newMemberID %s: %s\n", *newPrimary, err)
-			logFile.WriteString(errMsg)
+			log.Printf("failed to parse newMemberID %s: %s\n", *newPrimary, err)
 			os.Exit(1)
 		}
 
@@ -82,25 +74,20 @@ func main() {
 
 		for retry < maxRetries {
 			if err := reconfigurePGBouncer(*&newMemberID); err != nil {
-				errMsg := fmt.Sprintf("%s [%s] attempt: %d - failed to reconfigure pgbouncer: %s\n", *event, time.Now().String(), retry, err)
-				logFile.WriteString(errMsg)
-
+				log.Printf("%s - attempt: %d - failed to reconfigure pgbouncer: %s\n", *event, retry, err)
 				retry++
 				time.Sleep(1 * time.Second)
 				continue
 			}
-
 			success = true
 			break
 		}
 
 		if success {
-			msg := fmt.Sprintf("%s [%s] Successfully reconfigured pgBouncer to %d\n", *event, time.Now().String(), newMemberID)
-			logFile.WriteString(msg)
+			log.Printf("%s - Successfully reconfigured pgBouncer to %d\n", *event, newMemberID)
 			os.Exit(0)
 		} else {
-			msg := fmt.Sprintf(" %s [%s] Failed ot reconfigured pgBouncer to %d\n", *event, time.Now().String(), newMemberID)
-			logFile.WriteString(msg)
+			log.Printf("%s - Failed ot reconfigured pgBouncer to %d\n", *event, newMemberID)
 			os.Exit(1)
 		}
 
