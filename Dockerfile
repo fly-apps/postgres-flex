@@ -9,11 +9,10 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/event_handler ./cmd/event_handler
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/failover_validation ./cmd/failover_validation
-
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/standby_cleaner ./cmd/standby_cleaner
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/pg_unregister ./.flyctl/cmd/pg_unregister
-
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/pg_unregister ./cmd/pg_unregister
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
+
 COPY ./bin/* /fly/bin/
 
 FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
