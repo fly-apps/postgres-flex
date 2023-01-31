@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
-	"github.com/fly-apps/postgres-flex/pkg/supervisor"
+	"github.com/fly-apps/postgres-flex/internal/flypg"
+	"github.com/fly-apps/postgres-flex/internal/supervisor"
 )
 
 func main() {

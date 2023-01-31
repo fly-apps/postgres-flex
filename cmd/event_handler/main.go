@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
+	"github.com/fly-apps/postgres-flex/internal/flypg"
 )
 
 const eventLogFile = "/data/event.log"

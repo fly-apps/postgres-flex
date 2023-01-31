@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/fly-apps/postgres-flex/pkg/flypg"
-	"github.com/fly-apps/postgres-flex/pkg/flypg/admin"
+	"github.com/fly-apps/postgres-flex/internal/admin"
+	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/jackc/pgx/v4"
 
 	"golang.org/x/exp/maps"
