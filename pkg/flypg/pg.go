@@ -21,6 +21,7 @@ type PGConfig struct {
 
 	internalConfigFilePath string
 	userConfigFilePath     string
+	port                   int
 	dataDir                string
 
 	internalConfig ConfigMap
@@ -54,9 +55,10 @@ func (c *PGConfig) UserConfigFile() string {
 	return c.userConfigFilePath
 }
 
-func NewConfig(dataDir string) *PGConfig {
+func NewConfig(dataDir string, port int) *PGConfig {
 	return &PGConfig{
 		dataDir:        dataDir,
+		port:           port,
 		configFilePath: fmt.Sprintf("%s/postgresql.conf", dataDir),
 
 		internalConfigFilePath: fmt.Sprintf("%s/postgresql.internal.conf", dataDir),
@@ -198,6 +200,7 @@ func (c *PGConfig) SetDefaults() error {
 
 	conf := ConfigMap{
 		"random_page_cost":         "1.1",
+		"port":                     c.port,
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
 		"max_connections":          300,
 		"max_replication_slots":    10,

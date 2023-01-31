@@ -70,7 +70,7 @@ func NewNode() (*Node, error) {
 	}
 
 	// Stub configuration
-	node.PGConfig = NewConfig(node.DataDir)
+	node.PGConfig = NewConfig(node.DataDir, node.Port)
 
 	// Internal user
 	node.SUCredentials = Credentials{
