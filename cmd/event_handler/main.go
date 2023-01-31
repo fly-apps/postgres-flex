@@ -33,7 +33,7 @@ func main() {
 	defer logFile.Close()
 
 	log.SetOutput(logFile)
-	log.Printf("Event: %s\n Node: %d\n Success: %s\n Details: %s\n", *event, *nodeID, *success, *details)
+	log.Printf("event: %s\n node: %d\n success: %s\n details: %s\n", *event, *nodeID, *success, *details)
 
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
@@ -44,7 +44,7 @@ func main() {
 
 		for retry < maxRetries {
 			if err := reconfigurePGBouncer(*nodeID); err != nil {
-				log.Printf("%s - attempt: %d - failed to reconfigure pgbouncer: %s\n", *event, retry, err)
+				log.Printf("%s - failed to reconfigure pgbouncer: %s. (attempt: %d)\n", *event, err, retry)
 				retry++
 				time.Sleep(1 * time.Second)
 				continue
@@ -54,10 +54,10 @@ func main() {
 		}
 
 		if success {
-			log.Printf("%s - Successfully reconfigured pgBouncer to %d\n", *event, *nodeID)
+			log.Printf("%s - successfully reconfigured pgbouncer to target: %d\n", *event, *nodeID)
 			os.Exit(0)
 		} else {
-			log.Printf("%s - Failed ot reconfigured pgBouncer to %d\n", *event, *nodeID)
+			log.Printf("%s - failed to reconfigured pgbouncer to target: %d\n", *event, *nodeID)
 			os.Exit(1)
 		}
 
@@ -74,7 +74,7 @@ func main() {
 
 		for retry < maxRetries {
 			if err := reconfigurePGBouncer(*&newMemberID); err != nil {
-				log.Printf("%s - attempt: %d - failed to reconfigure pgbouncer: %s\n", *event, retry, err)
+				log.Printf("%s - failed to reconfigure pgbouncer: %s. (attempt: %d)\n", *event, err, retry)
 				retry++
 				time.Sleep(1 * time.Second)
 				continue
@@ -84,10 +84,10 @@ func main() {
 		}
 
 		if success {
-			log.Printf("%s - Successfully reconfigured pgBouncer to %d\n", *event, newMemberID)
+			log.Printf("%s - successfully reconfigured pgbouncer to target: %d\n", *event, newMemberID)
 			os.Exit(0)
 		} else {
-			log.Printf("%s - Failed ot reconfigured pgBouncer to %d\n", *event, newMemberID)
+			log.Printf("%s - failed to reconfigured pgbouncer to target: %d\n", *event, newMemberID)
 			os.Exit(1)
 		}
 
