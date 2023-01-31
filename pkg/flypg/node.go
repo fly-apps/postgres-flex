@@ -188,6 +188,11 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
+	err := WriteSSHKey()
+	if err != nil {
+		return fmt.Errorf("failed initialize ssh. %v", err)
+	}
+
 	store, err := state.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
@@ -234,6 +239,44 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	if err := setDirOwnership(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func WriteSSHKey() error {
+	err := os.Mkdir("/data/.ssh", 0700)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
+
+	key := os.Getenv("SSH_KEY")
+
+	keyFile, err := os.Create("/data/.ssh/id_rsa")
+	if err != nil {
+		return err
+	}
+	defer keyFile.Close()
+	_, err = keyFile.Write([]byte(key))
+	if err != nil {
+		return err
+	}
+
+	cert := os.Getenv("SSH_CERT")
+
+	certFile, err := os.Create("/data/.ssh/id_rsa-cert.pub")
+	if err != nil {
+		return err
+	}
+	defer certFile.Close()
+	_, err = certFile.Write([]byte(cert))
+	if err != nil {
+		return err
+	}
+
+	err = setSSHOwnership()
+	if err != nil {
 		return err
 	}
 
@@ -700,6 +743,13 @@ func openConnection(parentCtx context.Context, host string, database string, cre
 	conf.ConnectTimeout = 5 * time.Second
 
 	return pgx.ConnectConfig(ctx, conf)
+}
+
+func setSSHOwnership() error {
+	cmdStr := fmt.Sprintf("chmod 600 %s %s", "/data/.ssh/id_rsa", "/data/.ssh/id_rsa-cert.pub")
+	cmd := exec.Command("sh", "-c", cmdStr)
+	_, err := cmd.Output()
+	return err
 }
 
 func setDirOwnership() error {
