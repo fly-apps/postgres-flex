@@ -13,6 +13,10 @@ import (
 const ReadOnlyLockFile = "/data/readonly.lock"
 
 func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
+	if err := WriteReadOnlyLock(); err != nil {
+		return fmt.Errorf("failed to set readonly lock: %s", err)
+	}
+
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
 		return err
@@ -44,16 +48,17 @@ func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 			return fmt.Errorf("failed to turn database '%s' readonly. value(%s)", db.Name, out)
 		}
 
-		if err := WriteReadOnlyLock(); err != nil {
-			return fmt.Errorf("failed to write readonly lock file: %s", err)
-		}
-
 	}
 
 	return nil
 }
 
 func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
+	// Skip if there's no readonly lock present
+	if !ReadOnlyLockExists() {
+		return nil
+	}
+
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
 		return err
@@ -91,6 +96,10 @@ func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 		if err := RemoveReadOnlyLock(); err != nil {
 			return fmt.Errorf("failed to remove readonly lock file: %s", err)
 		}
+	}
+
+	if err := RemoveReadOnlyLock(); err != nil {
+		return fmt.Errorf("failed to remove readonly lock: %s", err)
 	}
 
 	return nil

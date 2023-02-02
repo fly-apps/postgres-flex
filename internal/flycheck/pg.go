@@ -46,33 +46,29 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 	})
 
 	if member.Role == flypg.PrimaryRoleName && member.Active {
+		// Check that provides additional insight into disk capacity and
+		// how close we are to hitting the readonly threshold.
 		checks.AddCheck("disk-capacity", func() (string, error) {
+			// Calculate current disk usage
 			size, available, err := diskUsage("/data/")
 			if err != nil {
 				return "", fmt.Errorf("failed to calculate disk usage: %s", err)
 			}
 
 			usedPercentage := float64(size-available) / float64(size) * 100
-			if usedPercentage > diskCapacityPercentageThreshold {
-				if err := flypg.WriteReadOnlyLock(); err != nil {
-					return "", fmt.Errorf("failed to set readonly lock: %s", err)
-				}
 
+			// Turn primary read-only
+			if usedPercentage > diskCapacityPercentageThreshold {
 				if err := flypg.SetReadOnly(ctx, node, localConn); err != nil {
 					return "", fmt.Errorf("failed to turn primary readonly: %s", err)
 				}
-
 				return "", fmt.Errorf("capacity has reached %0.1f%%. extend your volume to re-enable writes", usedPercentage)
 			}
 
-			// Don't unset readonly if zombie lock is present.
+			// Don't attempt to turn read/write if zombie lock exists.
 			if !flypg.ZombieLockExists() {
 				if err := flypg.UnsetReadOnly(ctx, node, localConn); err != nil {
 					return "", fmt.Errorf("failed to turn primary read/write: %s", err)
-				}
-
-				if err := flypg.RemoveReadOnlyLock(); err != nil {
-					return "", fmt.Errorf("faield to remove readonly lock: %s", err)
 				}
 			}
 
