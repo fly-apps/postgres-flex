@@ -20,11 +20,9 @@ const (
 func Restore(ctx context.Context, node *Node) error {
 	fmt.Println("Backing up HBA File")
 	if err := backupHBAFile(); err != nil {
-		fmt.Println(err)
+		// The HBAFile will not exist when a new standby is coming up.
 		if os.IsNotExist(err) {
-			fmt.Println("HBA FILE is not here for some reason, sleep for investigation")
-			time.Sleep(2 * time.Minute)
-			return err
+			return nil
 		}
 		return fmt.Errorf("failed backing up pg_hba.conf: %s", err)
 	}
