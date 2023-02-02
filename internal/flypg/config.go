@@ -111,9 +111,7 @@ func WriteConfigFiles(c Config) error {
 
 	for key, value := range c.UserConfig() {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
-		if _, ok := internal[key]; ok {
-			delete(internal, key)
-		}
+		delete(internal, key)
 		userFile.Write([]byte(entry))
 	}
 

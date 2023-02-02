@@ -52,12 +52,9 @@ func main() {
 
 	fmt.Printf("Pruning every %s...\n", deadMemberRemovalThreshold)
 
-	for {
-		select {
-		case <-ticker.C:
-			if err := handleTick(ctx, flypgNode, seenAt, deadMemberRemovalThreshold); err != nil {
-				fmt.Println(err)
-			}
+	for range ticker.C {
+		if err := handleTick(ctx, flypgNode, seenAt, deadMemberRemovalThreshold); err != nil {
+			fmt.Println(err)
 		}
 	}
 }
@@ -91,7 +88,7 @@ func handleTick(ctx context.Context, node *flypg.Node, seenAt map[int]time.Time,
 		sConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
 		if err != nil {
 			// TODO - Verify the exception that's getting thrown.
-			if time.Now().Sub(seenAt[standby.ID]) >= deadMemberRemovalThreshold {
+			if time.Since(seenAt[standby.ID]) >= deadMemberRemovalThreshold {
 				if err := node.RepMgr.UnregisterMember(ctx, standby); err != nil {
 					fmt.Printf("failed to unregister member %s: %v", standby.Hostname, err)
 					continue

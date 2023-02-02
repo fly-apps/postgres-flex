@@ -86,12 +86,12 @@ type ReplicationSlot struct {
 }
 
 func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
-	sql := fmt.Sprintf("SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;")
+	sql := "SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;"
 	rows, err := pg.Query(ctx, sql)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var slots []ReplicationSlot
 
@@ -140,8 +140,8 @@ func EnableExtension(ctx context.Context, pg *pgx.Conn, extension string) error 
 func ListDatabases(ctx context.Context, pg *pgx.Conn) ([]DbInfo, error) {
 	sql := `
 		SELECT d.datname,
-					(SELECT array_agg(u.usename::text order by u.usename) 
-						from pg_user u 
+					(SELECT array_agg(u.usename::text order by u.usename)
+						from pg_user u
 						where has_database_privilege(u.usename, d.datname, 'CONNECT')) as allowed_users
 		from pg_database d where d.datistemplate = false
 		order by d.datname;
@@ -168,9 +168,9 @@ func ListDatabases(ctx context.Context, pg *pgx.Conn) ([]DbInfo, error) {
 
 func FindDatabase(ctx context.Context, pg *pgx.Conn, name string) (*DbInfo, error) {
 	sql := `
-	SELECT 
-		datname, 
-		(SELECT array_agg(u.usename::text order by u.usename) FROM pg_user u WHERE has_database_privilege(u.usename, d.datname, 'CONNECT')) as allowed_users 
+	SELECT
+		datname,
+		(SELECT array_agg(u.usename::text order by u.usename) FROM pg_user u WHERE has_database_privilege(u.usename, d.datname, 'CONNECT')) as allowed_users
 	FROM pg_database d WHERE d.datname='%s';
 	`
 

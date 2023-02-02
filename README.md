@@ -11,13 +11,13 @@ To get started, run the following:
 fly version update
 
 # Provision a 3 member cluster
-fly pg create --name <app-name> --initial-cluster-size 3 --region ord --repmgr 
+fly pg create --name <app-name> --initial-cluster-size 3 --region ord --repmgr
 ```
 
 ## High Availability
-To ensure High Availability, it's recommended that your cluster has at least 3 members. 
+To ensure High Availability, it's recommended that your cluster has at least 3 members.
 
-Automatic failovers will only consider members residing within your primary region.  The primary region is represented as an environment variable defined within the `fly.toml` file.  That being said, if you're running a 3 member setup at least 2 of the members should reside within your primary region. 
+Automatic failovers will only consider members residing within your primary region.  The primary region is represented as an environment variable defined within the `fly.toml` file.  That being said, if you're running a 3 member setup at least 2 of the members should reside within your primary region.
 
 ## Horizontal scaling
 Use the clone command to scale up your cluster.
@@ -30,7 +30,7 @@ fly machines clone <machine-id> --region <target-region>
 ```
 
 ## Staying up-to-date!
-This project is in active development so it's important to stay current with the latest changes and bug fixes. 
+This project is in active development so it's important to stay current with the latest changes and bug fixes.
 
 ```
 # Use the following command to verify you're on the latest version.
@@ -46,4 +46,3 @@ Create an issue or ask a question here: https://community.fly.io/
 
 ## Contributing
 If you're looking to get involved, fork the project and send pull requests.
-

@@ -73,7 +73,7 @@ func main() {
 		success := false
 
 		for retry < maxRetries {
-			if err := reconfigurePGBouncer(*&newMemberID); err != nil {
+			if err := reconfigurePGBouncer(newMemberID); err != nil {
 				log.Printf("%s - failed to reconfigure pgbouncer: %s. (attempt: %d)\n", *event, err, retry)
 				retry++
 				time.Sleep(1 * time.Second)

@@ -147,24 +147,6 @@ func (r *RepMgr) registerPrimary() error {
 	return nil
 }
 
-func (r *RepMgr) unregisterPrimary() error {
-	cmdStr := fmt.Sprintf("repmgr -f %s primary unregister", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *RepMgr) followPrimary() error {
-	cmdStr := fmt.Sprintf("repmgr -f %s standby follow", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (r *RepMgr) rejoinCluster(hostname string) error {
 	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
 		r.ConfigPath,

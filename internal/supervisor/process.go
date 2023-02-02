@@ -19,11 +19,10 @@ type process struct {
 	restartDelay time.Duration
 	maxRestarts  int
 
-	f       cmdFactory
-	running bool
-	dir     string
-	env     []string
-	cmd     *exec.Cmd
+	f   cmdFactory
+	dir string
+	env []string
+	cmd *exec.Cmd
 }
 
 type Opt func(*process)

@@ -17,16 +17,16 @@ echo "Primary Machine ID: $MACHINE_ID"
 PRIMARY_IP=$(fly machines list --app $APP_NAME | grep $MACHINE_ID | awk '{print $7}')
 echo "Primary IP: $PRIMARY_IP"
 
-# Pull operator password from environment. 
+# Pull operator password from environment.
 OPERATOR_PASSWORD=$(fly ssh console -A $PRIMARY_IP --app $APP_NAME -q -C "printenv OPERATOR_PASSWORD" | tr -d "\r\n")
 echo ""
 
 echo "**Verifying connection target**"
 result=$(psql "postgres://postgres:$OPERATOR_PASSWORD@$APP_NAME.internal:5432" -c "SELECT inet_server_addr();" | sed -n "3 p" 2>&1)
 if [ $PRIMARY_IP = $result ];
-then 
+then
     echo "Connected to:$result (correct)"
-else 
+else
     echo "Connected to:$result (incorrect)"
 fi
 
@@ -34,13 +34,13 @@ fi
 echo ""
 echo "**Verifying PGBouncer configuration**"
 for ip in $(dig $APP_NAME.internal aaaa +short)
-do 
+do
   result=$(fly ssh console -A $ip --app $APP_NAME -q -C "cat data/pgbouncer/pgbouncer.database.ini" | grep "host=")
-  pgbouncer=$(echo $result | cut -d= -f3 | awk '{print $1}')  
+  pgbouncer=$(echo $result | cut -d= -f3 | awk '{print $1}')
   if [ $pgbouncer != $PRIMARY_IP ];
-  then 
+  then
     echo "$ip -> $pgbouncer  (incorrect)"
-  else 
+  else
     echo "$ip -> $pgbouncer (correct)"
   fi
 done
@@ -49,21 +49,21 @@ done
 echo ""
 echo "**Verifying Readonly configuration**"
 for ip in $(dig $APP_NAME.internal aaaa +short)
-do 
+do
   result=$(psql postgres://postgres:$OPERATOR_PASSWORD@[$ip]:5433 -c 'SELECT 'CREATE DATABASE configcheck WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'configcheck')' 2>&1)
   if [ "$ip" = "$PRIMARY_IP" ];
-  then 
+  then
     if [[ $result =~ "read-only" ]];
     then
         echo "Role: Primary - $ip -> $result (incorrect)"
     else
         echo "Role: Primary - $ip -> $result (correct)"
     fi
-  else 
+  else
     if [[ $result =~ "read-only" ]];
     then
         echo "Role: Standby - $ip -> $result (correct)"
-    else 
+    else
         echo "Role: Standby - $ip -> $result (incorrect)"
     fi
   fi
