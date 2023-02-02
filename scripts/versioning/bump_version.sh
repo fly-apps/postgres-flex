@@ -56,4 +56,3 @@ then
   git tag -m "release ${new_version}" -a "$new_version" && git push "${ORIGIN}" tag "$new_version"
   echo "done"
 fi
-

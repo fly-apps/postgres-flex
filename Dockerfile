@@ -19,7 +19,7 @@ FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
 
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/postgresql
-ARG VERSION 
+ARG VERSION
 ARG PG_MAJOR_VERSION
 
 LABEL fly.app_role=postgres_cluster
@@ -42,4 +42,3 @@ EXPOSE 5432
 
 
 CMD ["start"]
-
