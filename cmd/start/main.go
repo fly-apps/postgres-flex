@@ -56,6 +56,8 @@ func main() {
 	)
 	svisor.AddProcess("standby_cleaner", "/usr/local/bin/standby_cleaner", supervisor.WithRestart(0, 5*time.Second))
 
+	svisor.AddProcess("api", "/usr/local/bin/api")
+
 	exporterEnv := map[string]string{
 		"DATA_SOURCE_URI":                     fmt.Sprintf("[%s]:%d/postgres?sslmode=disable", node.PrivateIP, node.Port),
 		"DATA_SOURCE_USER":                    node.SUCredentials.Username,
@@ -67,7 +69,7 @@ func main() {
 	svisor.AddProcess("exporter", "postgres_exporter", supervisor.WithEnv(exporterEnv), supervisor.WithRestart(0, 1*time.Second))
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
-	svisor.StartHttpListener(node)
+	// svisor.StartHttpListener(node)
 
 	if err := svisor.Run(); err != nil {
 		fmt.Println(err)
