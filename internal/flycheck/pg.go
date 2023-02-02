@@ -71,7 +71,7 @@ func diskCapacityCheck(ctx context.Context, localConn *pgx.Conn, node *flypg.Nod
 			return "", fmt.Errorf("failed to turn primary readonly: %s", err)
 		}
 
-		return "", fmt.Errorf("%0.1f%% - extend your volume to re-enable writes", usedPercentage)
+		return "", fmt.Errorf("%0.1f%% - readonly mode enabled, extend your volume to re-enable writes", usedPercentage)
 	}
 
 	// Don't attempt to turn read/write if zombie lock exists.
