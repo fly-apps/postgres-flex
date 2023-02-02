@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/superfly/fly-checks/check"
 )

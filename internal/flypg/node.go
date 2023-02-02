@@ -18,7 +18,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/privnet"
 	"github.com/fly-apps/postgres-flex/internal/utils"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 )
 
 type Credentials struct {
