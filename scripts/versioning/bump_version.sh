@@ -23,21 +23,21 @@ fi
 
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-previous_version="$("$dir"/../scripts/version.sh -s)"
+previous_version="$("$dir"/../scripts/versioning/version.sh -s)"
 
 if [[ $prerel == "prerel" ]]; then
-  prerelversion=$("$dir"/../scripts/semver get prerel "$previous_version")
+  prerelversion=$("$dir"/../scripts/versioning/semver get prerel "$previous_version")
   if [[ $prerelversion == "" ]]; then
-    new_version=$("$dir"/../scripts/semver bump "$bump" "$previous_version")
-    new_version=$("$dir"/../scripts/semver bump prerel pre-1 "$new_version")
+    new_version=$("$dir"/../scripts/versioning/semver bump "$bump" "$previous_version")
+    new_version=$("$dir"/../scripts/versioning/semver bump prerel pre-1 "$new_version")
   else
     prerel=pre-$((${prerelversion#pre-} + 1))
-    new_version=$("$dir"/../scripts/semver bump prerel "$prerel" "$previous_version")
+    new_version=$("$dir"/../scripts/versioning/semver bump prerel "$prerel" "$previous_version")
   fi
 else
-  prerelversion=$("$dir"/../scripts/semver get prerel "$previous_version")
+  prerelversion=$("$dir"/../scripts/versioning/semver get prerel "$previous_version")
   if [[ $prerelversion == "" ]]; then
-    new_version=$("$dir"/../scripts/semver bump "$bump" "$previous_version")
+    new_version=$("$dir"/../scripts/versioning/semver bump "$bump" "$previous_version")
   else
     new_version=${previous_version//-$prerelversion/}
   fi
