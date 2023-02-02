@@ -123,8 +123,23 @@ func NewNode() (*Node, error) {
 }
 
 func (n *Node) Init(ctx context.Context) error {
+	// Ensure directory and files have proper permissions
 	if err := setDirOwnership(); err != nil {
 		return err
+	}
+
+	// Initiate a restore
+	if os.Getenv("FLY_RESTORED_FROM") != "" {
+		isRestore, err := isActiveRestore()
+		if err != nil {
+			return err
+		}
+
+		if isRestore {
+			if err := Restore(ctx, n); err != nil {
+				return fmt.Errorf("failed to issue restore: %s", err)
+			}
+		}
 	}
 
 	if ZombieLockExists() {
