@@ -92,10 +92,6 @@ func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 		if out == "on" {
 			return fmt.Errorf("failed to turn database '%s' read/write. value(%s): %s", db.Name, out, err)
 		}
-
-		if err := RemoveReadOnlyLock(); err != nil {
-			return fmt.Errorf("failed to remove readonly lock file: %s", err)
-		}
 	}
 
 	if err := RemoveReadOnlyLock(); err != nil {
