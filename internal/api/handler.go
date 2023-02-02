@@ -8,7 +8,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flycheck"
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 )
 
 const Port = 5500

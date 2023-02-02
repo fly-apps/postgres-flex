@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgconn"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 )
 
 func renderJSON(w http.ResponseWriter, data interface{}, status int) {
