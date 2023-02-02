@@ -10,10 +10,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const ReadOnlyLockFile = "/data/readonly.lock"
+const (
+	readOnlyLockFile = "/data/readonly.lock"
+	readOnlyEnabled  = "on"
+	readOnlyDisabled = "off"
+)
 
 func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
-	if err := WriteReadOnlyLock(); err != nil {
+	if err := writeReadOnlyLock(); err != nil {
 		return fmt.Errorf("failed to set readonly lock: %s", err)
 	}
 
@@ -23,31 +27,33 @@ func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 	}
 
 	for _, db := range databases {
+		// exclude administrative dbs
 		if db.Name == "repmgr" || db.Name == "postgres" {
 			continue
 		}
 
+		// Route configuration change through PGBouncer
 		dbConn, err := n.NewPrimaryConnection(ctx, db.Name)
 		if err != err {
 			return fmt.Errorf("failed to establish connection to db %s: %s", db.Name, err)
 		}
 		defer dbConn.Close(ctx)
 
+		// Set readonly
 		if _, err = dbConn.Exec(ctx, "SET default_transaction_read_only=true;"); err != nil {
 			return fmt.Errorf("failed to set readonly on db %s: %s", db.Name, err)
 		}
 
-		var out string
-
-		dbConn.QueryRow(ctx, "SHOW default_transaction_read_only;").Scan(&out)
+		// Query configuration value and confirm the value change.
+		var status string
+		dbConn.QueryRow(ctx, "SHOW default_transaction_read_only;").Scan(&status)
 		if err != nil {
 			return fmt.Errorf("failed to verify readonly was unset: %s", err)
 		}
 
-		if out == "off" {
-			return fmt.Errorf("failed to turn database '%s' readonly. value(%s)", db.Name, out)
+		if status == readOnlyDisabled {
+			return fmt.Errorf("failed to turn database '%s' readonly", db.Name)
 		}
-
 	}
 
 	return nil
@@ -65,36 +71,37 @@ func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 	}
 
 	for _, db := range databases {
+		// exclude administrative dbs
 		if db.Name == "repmgr" || db.Name == "postgres" {
 			continue
 		}
 
+		// Route configuration change through PGBouncer
 		dbConn, err := n.NewPrimaryConnection(ctx, db.Name)
 		if err != err {
 			return fmt.Errorf("failed to establish connection to db %s: %s", db.Name, err)
 		}
 		defer dbConn.Close(ctx)
 
+		// Disable readonly
 		_, err = dbConn.Exec(ctx, "SET default_transaction_read_only=false;")
 		if err != nil {
 			return fmt.Errorf("failed to unset readonly on db %s: %s", db.Name, err)
 		}
 
-		// confirm
-
-		var out string
-
-		dbConn.QueryRow(ctx, "SHOW default_transaction_read_only;").Scan(&out)
+		// Query configuration value and confirm the value change.
+		var status string
+		dbConn.QueryRow(ctx, "SHOW default_transaction_read_only;").Scan(&status)
 		if err != nil {
 			return fmt.Errorf("failed to verify readonly was unset: %s", err)
 		}
 
-		if out == "on" {
-			return fmt.Errorf("failed to turn database '%s' read/write. value(%s): %s", db.Name, out, err)
+		if status == readOnlyEnabled {
+			return fmt.Errorf("failed to turn database '%s' read/write : %s", db.Name, err)
 		}
 	}
 
-	if err := RemoveReadOnlyLock(); err != nil {
+	if err := removeReadOnlyLock(); err != nil {
 		return fmt.Errorf("failed to remove readonly lock: %s", err)
 	}
 
@@ -102,31 +109,32 @@ func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 }
 
 func ReadOnlyLockExists() bool {
-	_, err := os.Stat(ReadOnlyLockFile)
+	_, err := os.Stat(readOnlyLockFile)
 	if os.IsNotExist(err) {
 		return false
 	}
+
 	return true
 }
 
-func WriteReadOnlyLock() error {
+func writeReadOnlyLock() error {
 	if ReadOnlyLockExists() {
 		return nil
 	}
 
-	if err := os.WriteFile(ReadOnlyLockFile, []byte(time.Now().String()), 0644); err != nil {
+	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0644); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func RemoveReadOnlyLock() error {
+func removeReadOnlyLock() error {
 	if !ReadOnlyLockExists() {
 		return nil
 	}
 
-	if err := os.Remove(ReadOnlyLockFile); err != nil {
+	if err := os.Remove(readOnlyLockFile); err != nil {
 		return err
 	}
 
