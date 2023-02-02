@@ -2,7 +2,7 @@ package flycheck
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -93,7 +93,7 @@ func handleCheckResponse(w http.ResponseWriter, suite *check.CheckSuite, raw boo
 		result = suite.Result()
 	}
 	if !suite.Passed() {
-		handleError(w, fmt.Errorf(result))
+		handleError(w, errors.New(result))
 		return
 	}
 	io.WriteString(w, result)
