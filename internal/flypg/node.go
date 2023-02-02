@@ -417,7 +417,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 
 				fmt.Println("Turning all user-created databases readonly.")
-				if err := admin.SetReadOnly(ctx, conn); err != nil {
+				if err := SetReadOnly(ctx, n, conn); err != nil {
 					return fmt.Errorf("failed to set read-only: %s", err)
 				}
 
@@ -439,7 +439,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 
 				fmt.Println("Turning user-created databases read-only")
-				if err := admin.SetReadOnly(ctx, conn); err != nil {
+				if err := SetReadOnly(ctx, n, conn); err != nil {
 					return fmt.Errorf("failed to set read-only: %s", err)
 				}
 
@@ -457,8 +457,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
 			}
 
-			if err := admin.UnsetReadOnly(ctx, conn); err != nil {
-				return fmt.Errorf("failed to unset read-only")
+			// Readonly lock is set by healthchecks when disk capacity is dangerously high.
+			if !ReadOnlyLockExists() {
+				if err := UnsetReadOnly(ctx, n, conn); err != nil {
+					return fmt.Errorf("failed to unset read-only: %s", err)
+				}
 			}
 
 		default:
@@ -495,6 +498,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
+	return openConnection(ctx, host, database, n.OperatorCredentials)
+}
+
+func (n *Node) NewPrimaryConnection(ctx context.Context, database string) (*pgx.Conn, error) {
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGBouncer.Port))
 	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
