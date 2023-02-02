@@ -161,7 +161,7 @@ func (h *Supervisor) Stop() {
 }
 
 func (h *Supervisor) StopOnSignal(sigs ...os.Signal) {
-	sigch := make(chan os.Signal)
+	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, sigs...)
 
 	go func() {

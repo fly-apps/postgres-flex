@@ -52,12 +52,9 @@ func main() {
 
 	fmt.Printf("Pruning every %s...\n", deadMemberRemovalThreshold)
 
-	for {
-		select {
-		case <-ticker.C:
-			if err := handleTick(ctx, flypgNode, seenAt, deadMemberRemovalThreshold); err != nil {
-				fmt.Println(err)
-			}
+	for range ticker.C {
+		if err := handleTick(ctx, flypgNode, seenAt, deadMemberRemovalThreshold); err != nil {
+			fmt.Println(err)
 		}
 	}
 }
