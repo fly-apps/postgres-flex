@@ -93,7 +93,7 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 
 	var requiresRestart []string
 
-	for k, _ := range user {
+	for k := range user {
 		restart, err := admin.SettingRequiresRestart(r.Context(), conn, k)
 		if err != nil {
 			renderErr(w, err)
@@ -185,7 +185,7 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 
 	var out []admin.PGSetting
 
-	for key, _ := range all {
+	for key := range all {
 		if slices.Contains(in, key) {
 			setting, err := admin.GetSetting(r.Context(), conn, key)
 			if err != nil {
@@ -222,8 +222,8 @@ func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Reques
 
 	out := map[string]interface{}{}
 
-	for key, _ := range all {
-		val, _ := all[key]
+	for key := range all {
+		val := all[key]
 		if slices.Contains(in, key) {
 			out[key] = val
 		}
@@ -255,8 +255,8 @@ func (s *Server) handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request
 
 	out := map[string]interface{}{}
 
-	for key, _ := range all {
-		val, _ := all[key]
+	for key := range all {
+		val := all[key]
 		if slices.Contains(in, key) {
 			out[key] = val
 		}

@@ -43,7 +43,7 @@ func checkPressure(name string) (string, error) {
 		return "", err
 	}
 
-	_, err = fmt.Sscanf(
+	fmt.Sscanf(
 		string(raw),
 		"some avg10=%f avg60=%f avg300=%f total=%f",
 		&avg10, &avg60, &avg300, &counter,
@@ -171,7 +171,7 @@ func dataSize(size uint64) string {
 	base := math.Log(float64(size)) / math.Log(1024)
 	getSize := round(math.Pow(1024, base-math.Floor(base)), .5, 2)
 	getSuffix := suffixes[int(math.Floor(base))]
-	return fmt.Sprint(strconv.FormatFloat(getSize, 'f', -1, 64) + " " + string(getSuffix))
+	return fmt.Sprint(strconv.FormatFloat(getSize, 'f', -1, 64) + " " + getSuffix)
 }
 
 func pressureToDuration(pressure float64, base float64) (time.Duration, error) {

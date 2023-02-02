@@ -86,12 +86,12 @@ type ReplicationSlot struct {
 }
 
 func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
-	sql := fmt.Sprintf("SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;")
+	sql := "SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;"
 	rows, err := pg.Query(ctx, sql)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var slots []ReplicationSlot
 
