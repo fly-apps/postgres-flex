@@ -101,15 +101,6 @@ func ZombieDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASa
 	return sample, nil
 }
 
-func printDNASample(s *DNASample) {
-	fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
-		s.totalMembers,
-		s.totalActive,
-		s.totalInactive,
-		s.totalConflicts,
-	)
-}
-
 func ZombieDiagnosis(s *DNASample) (string, error) {
 	// We can short-circuit a single node cluster.
 	if s.totalMembers == 1 {
@@ -124,12 +115,9 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 
 	topCandidate := ""
 	highestTotal := 0
-	totalConflicts := 0
 
 	// Evaluate conflicts and calculate top referenced primary
 	for hostname, total := range s.conflictMap {
-		totalConflicts += total
-
 		if total > highestTotal {
 			highestTotal = total
 			topCandidate = hostname
@@ -137,11 +125,11 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 	}
 
 	// Calculate our references
-	myCount := s.totalMembers - s.totalInactive - totalConflicts
+	myCount := s.totalMembers - s.totalInactive - s.totalConflicts
 
 	// We have to fence the primary in case the active cluster is in the middle of a failover.
 	if myCount >= quorum {
-		if totalConflicts > 0 {
+		if s.totalConflicts > 0 {
 			return "", ErrZombieDiagnosisUndecided
 		}
 		return s.hostname, nil
@@ -152,4 +140,13 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 	}
 
 	return "", ErrZombieDiagnosisUndecided
+}
+
+func printDNASample(s *DNASample) {
+	fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
+		s.totalMembers,
+		s.totalActive,
+		s.totalInactive,
+		s.totalConflicts,
+	)
 }

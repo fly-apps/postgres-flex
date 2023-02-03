@@ -144,10 +144,11 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	t.Run("ThreeMemberWithStandbyReportDiffPrimary", func(t *testing.T) {
 		sample := &DNASample{
-			hostname:      "host-1",
-			totalMembers:  3,
-			totalInactive: 0,
-			totalActive:   3,
+			hostname:       "host-1",
+			totalMembers:   3,
+			totalInactive:  0,
+			totalActive:    3,
+			totalConflicts: 2,
 			conflictMap: map[string]int{
 				"host-99": 2,
 			},
@@ -165,10 +166,11 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	t.Run("ThreeMemberWithOneStandbyInDisagreement", func(t *testing.T) {
 		sample := &DNASample{
-			hostname:      "host-1",
-			totalMembers:  3,
-			totalInactive: 0,
-			totalActive:   3,
+			hostname:       "host-1",
+			totalMembers:   3,
+			totalInactive:  0,
+			totalActive:    3,
+			totalConflicts: 1,
 			conflictMap: map[string]int{
 				"host-99": 1,
 			},
@@ -186,10 +188,11 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	t.Run("ThreeMemberWithTwoReportingDifferentPrimaries", func(t *testing.T) {
 		sample := &DNASample{
-			hostname:      "host-1",
-			totalMembers:  3,
-			totalInactive: 0,
-			totalActive:   3,
+			hostname:       "host-1",
+			totalMembers:   3,
+			totalInactive:  0,
+			totalActive:    3,
+			totalConflicts: 2,
 			conflictMap: map[string]int{
 				"host-99": 1,
 				"host-33": 1,
@@ -265,10 +268,11 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	t.Run("FourMemberWithTwoReportingDifferentPrimary", func(t *testing.T) {
 		sample := &DNASample{
-			hostname:      "host-1",
-			totalMembers:  4,
-			totalInactive: 0,
-			totalActive:   4,
+			hostname:       "host-1",
+			totalMembers:   4,
+			totalInactive:  0,
+			totalActive:    4,
+			totalConflicts: 2,
 			conflictMap: map[string]int{
 				"host-99": 2,
 			},
@@ -286,10 +290,11 @@ func TestZombieDiagnosis(t *testing.T) {
 
 	t.Run("FourMemberWithThreeStandbyReportingDiffPrimary", func(t *testing.T) {
 		sample := &DNASample{
-			hostname:      "host-1",
-			totalMembers:  4,
-			totalInactive: 0,
-			totalActive:   4,
+			hostname:       "host-1",
+			totalMembers:   4,
+			totalInactive:  0,
+			totalActive:    4,
+			totalConflicts: 3,
 			conflictMap: map[string]int{
 				"host-99": 3,
 			},
