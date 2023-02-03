@@ -61,7 +61,7 @@ type DNASample struct {
 	conflictMap    map[string]int
 }
 
-func ZombieDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASample, error) {
+func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASample, error) {
 	sample := &DNASample{
 		hostname:       node.PrivateIP,
 		totalMembers:   len(standbys) + 1,

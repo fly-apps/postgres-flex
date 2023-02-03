@@ -343,13 +343,14 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Collect sample data from registered standbys
-			sample, err := ZombieDNASample(ctx, n, standbys)
+			sample, err := TakeDNASample(ctx, n, standbys)
 			if err != nil {
 				return fmt.Errorf("failed to resolve cluster metrics: %s", err)
 			}
 
 			printDNASample(sample)
 
+			// Evaluate whether we are a zombie or not.
 			primary, err := ZombieDiagnosis(sample)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
