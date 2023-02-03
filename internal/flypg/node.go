@@ -342,49 +342,17 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 
-			totalMembers := len(standbys) + 1
-			totalActive := 1
-			totalInactive := 0
-			totalConflicts := 0
-
-			conflictMap := map[string]int{}
-
-			for _, standby := range standbys {
-				// Check for connectivity
-				mConn, err := repmgr.NewRemoteConnection(ctx, standby.Hostname)
-				if err != nil {
-					fmt.Printf("failed to connect to %s", standby.Hostname)
-					totalInactive++
-					continue
-				}
-				defer mConn.Close(ctx)
-
-				// Verify the primary
-				primary, err := repmgr.PrimaryMember(ctx, mConn)
-				if err != nil {
-					fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
-					totalInactive++
-					continue
-				}
-
-				totalActive++
-
-				// Record conflict when primary doesn't match.
-				if primary.Hostname != n.PrivateIP {
-					totalConflicts++
-					conflictMap[primary.Hostname]++
-				}
+			// Collect sample data from registered standbys
+			sample, err := ZombieDNASample(ctx, n, standbys)
+			if err != nil {
+				return fmt.Errorf("failed to resolve cluster metrics: %s", err)
 			}
 
-			primary, err := ZombieDiagnosis(n.PrivateIP, totalMembers, totalInactive, totalActive, conflictMap)
+			printDNASample(sample)
+
+			primary, err := ZombieDiagnosis(sample)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
-				fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
-					totalMembers,
-					totalActive,
-					totalInactive,
-					totalConflicts,
-				)
 
 				fmt.Println("Writing zombie.lock file.")
 				if err := writeZombieLock(""); err != nil {
