@@ -13,5 +13,4 @@ func main() {
 	}
 
 	api.StartHttpServer(node)
-
 }

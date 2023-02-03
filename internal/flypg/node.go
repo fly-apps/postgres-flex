@@ -130,6 +130,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Initiate a restore
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
+		// Check to see if there's an active restore.
 		isRestore, err := isActiveRestore()
 		if err != nil {
 			return err

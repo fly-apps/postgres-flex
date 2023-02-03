@@ -18,60 +18,66 @@ const (
 )
 
 func Restore(ctx context.Context, node *Node) error {
-	fmt.Println("Backing up HBA File")
+	// Clear any locks that may have been set on the original cluster
+	if err := clearLocks(); err != nil {
+		return fmt.Errorf("failed to clear locks: %s", err)
+	}
+
+	// create a copy of the pg_hba.conf file so we can revert back to it when needed.
+	// If the file doesn't exist, then we are new standby coming up.
 	if err := backupHBAFile(); err != nil {
-		// The HBAFile will not exist when a new standby is coming up.
 		if os.IsNotExist(err) {
 			return nil
 		}
+
 		return fmt.Errorf("failed backing up pg_hba.conf: %s", err)
 	}
 
-	fmt.Println("Overwriting HBA file so we can update authentication")
-	if err := overwriteHBAFile(); err != nil {
-		return fmt.Errorf("failed to overwrite pg_hba.conf: %s", err)
+	if err := grantLocalAccess(); err != nil {
+		return fmt.Errorf("failed to grant local access: %s", err)
 	}
 
+	// Clear the standby.signal if it exists.
 	if _, err := os.Stat("/data/postgresql/standby.signal"); err == nil {
-		fmt.Println("restoring from a hot standby. clearing standby signal so we can boot.")
-		// We are restoring from a hot standby, so we need to clear the signal so we can boot.
+		fmt.Println("Restoring from a hot standby.")
+		// Clear the signal so we can boot.
 		if err = os.Remove("/data/postgresql/standby.signal"); err != nil {
 			return fmt.Errorf("failed to remove standby signal: %s", err)
 		}
 	}
 
-	fmt.Println("Starting PG in standalone mode")
-
+	// Boot postgres in standalone mode
 	svisor := supervisor.New("flypg", 5*time.Minute)
 	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D /data/postgresql -p 5433 -h %s", node.PrivateIP))
+
 	go svisor.Run()
 
-	fmt.Println("Establishing new connection to PG")
 	conn, err := openConn(ctx, node)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
 
-	// Blow away repmgr database
-	fmt.Println("Dropping repmgr database")
-	sql := fmt.Sprintf("DROP DATABASE repmgr;")
+	// Drop repmgr database to clear any metadata that belonged to the old cluster.
+	sql := "DROP DATABASE repmgr;"
 	_, err = conn.Exec(ctx, sql)
 	if err != nil {
 		return fmt.Errorf("failed to drop repmgr database: %s", err)
 	}
 
-	fmt.Println("Establishing new connection to PG")
+	// Create required users and ensure auth is configured to match the environment.
 	if err = node.createRequiredUsers(ctx, conn); err != nil {
 		return fmt.Errorf("failed creating required users: %s", err)
 	}
 
-	fmt.Println("Restore original HBA file")
+	// Revert back to the original config file
 	if err := restoreHBAFile(); err != nil {
 		return fmt.Errorf("failed to restore original pg_hba.conf: %s", err)
 	}
 
 	svisor.Stop()
 
+	// Set the lock file so the init process knows not to restart
+	// the restore process.
 	if err := setRestoreLock(); err != nil {
 		return fmt.Errorf("failed to set restore lock: %s", err)
 	}
@@ -81,7 +87,6 @@ func Restore(ctx context.Context, node *Node) error {
 
 func isActiveRestore() (bool, error) {
 	if _, err := os.Stat(restoreLockFile); err == nil {
-
 		val, err := os.ReadFile(restoreLockFile)
 		if err != nil {
 			return false, err
@@ -112,7 +117,7 @@ func backupHBAFile() error {
 	return nil
 }
 
-func overwriteHBAFile() error {
+func grantLocalAccess() error {
 	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -129,22 +134,26 @@ func overwriteHBAFile() error {
 }
 
 func restoreHBAFile() error {
-	input, err := os.ReadFile(pathToHBABackup)
+	// open pg_hba backup
+	data, err := os.ReadFile(pathToHBABackup)
 	if err != nil {
 		return err
 	}
 
+	// open the main pg_hba
 	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	_, err = file.Write(input)
+	// revert back to our original config
+	_, err = file.Write(data)
 	if err != nil {
 		return err
 	}
 
+	// remove the backup
 	if err := os.Remove(pathToHBABackup); err != nil {
 		return err
 	}
@@ -163,6 +172,7 @@ func setRestoreLock() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -177,17 +187,30 @@ func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
 	conf.User = "postgres"
 
 	// Allow up to 30 seconds for PG to boot and accept connections.
-	timeout := time.After(2 * time.Minute)
-	tick := time.Tick(1 * time.Second)
+	timeout := time.After(30 * time.Second)
+	tick := time.NewTicker(1 * time.Second)
+	defer tick.Stop()
 	for {
 		select {
 		case <-timeout:
 			return nil, fmt.Errorf("timed out waiting for successful connection")
-		case <-tick:
+		case <-tick.C:
 			conn, err := pgx.ConnectConfig(ctx, conf)
 			if err == nil {
 				return conn, err
 			}
 		}
 	}
+}
+
+func clearLocks() error {
+	if err := removeReadOnlyLock(); err != nil {
+		return fmt.Errorf("failed to remove readonly lock pre-restore: %s", err)
+	}
+
+	if err := removeZombieLock(); err != nil {
+		return fmt.Errorf("failed to remove zombie lock pre-restore: %s", err)
+	}
+
+	return nil
 }

@@ -69,7 +69,6 @@ func main() {
 	svisor.AddProcess("exporter", "postgres_exporter", supervisor.WithEnv(exporterEnv), supervisor.WithRestart(0, 1*time.Second))
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
-	// svisor.StartHttpListener(node)
 
 	if err := svisor.Run(); err != nil {
 		fmt.Println(err)
