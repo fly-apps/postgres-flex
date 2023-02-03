@@ -131,12 +131,12 @@ func (n *Node) Init(ctx context.Context) error {
 	// Initiate a restore
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
 		// Check to see if there's an active restore.
-		isRestore, err := isActiveRestore()
+		active, err := isRestoreActive()
 		if err != nil {
 			return err
 		}
 
-		if isRestore {
+		if active {
 			if err := Restore(ctx, n); err != nil {
 				return fmt.Errorf("failed to issue restore: %s", err)
 			}
@@ -204,7 +204,7 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	err := WriteSSHKey()
+	err := writeSSHKey()
 	if err != nil {
 		return fmt.Errorf("failed initialize ssh. %v", err)
 	}
@@ -227,12 +227,10 @@ func (n *Node) Init(ctx context.Context) error {
 
 		if !clusterInitialized {
 			// Initialize ourselves as the primary.
-			fmt.Println("Initializing postgres")
 			if err := n.initializePG(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
 
-			fmt.Println("Setting default HBA")
 			if err := n.setDefaultHBA(); err != nil {
 				return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 			}
@@ -249,50 +247,11 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	fmt.Println("Initializing Postgres configuration")
 	if err := n.configurePostgres(store); err != nil {
 		return fmt.Errorf("failed to configure postgres: %s", err)
 	}
 
 	if err := setDirOwnership(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func WriteSSHKey() error {
-	err := os.Mkdir("/data/.ssh", 0700)
-	if err != nil && !os.IsExist(err) {
-		return err
-	}
-
-	key := os.Getenv("SSH_KEY")
-
-	keyFile, err := os.Create("/data/.ssh/id_rsa")
-	if err != nil {
-		return err
-	}
-	defer keyFile.Close()
-	_, err = keyFile.Write([]byte(key))
-	if err != nil {
-		return err
-	}
-
-	cert := os.Getenv("SSH_CERT")
-
-	certFile, err := os.Create("/data/.ssh/id_rsa-cert.pub")
-	if err != nil {
-		return err
-	}
-	defer certFile.Close()
-	_, err = certFile.Write([]byte(cert))
-	if err != nil {
-		return err
-	}
-
-	err = setSSHOwnership()
-	if err != nil {
 		return err
 	}
 
@@ -545,17 +504,14 @@ func (n *Node) isPGInitialized() bool {
 }
 
 func (n *Node) configure(ctx context.Context, store *state.Store) error {
-	fmt.Println("Initializing internal config")
 	if err := n.configureInternal(store); err != nil {
 		return fmt.Errorf("failed to set internal config: %s", err)
 	}
 
-	fmt.Println("Initializing replication manager")
 	if err := n.configureRepmgr(store); err != nil {
 		return fmt.Errorf("failed to configure repmgr config: %s", err)
 	}
 
-	fmt.Println("Initializing pgbouncer")
 	if err := n.configurePGBouncer(store); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer: %s", err)
 	}
@@ -564,6 +520,44 @@ func (n *Node) configure(ctx context.Context, store *state.Store) error {
 	fmt.Println("Disabling PGBouncer until primary is resolved")
 	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
 		return fmt.Errorf("failed to set pgbouncer target: %s", err)
+	}
+
+	return nil
+}
+
+func writeSSHKey() error {
+	err := os.Mkdir("/data/.ssh", 0700)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
+
+	key := os.Getenv("SSH_KEY")
+
+	keyFile, err := os.Create("/data/.ssh/id_rsa")
+	if err != nil {
+		return err
+	}
+	defer keyFile.Close()
+	_, err = keyFile.Write([]byte(key))
+	if err != nil {
+		return err
+	}
+
+	cert := os.Getenv("SSH_CERT")
+
+	certFile, err := os.Create("/data/.ssh/id_rsa-cert.pub")
+	if err != nil {
+		return err
+	}
+	defer certFile.Close()
+	_, err = certFile.Write([]byte(cert))
+	if err != nil {
+		return err
+	}
+
+	err = setSSHOwnership()
+	if err != nil {
+		return err
 	}
 
 	return nil

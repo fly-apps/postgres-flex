@@ -85,7 +85,7 @@ func Restore(ctx context.Context, node *Node) error {
 	return nil
 }
 
-func isActiveRestore() (bool, error) {
+func isRestoreActive() (bool, error) {
 	if _, err := os.Stat(restoreLockFile); err == nil {
 		val, err := os.ReadFile(restoreLockFile)
 		if err != nil {
