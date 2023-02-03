@@ -54,9 +54,12 @@ func main() {
 	svisor.AddProcess("repmgrd", fmt.Sprintf("gosu postgres repmgrd -f %s --daemonize=false", node.RepMgr.ConfigPath),
 		supervisor.WithRestart(0, 5*time.Second),
 	)
-	svisor.AddProcess("standby_cleaner", "/usr/local/bin/standby_cleaner", supervisor.WithRestart(0, 5*time.Second))
-
-	svisor.AddProcess("api", "/usr/local/bin/api")
+	svisor.AddProcess("standby_cleaner", "/usr/local/bin/standby_cleaner",
+		supervisor.WithRestart(0, 5*time.Second),
+	)
+	svisor.AddProcess("admin", "/usr/local/bin/start_admin_server",
+		supervisor.WithRestart(0, 5*time.Second),
+	)
 
 	exporterEnv := map[string]string{
 		"DATA_SOURCE_URI":                     fmt.Sprintf("[%s]:%d/postgres?sslmode=disable", node.PrivateIP, node.Port),
@@ -65,8 +68,10 @@ func main() {
 		"PG_EXPORTER_EXCLUDE_DATABASE":        "template0,template1",
 		"PG_EXPORTER_AUTO_DISCOVER_DATABASES": "true",
 	}
-
-	svisor.AddProcess("exporter", "postgres_exporter", supervisor.WithEnv(exporterEnv), supervisor.WithRestart(0, 1*time.Second))
+	svisor.AddProcess("exporter", "postgres_exporter",
+		supervisor.WithEnv(exporterEnv),
+		supervisor.WithRestart(0, 1*time.Second),
+	)
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 

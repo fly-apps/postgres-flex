@@ -6,7 +6,6 @@ import (
 )
 
 func main() {
-
 	node, err := flypg.NewNode()
 	if err != nil {
 		panic(err)
