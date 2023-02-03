@@ -9,9 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-apps/postgres-flex/internal/flypg"
-
-	"github.com/fly-apps/postgres-flex/internal/api"
 	"github.com/google/shlex"
 	"golang.org/x/sync/errgroup"
 )
@@ -126,10 +123,6 @@ func (h *Supervisor) waitForExit(ctx context.Context) {
 	for _, proc := range h.procs {
 		go proc.Kill()
 	}
-}
-
-func (h *Supervisor) StartHttpListener(node *flypg.Node) {
-	go api.StartHttpServer(node)
 }
 
 func (h *Supervisor) Run() error {
