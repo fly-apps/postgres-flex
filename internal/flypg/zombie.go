@@ -1,7 +1,9 @@
 package flypg
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -50,26 +52,72 @@ func readZombieLock() (string, error) {
 	return string(body), nil
 }
 
-func ZombieDiagnosis(myHostname string, total int, inactive int, active int, conflictMap map[string]int) (string, error) {
-	// We can short-circuit a single node cluster.
-	if total == 1 {
-		return myHostname, nil
+type DNASample struct {
+	hostname       string
+	totalMembers   int
+	totalActive    int
+	totalInactive  int
+	totalConflicts int
+	conflictMap    map[string]int
+}
+
+func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASample, error) {
+	sample := &DNASample{
+		hostname:       node.PrivateIP,
+		totalMembers:   len(standbys) + 1,
+		totalActive:    1,
+		totalInactive:  0,
+		totalConflicts: 0,
+		conflictMap:    map[string]int{},
 	}
 
-	quorum := total/2 + 1
+	for _, standby := range standbys {
+		// Check for connectivity
+		mConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
+		if err != nil {
+			fmt.Printf("failed to connect to %s", standby.Hostname)
+			sample.totalInactive++
+			continue
+		}
+		defer mConn.Close(ctx)
 
-	if active < quorum {
+		// Verify the primary
+		primary, err := node.RepMgr.PrimaryMember(ctx, mConn)
+		if err != nil {
+			fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
+			sample.totalInactive++
+			continue
+		}
+
+		sample.totalActive++
+
+		// Record conflict when primary doesn't match.
+		if primary.Hostname != node.PrivateIP {
+			sample.totalConflicts++
+			sample.conflictMap[primary.Hostname]++
+		}
+	}
+
+	return sample, nil
+}
+
+func ZombieDiagnosis(s *DNASample) (string, error) {
+	// We can short-circuit a single node cluster.
+	if s.totalMembers == 1 {
+		return s.hostname, nil
+	}
+
+	quorum := s.totalMembers/2 + 1
+
+	if s.totalActive < quorum {
 		return "", ErrZombieDiagnosisUndecided
 	}
 
 	topCandidate := ""
 	highestTotal := 0
-	totalConflicts := 0
 
 	// Evaluate conflicts and calculate top referenced primary
-	for hostname, total := range conflictMap {
-		totalConflicts += total
-
+	for hostname, total := range s.conflictMap {
 		if total > highestTotal {
 			highestTotal = total
 			topCandidate = hostname
@@ -77,14 +125,14 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	}
 
 	// Calculate our references
-	myCount := total - inactive - totalConflicts
+	myCount := s.totalMembers - s.totalInactive - s.totalConflicts
 
 	// We have to fence the primary in case the active cluster is in the middle of a failover.
 	if myCount >= quorum {
-		if totalConflicts > 0 {
+		if s.totalConflicts > 0 {
 			return "", ErrZombieDiagnosisUndecided
 		}
-		return myHostname, nil
+		return s.hostname, nil
 	}
 
 	if highestTotal >= quorum {
@@ -92,4 +140,13 @@ func ZombieDiagnosis(myHostname string, total int, inactive int, active int, con
 	}
 
 	return "", ErrZombieDiagnosisUndecided
+}
+
+func printDNASample(s *DNASample) {
+	fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
+		s.totalMembers,
+		s.totalActive,
+		s.totalInactive,
+		s.totalConflicts,
+	)
 }
