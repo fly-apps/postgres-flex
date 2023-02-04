@@ -67,6 +67,10 @@ func diskCapacityCheck(ctx context.Context, localConn *pgx.Conn, node *flypg.Nod
 
 	// Turn primary read-only
 	if usedPercentage > diskCapacityPercentageThreshold {
+
+		if err := flypg.WriteReadOnlyLock(); err != nil {
+			return "", fmt.Errorf("failed to set readonly lock: %s", err)
+		}
 		if err := flypg.SetReadOnly(ctx, node, localConn); err != nil {
 			return "", fmt.Errorf("failed to turn primary readonly: %s", err)
 		}
@@ -79,6 +83,11 @@ func diskCapacityCheck(ctx context.Context, localConn *pgx.Conn, node *flypg.Nod
 		if err := flypg.UnsetReadOnly(ctx, node, localConn); err != nil {
 			return "", fmt.Errorf("failed to turn primary read/write: %s", err)
 		}
+
+		if err := flypg.RemoveReadOnlyLock(); err != nil {
+			return "", fmt.Errorf("failed to remove readonly lock: %s", err)
+		}
+
 	}
 
 	return fmt.Sprintf("%0.1f%% - readonly mode will be enabled at %0.1f%%", usedPercentage, diskCapacityPercentageThreshold), nil

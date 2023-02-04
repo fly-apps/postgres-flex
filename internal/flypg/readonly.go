@@ -17,10 +17,6 @@ const (
 )
 
 func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
-	if err := writeReadOnlyLock(); err != nil {
-		return fmt.Errorf("failed to set readonly lock: %s", err)
-	}
-
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
 		return err
@@ -101,10 +97,6 @@ func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 		}
 	}
 
-	if err := removeReadOnlyLock(); err != nil {
-		return fmt.Errorf("failed to remove readonly lock: %s", err)
-	}
-
 	return nil
 }
 
@@ -117,7 +109,7 @@ func ReadOnlyLockExists() bool {
 	return true
 }
 
-func writeReadOnlyLock() error {
+func WriteReadOnlyLock() error {
 	if ReadOnlyLockExists() {
 		return nil
 	}
@@ -129,7 +121,7 @@ func writeReadOnlyLock() error {
 	return nil
 }
 
-func removeReadOnlyLock() error {
+func RemoveReadOnlyLock() error {
 	if !ReadOnlyLockExists() {
 		return nil
 	}

@@ -145,7 +145,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	if ZombieLockExists() {
 		fmt.Println("Zombie lock detected!")
-		primaryStr, err := readZombieLock()
+		primaryStr, err := ReadZombieLock()
 		if err != nil {
 			return fmt.Errorf("failed to read zombie lock: %s", primaryStr)
 		}
@@ -172,7 +172,7 @@ func (n *Node) Init(ctx context.Context) error {
 			// Confirm that our rejoin target still identifies itself as the primary.
 			if primary.Hostname != ip.String() {
 				// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
-				if err := removeZombieLock(); err != nil {
+				if err := RemoveZombieLock(); err != nil {
 					return fmt.Errorf("failed to remove zombie lock: %s", err)
 				}
 
@@ -191,7 +191,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 			// TODO - Wait for target cluster to register self as a standby.
 
-			if err := removeZombieLock(); err != nil {
+			if err := RemoveZombieLock(); err != nil {
 				return fmt.Errorf("failed to remove zombie lock: %s", err)
 			}
 
@@ -348,46 +348,28 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to resolve cluster metrics: %s", err)
 			}
 
-			printDNASample(sample)
+			fmt.Println(DNASampleString(sample))
 
 			// Evaluate whether we are a zombie or not.
 			primary, err := ZombieDiagnosis(sample)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
 
-				fmt.Println("Writing zombie.lock file.")
-				if err := writeZombieLock(""); err != nil {
-					return fmt.Errorf("failed to set zombie lock: %s", err)
+				if err := Quarantine(ctx, conn, n, primary); err != nil {
+					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
-
-				fmt.Println("Turning all user-created databases readonly.")
-				if err := SetReadOnly(ctx, n, conn); err != nil {
-					return fmt.Errorf("failed to set read-only: %s", err)
-				}
-
-				// TODO - Add link to docs
-				fmt.Println("Please refer to following documentation for more information: <insert-doc-link-here>.")
 
 			} else if errors.Is(err, ErrZombieDiscovered) {
-				fmt.Println("Zombie primary discovered!")
 				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
 
-				fmt.Printf("Reconfiguring PGBouncer to point to '%s'\n", primary)
-				if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-					return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+				if err := Quarantine(ctx, conn, n, primary); err != nil {
+					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 
-				fmt.Println("Writing zombie.lock file")
-				if err := writeZombieLock(primary); err != nil {
-					return fmt.Errorf("failed to set zombie lock: %s", err)
-				}
-
-				fmt.Println("Turning user-created databases read-only")
-				if err := SetReadOnly(ctx, n, conn); err != nil {
-					return fmt.Errorf("failed to set read-only: %s", err)
-				}
-
+				// Issue panic to force a process restart so we can attempt to rejoin
+				// the the cluster we've diverged from.
 				panic(err)
+
 			} else if err != nil {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}

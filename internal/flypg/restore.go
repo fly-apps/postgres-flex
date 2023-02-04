@@ -204,13 +204,13 @@ func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
 }
 
 func clearLocks() error {
-	if err := removeReadOnlyLock(); err != nil {
+	if err := RemoveReadOnlyLock(); err != nil {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove readonly lock pre-restore: %s", err)
 		}
 	}
 
-	if err := removeZombieLock(); err != nil {
+	if err := RemoveZombieLock(); err != nil {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove zombie lock pre-restore: %s", err)
 		}
