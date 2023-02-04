@@ -165,7 +165,7 @@ func Quarantine(ctx context.Context, conn *pgx.Conn, n *Node, primary string) er
 }
 
 func DNASampleString(s *DNASample) string {
-	return fmt.Sprintf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
+	return fmt.Sprintf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d",
 		s.totalMembers,
 		s.totalActive,
 		s.totalInactive,

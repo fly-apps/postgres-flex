@@ -126,7 +126,6 @@ func main() {
 		}
 
 		os.Exit(0)
-
 	default:
 		// noop
 	}
@@ -142,6 +141,7 @@ func reconfigurePGBouncer(ctx context.Context, id int) error {
 	if err != nil {
 		return fmt.Errorf("failed to establish connection with local pg: %s", err)
 	}
+	defer conn.Close(ctx)
 
 	member, err := node.RepMgr.MemberByID(ctx, conn, id)
 	if err != nil {
@@ -183,14 +183,27 @@ func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node)
 
 	// If the zombie lock exists clear it
 	if flypg.ZombieLockExists() {
-		log.Println("Clearing zombie lock and turning read/write")
+		log.Println("Clearing zombie lock and enabling read/write")
 		if err := flypg.RemoveZombieLock(); err != nil {
 			return fmt.Errorf("failed to remove zombie lock: %s", err)
 		}
 
-		if err := flypg.UnsetReadOnly(ctx, node, conn); err != nil {
-			return fmt.Errorf("failed to unset readonly: %s", err)
+		maxRetries := 5
+		retry := 0
+
+		for retry < maxRetries {
+			if err := flypg.UnsetReadOnly(ctx, node, conn); err != nil {
+				log.Printf("attempt %d - failed to unset readonly: %s", retry, err)
+				retry++
+				continue
+			}
+			log.Println("successfully enabled read/write")
+			break
 		}
+	}
+
+	if err := node.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+		return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
 	}
 
 	return nil

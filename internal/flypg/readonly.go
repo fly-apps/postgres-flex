@@ -19,7 +19,7 @@ const (
 func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list database: %s", err)
 	}
 
 	for _, db := range databases {
@@ -56,14 +56,9 @@ func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 }
 
 func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
-	// Skip if there's no readonly lock present
-	if !ReadOnlyLockExists() {
-		return nil
-	}
-
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list databases: %s", err)
 	}
 
 	for _, db := range databases {

@@ -78,16 +78,18 @@ func diskCapacityCheck(ctx context.Context, localConn *pgx.Conn, node *flypg.Nod
 		return "", fmt.Errorf("%0.1f%% - readonly mode enabled, extend your volume to re-enable writes", usedPercentage)
 	}
 
-	// Don't attempt to turn read/write if zombie lock exists.
-	if !flypg.ZombieLockExists() {
-		if err := flypg.UnsetReadOnly(ctx, node, localConn); err != nil {
-			return "", fmt.Errorf("failed to turn primary read/write: %s", err)
+	if flypg.ReadOnlyLockExists() {
+		// We are required to stay read-only if the zombie.lock is present.
+		if !flypg.ZombieLockExists() {
+			if err := flypg.UnsetReadOnly(ctx, node, localConn); err != nil {
+				return "", fmt.Errorf("failed to turn primary read/write: %s", err)
+			}
 		}
 
+		// Remove the read-only lock.
 		if err := flypg.RemoveReadOnlyLock(); err != nil {
 			return "", fmt.Errorf("failed to remove readonly lock: %s", err)
 		}
-
 	}
 
 	return fmt.Sprintf("%0.1f%% - readonly mode will be enabled at %0.1f%%", usedPercentage, diskCapacityPercentageThreshold), nil
