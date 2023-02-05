@@ -210,7 +210,7 @@ func clearLocks() error {
 		}
 	}
 
-	if err := removeZombieLock(); err != nil {
+	if err := RemoveZombieLock(); err != nil {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove zombie lock pre-restore: %s", err)
 		}

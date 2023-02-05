@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
+	"github.com/jackc/pgx/v5"
 )
 
 const eventLogFile = "/data/event.log"
@@ -25,6 +27,8 @@ func main() {
 	success := flag.String("success", "", "success (1) failure (0)")
 	details := flag.String("details", "", "details")
 	flag.Parse()
+
+	ctx := context.Background()
 
 	logFile, err := os.OpenFile(eventLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
@@ -91,6 +95,39 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "child_node_disconnect", "child_node_reconnect", "child_node_new_connect":
+		node, err := flypg.NewNode()
+		if err != nil {
+			log.Printf("failed to initialize node: %s", err)
+			os.Exit(1)
+		}
+
+		conn, err := node.RepMgr.NewLocalConnection(ctx)
+		if err != nil {
+			log.Printf("failed to open local connection: %s", err)
+			os.Exit(1)
+		}
+		defer conn.Close(ctx)
+
+		member, err := node.RepMgr.Member(ctx, conn)
+		if err != nil {
+			log.Printf("failed to resolve member: %s", err)
+			os.Exit(1)
+		}
+
+		if member.Role != flypg.PrimaryRoleName {
+			// We should never get here.
+			log.Println("skipping since we are not the primary")
+			os.Exit(0)
+		}
+
+		if err := evaluateClusterState(ctx, conn, node); err != nil {
+			log.Printf("failed to evaluate cluster state: %s", err)
+			os.Exit(0)
+		}
+
+		os.Exit(0)
+
 	default:
 		// noop
 	}
@@ -113,6 +150,60 @@ func reconfigurePGBouncer(id int) error {
 	}
 
 	if err := node.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
+		return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
+	}
+
+	return nil
+}
+
+func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {
+	standbys, err := node.RepMgr.StandbyMembers(ctx, conn)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("failed to query standbys")
+		}
+	}
+
+	sample, err := flypg.TakeDNASample(ctx, node, standbys)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate cluster data: %s", err)
+	}
+
+	log.Println(flypg.DNASampleString(sample))
+
+	primary, err := flypg.ZombieDiagnosis(sample)
+	if errors.Is(err, flypg.ErrZombieDiagnosisUndecided) || errors.Is(err, flypg.ErrZombieDiscovered) {
+		if err := flypg.Quarantine(ctx, conn, node, primary); err != nil {
+			return fmt.Errorf("failed to quarantine failed primary: %s", err)
+		}
+
+		return fmt.Errorf("primary has been quarantined: %s", err)
+	} else if err != nil {
+		return fmt.Errorf("failed to run zombie diagnosis: %s", err)
+	}
+
+	// If the zombie lock exists clear it
+	if flypg.ZombieLockExists() {
+		log.Println("Clearing zombie lock and enabling read/write")
+		if err := flypg.RemoveZombieLock(); err != nil {
+			return fmt.Errorf("failed to remove zombie lock: %s", err)
+		}
+
+		maxRetries := 5
+		retry := 0
+
+		for retry < maxRetries {
+			if err := flypg.DisableReadonly(ctx, node); err != nil {
+				log.Printf("attempt %d - failed to unset readonly: %s", retry, err)
+				retry++
+				continue
+			}
+			log.Println("successfully enabled read/write")
+			break
+		}
+	}
+
+	if err := node.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
 		return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
 	}
 

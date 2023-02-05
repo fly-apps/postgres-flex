@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -35,7 +37,7 @@ func writeZombieLock(hostname string) error {
 	return nil
 }
 
-func removeZombieLock() error {
+func RemoveZombieLock() error {
 	if err := os.Remove("/data/zombie.lock"); err != nil {
 		return err
 	}
@@ -43,7 +45,7 @@ func removeZombieLock() error {
 	return nil
 }
 
-func readZombieLock() (string, error) {
+func ReadZombieLock() (string, error) {
 	body, err := os.ReadFile("/data/zombie.lock")
 	if err != nil {
 		return "", err
@@ -142,8 +144,27 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 	return "", ErrZombieDiagnosisUndecided
 }
 
-func printDNASample(s *DNASample) {
-	fmt.Printf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d\n",
+func Quarantine(ctx context.Context, conn *pgx.Conn, n *Node, primary string) error {
+	if primary != "" {
+		if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+			return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+		}
+	}
+
+	fmt.Println("Writing zombie.lock file.")
+	if err := writeZombieLock(""); err != nil {
+		return fmt.Errorf("failed to set zombie lock: %s", err)
+	}
+
+	if err := BroadcastReadonlyChange(ctx, n, true); err != nil {
+		return fmt.Errorf("failed to set read-only: %s", err)
+	}
+
+	return nil
+}
+
+func DNASampleString(s *DNASample) string {
+	return fmt.Sprintf("Registered members: %d, Active member(s): %d, Inactive member(s): %d, Conflicts detected: %d",
 		s.totalMembers,
 		s.totalActive,
 		s.totalInactive,

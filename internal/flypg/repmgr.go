@@ -123,7 +123,7 @@ func (r *RepMgr) setDefaults() {
 		"promote_command":              fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", r.ConfigPath),
 		"follow_command":               fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", r.ConfigPath),
 		"event_notification_command":   fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\" -new-node-id \\'%%p\\''"),
-		"event_notifications":          "'repmgrd_failover_promote,standby_promote,standby_follow'",
+		"event_notifications":          "'repmgrd_failover_promote,standby_promote,standby_follow,child_node_disconnect,child_node_reconnect,child_node_new_connect'",
 		"location":                     r.Region,
 		"primary_visibility_consensus": true,
 		"failover_validation_command":  fmt.Sprintf("'/usr/local/bin/failover_validation -visible-nodes %%v -total-nodes %%t'"),
