@@ -130,7 +130,7 @@ func (p *PGBouncer) configureAuth() error {
 }
 
 func (p *PGBouncer) reloadConfig(ctx context.Context) error {
-	conn, err := p.newConnection(ctx)
+	conn, err := p.NewConnection(ctx)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,24 @@ func (p *PGBouncer) reloadConfig(ctx context.Context) error {
 	return err
 }
 
-func (p *PGBouncer) newConnection(ctx context.Context) (*pgx.Conn, error) {
+func (p *PGBouncer) forceReconnect(ctx context.Context, databases []string) error {
+	conn, err := p.NewConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	for _, db := range databases {
+		_, err = conn.Exec(ctx, fmt.Sprintf("RECONNECT %s;", db))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *PGBouncer) NewConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(p.PrivateIP, strconv.Itoa(p.Port))
 	return openConnection(ctx, host, "pgbouncer", p.Credentials)
 }

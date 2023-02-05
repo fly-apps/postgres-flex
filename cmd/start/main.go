@@ -54,7 +54,7 @@ func main() {
 	svisor.AddProcess("repmgrd", fmt.Sprintf("gosu postgres repmgrd -f %s --daemonize=false", node.RepMgr.ConfigPath),
 		supervisor.WithRestart(0, 5*time.Second),
 	)
-	svisor.AddProcess("standby_cleaner", "/usr/local/bin/standby_cleaner",
+	svisor.AddProcess("monitor", "/usr/local/bin/start_monitor",
 		supervisor.WithRestart(0, 5*time.Second),
 	)
 	svisor.AddProcess("admin", "/usr/local/bin/start_admin_server",

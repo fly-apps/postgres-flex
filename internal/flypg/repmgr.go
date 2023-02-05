@@ -231,7 +231,7 @@ type Member struct {
 	Role     string
 }
 
-func Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
+func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes;"
 	rows, err := pg.Query(ctx, sql)
 	if err != nil {
@@ -253,7 +253,7 @@ func Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 }
 
 func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
-	members, err := Members(ctx, conn)
+	members, err := r.Members(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, erro
 }
 
 func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
-	members, err := Members(ctx, conn)
+	members, err := r.Members(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
