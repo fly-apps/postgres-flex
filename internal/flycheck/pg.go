@@ -67,21 +67,22 @@ func diskCapacityCheck(ctx context.Context, node *flypg.Node) (string, error) {
 
 	// Turn primary read-only
 	if usedPercentage > diskCapacityPercentageThreshold {
-		fmt.Println("Broadcasting readonly change to registered standbys")
-
+		// If the read-only lock has already been set, we can assume that we've already
+		// broadcasted.
 		if !flypg.ReadOnlyLockExists() {
+			fmt.Println("Broadcasting readonly change to registered standbys")
 			if err := flypg.BroadcastReadonlyChange(ctx, node, true); err != nil {
-				fmt.Printf("errors with set readonly broadcast: %s\n", err)
+				fmt.Printf("errors with enable readonly broadcast: %s\n", err)
 			}
 		}
 
 		return "", fmt.Errorf("%0.1f%% - readonly mode enabled, extend your volume to re-enable writes", usedPercentage)
 	}
 
-	// Don't attempt to turn read/write if zombie lock exists.
+	// Don't attempt to disable readonly if there's a zombie.lock
 	if !flypg.ZombieLockExists() && flypg.ReadOnlyLockExists() {
 		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
-			fmt.Printf("errors with unset readonly broadcast: %s\n", err)
+			fmt.Printf("errors with disable readonly broadcast: %s\n", err)
 		}
 	}
 

@@ -157,7 +157,6 @@ func handleDeadMemberMonitorTick(ctx context.Context, node *flypg.Node, seenAt m
 	}
 
 	for _, standby := range standbys {
-		// Wrap this in a function so connections are properly closed.
 		sConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
 		if err != nil {
 			// TODO - Verify the exception that's getting thrown.
