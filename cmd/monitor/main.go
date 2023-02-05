@@ -58,7 +58,8 @@ func main() {
 		fmt.Printf("Pruning every %s...\n", deadMemberRemovalThreshold)
 
 		for range ticker.C {
-			if err := handleDeadMemberMonitorTick(ctx, flypgNode, seenAt, deadMemberRemovalThreshold); err != nil {
+			err := handleDeadMemberMonitorTick(ctx, flypgNode, seenAt, deadMemberRemovalThreshold)
+			if err != nil {
 				fmt.Println(err)
 			}
 		}
