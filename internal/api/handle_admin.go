@@ -12,6 +12,58 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
+	res := &Response{
+		Result: false,
+	}
+
+	if flypg.ReadOnlyLockExists() || flypg.ZombieLockExists() {
+		res.Result = true
+	}
+
+	renderJSON(w, res, http.StatusOK)
+}
+
+func handleEnableReadonly(w http.ResponseWriter, r *http.Request) {
+	res := &Response{
+		Result: true,
+	}
+
+	node, err := flypg.NewNode()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	if err := flypg.EnableReadonly(r.Context(), node); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	renderJSON(w, res, http.StatusOK)
+}
+
+func handleDisableReadonly(w http.ResponseWriter, r *http.Request) {
+	node, err := flypg.NewNode()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	res := &Response{
+		Result: false,
+	}
+
+	if err := flypg.DisableReadonly(r.Context(), node); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	res.Result = true
+
+	renderJSON(w, res, http.StatusOK)
+}
+
 func handleRole(w http.ResponseWriter, r *http.Request) {
 	conn, close, err := localConnection(r.Context(), "postgres")
 	if err != nil {

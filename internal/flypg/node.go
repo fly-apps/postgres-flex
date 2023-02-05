@@ -361,7 +361,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 
 				fmt.Println("Turning all user-created databases readonly.")
-				if err := SetReadOnly(ctx, n, conn); err != nil {
+				if err := BroadcastReadonlyChange(ctx, n, true); err != nil {
 					return fmt.Errorf("failed to set read-only: %s", err)
 				}
 
@@ -383,7 +383,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 
 				fmt.Println("Turning user-created databases read-only")
-				if err := SetReadOnly(ctx, n, conn); err != nil {
+				if err := BroadcastReadonlyChange(ctx, n, true); err != nil {
 					return fmt.Errorf("failed to set read-only: %s", err)
 				}
 
@@ -403,7 +403,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 			// Readonly lock is set by healthchecks when disk capacity is dangerously high.
 			if !ReadOnlyLockExists() {
-				if err := UnsetReadOnly(ctx, n, conn); err != nil {
+				if err := BroadcastReadonlyChange(ctx, n, false); err != nil {
 					return fmt.Errorf("failed to unset read-only: %s", err)
 				}
 			}

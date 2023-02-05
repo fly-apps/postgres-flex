@@ -45,6 +45,10 @@ func (s *Server) Handler() http.Handler {
 	})
 
 	r.Route("/admin", func(r chi.Router) {
+		r.Get("/readonly/enable", handleEnableReadonly)
+		r.Get("/readonly/disable", handleDisableReadonly)
+		r.Get("/readonly/state", handleReadonlyState)
+
 		r.Get("/role", handleRole)
 		r.Get("/settings/view/postgres", s.handleViewPostgresSettings)
 		r.Get("/settings/view/pgbouncer", s.handleViewBouncerSettings)

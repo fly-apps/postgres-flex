@@ -3,106 +3,81 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
-	"github.com/jackc/pgx/v5"
 )
 
 const (
 	readOnlyLockFile = "/data/readonly.lock"
 	readOnlyEnabled  = "on"
 	readOnlyDisabled = "off"
+
+	ReadOnlyStateEndpoint    = "commands/admin/readonly/state"
+	BroadcastEnableEndpoint  = "commands/admin/readonly/enable"
+	BroadcastDisableEndpoint = "commands/admin/readonly/disable"
 )
 
-func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
+func EnableReadonly(ctx context.Context, n *Node) error {
 	if err := writeReadOnlyLock(); err != nil {
 		return fmt.Errorf("failed to set readonly lock: %s", err)
 	}
 
-	databases, err := admin.ListDatabases(ctx, conn)
-	if err != nil {
-		return err
-	}
-
-	for _, db := range databases {
-		// exclude administrative dbs
-		if db.Name == "repmgr" || db.Name == "postgres" {
-			continue
-		}
-
-		// Route configuration change through PGBouncer
-		dbConn, err := n.NewPrimaryConnection(ctx, db.Name)
-		if err != err {
-			return fmt.Errorf("failed to establish connection to db %s: %s", db.Name, err)
-		}
-		defer dbConn.Close(ctx)
-
-		// Set readonly
-		if _, err = dbConn.Exec(ctx, "SET default_transaction_read_only=true;"); err != nil {
-			return fmt.Errorf("failed to set readonly on db %s: %s", db.Name, err)
-		}
-
-		// Query configuration value and confirm the value change.
-		var status string
-		dbConn.QueryRow(ctx, "SHOW default_transaction_read_only;").Scan(&status)
-		if err != nil {
-			return fmt.Errorf("failed to verify readonly was unset: %s", err)
-		}
-
-		if status == readOnlyDisabled {
-			return fmt.Errorf("failed to turn database '%s' readonly", db.Name)
-		}
+	if err := changeReadOnlyState(ctx, n, true); err != nil {
+		return fmt.Errorf("failed to change readonly state to false: %s", err)
 	}
 
 	return nil
 }
 
-func UnsetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
-	// Skip if there's no readonly lock present
+func DisableReadonly(ctx context.Context, n *Node) error {
 	if !ReadOnlyLockExists() {
 		return nil
 	}
 
-	databases, err := admin.ListDatabases(ctx, conn)
-	if err != nil {
-		return err
-	}
-
-	for _, db := range databases {
-		// exclude administrative dbs
-		if db.Name == "repmgr" || db.Name == "postgres" {
-			continue
-		}
-
-		// Route configuration change through PGBouncer
-		dbConn, err := n.NewPrimaryConnection(ctx, db.Name)
-		if err != err {
-			return fmt.Errorf("failed to establish connection to db %s: %s", db.Name, err)
-		}
-		defer dbConn.Close(ctx)
-
-		// Disable readonly
-		_, err = dbConn.Exec(ctx, "SET default_transaction_read_only=false;")
-		if err != nil {
-			return fmt.Errorf("failed to unset readonly on db %s: %s", db.Name, err)
-		}
-
-		// Query configuration value and confirm the value change.
-		var status string
-		dbConn.QueryRow(ctx, "SHOW default_transaction_read_only;").Scan(&status)
-		if err != nil {
-			return fmt.Errorf("failed to verify readonly was unset: %s", err)
-		}
-
-		if status == readOnlyEnabled {
-			return fmt.Errorf("failed to turn database '%s' read/write : %s", db.Name, err)
-		}
+	if err := changeReadOnlyState(ctx, n, false); err != nil {
+		return fmt.Errorf("failed to change readonly state to false: %s", err)
 	}
 
 	if err := removeReadOnlyLock(); err != nil {
 		return fmt.Errorf("failed to remove readonly lock: %s", err)
+	}
+
+	return nil
+}
+
+// BroadcastReadonlyChange will communicate the readonly state change to all registered
+// members.
+func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
+	conn, err := n.RepMgr.NewLocalConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to establish connection: %s", err)
+	}
+
+	members, err := n.RepMgr.Members(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to query standby members: %s", err)
+	}
+
+	target := BroadcastEnableEndpoint
+	if !enabled {
+		target = BroadcastDisableEndpoint
+	}
+
+	for _, member := range members {
+		endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, target)
+		resp, err := http.Get(endpoint)
+		if err != nil {
+			fmt.Printf("failed to broadcast readonly state to member %s: %s", member.Hostname, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode > 299 {
+			fmt.Printf("failed to broadcast readonly state to member %s: %d\n", member.Hostname, resp.StatusCode)
+		}
 	}
 
 	return nil
@@ -136,6 +111,45 @@ func removeReadOnlyLock() error {
 
 	if err := os.Remove(readOnlyLockFile); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
+	conn, err := n.NewPrimaryConnection(ctx, "postgres")
+	if err != nil {
+		return fmt.Errorf("failed to establish connection: %s", err)
+	}
+
+	databases, err := admin.ListDatabases(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	var dbNames []string
+	for _, db := range databases {
+		// exclude administrative dbs
+		if db.Name == "repmgr" || db.Name == "postgres" {
+			continue
+		}
+
+		sql := fmt.Sprintf("ALTER DATABASE %s SET default_transaction_read_only=%v;", db.Name, enable)
+		if _, err = conn.Exec(ctx, sql); err != nil {
+			return fmt.Errorf("failed to unset readonly on db %s: %s", db.Name, err)
+		}
+
+		dbNames = append(dbNames, db.Name)
+	}
+
+	bConn, err := n.PGBouncer.NewConnection(ctx)
+	if err != err {
+		return fmt.Errorf("failed to establish connection to pgbouncer: %s", err)
+	}
+	defer bConn.Close(ctx)
+
+	if err := n.PGBouncer.forceReconnect(ctx, dbNames); err != nil {
+		return fmt.Errorf("failed to force connection reset: %s", err)
 	}
 
 	return nil
