@@ -47,7 +47,7 @@ func SetReadOnly(ctx context.Context, n *Node, conn *pgx.Conn) error {
 			return fmt.Errorf("failed to verify readonly was unset: %s", err)
 		}
 
-		if status == readOnlyDisabled {
+		if status != readOnlyEnabled {
 			return fmt.Errorf("failed to turn database '%s' readonly", db.Name)
 		}
 	}
