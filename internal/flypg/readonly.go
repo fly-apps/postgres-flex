@@ -124,7 +124,7 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list database: %s", err)
 	}
 
 	var dbNames []string

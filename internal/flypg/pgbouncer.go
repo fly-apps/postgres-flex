@@ -62,7 +62,7 @@ func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload
 	if reload {
 		err = p.reloadConfig(ctx)
 		if err != nil {
-			fmt.Printf("failed to reconfigure pgbouncer primary %s\n", err)
+			return fmt.Errorf("failed to reconfigure pgbouncer primary: %s", err)
 		}
 	}
 	return nil
