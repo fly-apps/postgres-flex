@@ -148,13 +148,13 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 	}
 	defer bConn.Close(ctx)
 
-	poolMode, err := n.PGBouncer.PoolMode()
+	poolMode, err := n.PGBouncer.poolMode()
 	if err != nil {
 		return fmt.Errorf("failed to resolve active pool mode: %s", err)
 	}
 
 	switch poolMode {
-	case transactionPooler:
+	case transactionPooler, statementPooler:
 		if err := n.PGBouncer.forceReconnect(ctx, dbNames); err != nil {
 			return fmt.Errorf("failed to force connection reset: %s", err)
 		}
@@ -165,10 +165,6 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 
 		if err := n.PGBouncer.resumeConnections(ctx, dbNames); err != nil {
 			return fmt.Errorf("failed to resume connections: %s", err)
-		}
-	case statementPooler:
-		if err := n.PGBouncer.forceReconnect(ctx, dbNames); err != nil {
-			return fmt.Errorf("failed to force connection reset: %s", err)
 		}
 	default:
 		return fmt.Errorf("failed to resolve valid pooler. found: %s", poolMode)

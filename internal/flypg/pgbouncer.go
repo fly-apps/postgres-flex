@@ -96,7 +96,7 @@ func (p *PGBouncer) CurrentConfig() (map[string]interface{}, error) {
 	return all, nil
 }
 
-func (p *PGBouncer) PoolMode() (string, error) {
+func (p *PGBouncer) poolMode() (string, error) {
 	conf, err := p.CurrentConfig()
 	if err != nil {
 		return "", err
@@ -147,7 +147,7 @@ func (p *PGBouncer) setDefaults() {
 		"auth_file":            fmt.Sprintf("%s/pgbouncer.auth", p.ConfigPath),
 		"admin_users":          "postgres",
 		"user":                 "postgres",
-		"pool_mode":            "session",
+		"pool_mode":            "transaction",
 		"min_pool_size":        "5",
 		"reserve_pool_size":    "5",
 		"reserve_pool_timeout": "3",
