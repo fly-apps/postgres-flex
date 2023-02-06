@@ -55,6 +55,28 @@ func (c *FlyPGConfig) UserConfigFile() string {
 	return c.userConfigFilePath
 }
 
+func (c *FlyPGConfig) CurrentConfig() (map[string]interface{}, error) {
+	internal, err := ReadFromFile(c.InternalConfigFile())
+	if err != nil {
+		return nil, err
+	}
+	user, err := ReadFromFile(c.UserConfigFile())
+	if err != nil {
+		return nil, err
+	}
+
+	all := map[string]interface{}{}
+
+	for k, v := range internal {
+		all[k] = v
+	}
+	for k, v := range user {
+		all[k] = v
+	}
+
+	return all, nil
+}
+
 func (c *FlyPGConfig) initialize() error {
 	c.SetDefaults()
 

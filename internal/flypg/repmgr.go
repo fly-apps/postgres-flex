@@ -58,6 +58,28 @@ func (r *RepMgr) SetUserConfig(configMap ConfigMap) {
 	r.userConfig = configMap
 }
 
+func (r *RepMgr) CurrentConfig() (map[string]interface{}, error) {
+	internal, err := ReadFromFile(r.InternalConfigFile())
+	if err != nil {
+		return nil, err
+	}
+	user, err := ReadFromFile(r.UserConfigFile())
+	if err != nil {
+		return nil, err
+	}
+
+	all := map[string]interface{}{}
+
+	for k, v := range internal {
+		all[k] = v
+	}
+	for k, v := range user {
+		all[k] = v
+	}
+
+	return all, nil
+}
+
 func (r *RepMgr) ConsulKey() string {
 	return "repmgr"
 }
