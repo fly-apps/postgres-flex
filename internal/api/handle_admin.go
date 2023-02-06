@@ -216,6 +216,7 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 	}
 
 	defer close()
+
 	internal := s.node.PGConfig.InternalConfig()
 	user := s.node.PGConfig.UserConfig()
 

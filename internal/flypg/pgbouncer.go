@@ -12,6 +12,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const (
+	transactionPooler = "transaction"
+	sessionPooler     = "session"
+	statementPooler   = "statement"
+)
+
 type PGBouncer struct {
 	PrivateIP   string
 	Credentials Credentials
@@ -68,6 +74,37 @@ func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload
 	return nil
 }
 
+func (p *PGBouncer) CurrentConfig() (map[string]interface{}, error) {
+	internal, err := ReadFromFile(p.InternalConfigFile())
+	if err != nil {
+		return nil, err
+	}
+	user, err := ReadFromFile(p.UserConfigFile())
+	if err != nil {
+		return nil, err
+	}
+
+	all := map[string]interface{}{}
+
+	for k, v := range internal {
+		all[k] = v
+	}
+	for k, v := range user {
+		all[k] = v
+	}
+
+	return all, nil
+}
+
+func (p *PGBouncer) PoolMode() (string, error) {
+	conf, err := p.CurrentConfig()
+	if err != nil {
+		return "", err
+	}
+
+	return conf["pool_mode"].(string), nil
+}
+
 func (p *PGBouncer) initialize() error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
 	if err := utils.RunCommand(cmdStr); err != nil {
@@ -110,7 +147,7 @@ func (p *PGBouncer) setDefaults() {
 		"auth_file":            fmt.Sprintf("%s/pgbouncer.auth", p.ConfigPath),
 		"admin_users":          "postgres",
 		"user":                 "postgres",
-		"pool_mode":            "transaction",
+		"pool_mode":            "session",
 		"min_pool_size":        "5",
 		"reserve_pool_size":    "5",
 		"reserve_pool_timeout": "3",
@@ -149,6 +186,40 @@ func (p *PGBouncer) forceReconnect(ctx context.Context, databases []string) erro
 
 	for _, db := range databases {
 		_, err = conn.Exec(ctx, fmt.Sprintf("RECONNECT %s;", db))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *PGBouncer) killConnections(ctx context.Context, databases []string) error {
+	conn, err := p.NewConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	for _, db := range databases {
+		_, err = conn.Exec(ctx, fmt.Sprintf("KILL %s;", db))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *PGBouncer) resumeConnections(ctx context.Context, databases []string) error {
+	conn, err := p.NewConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	for _, db := range databases {
+		_, err = conn.Exec(ctx, fmt.Sprintf("RESUME %s;", db))
 		if err != nil {
 			return err
 		}
