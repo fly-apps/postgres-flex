@@ -119,7 +119,11 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user := s.node.PGConfig.UserConfig()
+	user, err := flypg.ReadFromFile(s.node.PGConfig.UserConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
 
 	var in map[string]interface{}
 
@@ -216,8 +220,17 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 	}
 
 	defer close()
-	internal := s.node.PGConfig.InternalConfig()
-	user := s.node.PGConfig.UserConfig()
+
+	internal, err := flypg.ReadFromFile(s.node.PGConfig.InternalConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	user, err := flypg.ReadFromFile(s.node.PGConfig.UserConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
 
 	all := map[string]interface{}{}
 
@@ -253,8 +266,16 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Request) {
-	internal := s.node.PGBouncer.InternalConfig()
-	user := s.node.PGBouncer.UserConfig()
+	internal, err := flypg.ReadFromFile(s.node.PGBouncer.InternalConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	user, err := flypg.ReadFromFile(s.node.PGBouncer.UserConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
 
 	all := map[string]interface{}{}
 
@@ -286,8 +307,16 @@ func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
-	internal := s.node.RepMgr.InternalConfig()
-	user := s.node.RepMgr.UserConfig()
+	internal, err := flypg.ReadFromFile(s.node.RepMgr.InternalConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	user, err := flypg.ReadFromFile(s.node.RepMgr.UserConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
 
 	all := map[string]interface{}{}
 
