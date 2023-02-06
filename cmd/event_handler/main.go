@@ -127,7 +127,6 @@ func main() {
 		}
 
 		os.Exit(0)
-
 	default:
 		// noop
 	}
@@ -173,6 +172,7 @@ func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node)
 
 	primary, err := flypg.ZombieDiagnosis(sample)
 	if errors.Is(err, flypg.ErrZombieDiagnosisUndecided) || errors.Is(err, flypg.ErrZombieDiscovered) {
+		// Quarantine primary
 		if err := flypg.Quarantine(ctx, conn, node, primary); err != nil {
 			return fmt.Errorf("failed to quarantine failed primary: %s", err)
 		}
@@ -182,24 +182,16 @@ func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node)
 		return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 	}
 
-	// If the zombie lock exists clear it
+	// Clear zombie lock if it exists
 	if flypg.ZombieLockExists() {
 		log.Println("Clearing zombie lock and enabling read/write")
 		if err := flypg.RemoveZombieLock(); err != nil {
 			return fmt.Errorf("failed to remove zombie lock: %s", err)
 		}
 
-		maxRetries := 5
-		retry := 0
-
-		for retry < maxRetries {
-			if err := flypg.DisableReadonly(ctx, node); err != nil {
-				log.Printf("attempt %d - failed to unset readonly: %s", retry, err)
-				retry++
-				continue
-			}
-			log.Println("successfully enabled read/write")
-			break
+		log.Println("Broadcasting readonly state change")
+		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
+			log.Printf("errors while disabling readonly: %s", err)
 		}
 	}
 
