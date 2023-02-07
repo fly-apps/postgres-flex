@@ -55,7 +55,7 @@ func (c *FlyPGConfig) UserConfigFile() string {
 	return c.userConfigFilePath
 }
 
-func (c *FlyPGConfig) CurrentConfig() (map[string]interface{}, error) {
+func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 	internal, err := ReadFromFile(c.InternalConfigFile())
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (c *FlyPGConfig) CurrentConfig() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	all := map[string]interface{}{}
+	all := ConfigMap{}
 
 	for k, v := range internal {
 		all[k] = v

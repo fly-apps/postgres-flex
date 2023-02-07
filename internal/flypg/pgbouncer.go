@@ -74,7 +74,7 @@ func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload
 	return nil
 }
 
-func (p *PGBouncer) CurrentConfig() (map[string]interface{}, error) {
+func (p *PGBouncer) CurrentConfig() (ConfigMap, error) {
 	internal, err := ReadFromFile(p.InternalConfigFile())
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (p *PGBouncer) CurrentConfig() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	all := map[string]interface{}{}
+	all := ConfigMap{}
 
 	for k, v := range internal {
 		all[k] = v

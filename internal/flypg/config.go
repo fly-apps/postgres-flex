@@ -19,6 +19,7 @@ type Config interface {
 	UserConfig() ConfigMap
 	SetUserConfig(configMap ConfigMap)
 	ConsulKey() string
+	CurrentConfig() (ConfigMap, error)
 }
 
 func WriteUserConfig(c Config, consul *state.Store) error {

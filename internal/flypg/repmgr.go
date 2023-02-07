@@ -58,7 +58,7 @@ func (r *RepMgr) SetUserConfig(configMap ConfigMap) {
 	r.userConfig = configMap
 }
 
-func (r *RepMgr) CurrentConfig() (map[string]interface{}, error) {
+func (r *RepMgr) CurrentConfig() (ConfigMap, error) {
 	internal, err := ReadFromFile(r.InternalConfigFile())
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (r *RepMgr) CurrentConfig() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	all := map[string]interface{}{}
+	all := ConfigMap{}
 
 	for k, v := range internal {
 		all[k] = v
