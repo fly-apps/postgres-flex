@@ -147,6 +147,15 @@ func (r *RepMgr) registerPrimary() error {
 	return nil
 }
 
+func (r *RepMgr) unregisterPrimary(id int) error {
+	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
+	if err := utils.RunCommand(cmdStr); err != nil {
+		fmt.Printf("failed to unregister primary: %s", err)
+	}
+
+	return nil
+}
+
 func (r *RepMgr) rejoinCluster(hostname string) error {
 	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
 		r.ConfigPath,
@@ -380,21 +389,15 @@ func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error
 }
 
 func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
-	if err := r.unregisterStandby(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
-	}
-
-	return nil
-}
-
-func (r *RepMgr) UnregisterMemberByHostname(ctx context.Context, conn *pgx.Conn, hostname string) error {
-	member, err := r.MemberByHostname(ctx, conn, hostname)
-	if err != nil {
-		return fmt.Errorf("failed to resolve member %s: %s", hostname, err)
+	if member.Role == PrimaryRoleName {
+		if err := r.unregisterPrimary(member.ID); err != nil {
+			return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)
+		}
+		return nil
 	}
 
 	if err := r.unregisterStandby(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d from repmgr: %s", member.ID, err)
+		return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)
 	}
 
 	return nil

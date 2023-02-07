@@ -35,7 +35,14 @@ func main() {
 		return
 	}
 
-	if err := node.RepMgr.UnregisterMemberByHostname(ctx, conn, string(hostnameBytes)); err != nil {
+	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
+	if err != nil {
+		utils.WriteError(fmt.Errorf("failed to resolve member: %s", err))
+		os.Exit(1)
+		return
+	}
+
+	if err := node.RepMgr.UnregisterMember(ctx, *member); err != nil {
 		utils.WriteError(fmt.Errorf("failed to unregister member: %v", err))
 		os.Exit(1)
 		return
