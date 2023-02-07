@@ -221,24 +221,10 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 
 	defer close()
 
-	internal, err := flypg.ReadFromFile(s.node.PGConfig.InternalConfigFile())
+	all, err := s.node.PGConfig.CurrentConfig()
 	if err != nil {
 		renderErr(w, err)
 		return
-	}
-	user, err := flypg.ReadFromFile(s.node.PGConfig.UserConfigFile())
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	all := map[string]interface{}{}
-
-	for k, v := range internal {
-		all[k] = v
-	}
-	for k, v := range user {
-		all[k] = v
 	}
 
 	var in []string
@@ -266,24 +252,10 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Request) {
-	internal, err := flypg.ReadFromFile(s.node.PGBouncer.InternalConfigFile())
+	all, err := s.node.PGBouncer.CurrentConfig()
 	if err != nil {
 		renderErr(w, err)
 		return
-	}
-	user, err := flypg.ReadFromFile(s.node.PGBouncer.UserConfigFile())
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	all := map[string]interface{}{}
-
-	for k, v := range internal {
-		all[k] = v
-	}
-	for k, v := range user {
-		all[k] = v
 	}
 
 	var in []string
@@ -307,24 +279,10 @@ func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
-	internal, err := flypg.ReadFromFile(s.node.RepMgr.InternalConfigFile())
+	all, err := s.node.RepMgr.CurrentConfig()
 	if err != nil {
 		renderErr(w, err)
 		return
-	}
-	user, err := flypg.ReadFromFile(s.node.RepMgr.UserConfigFile())
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	all := map[string]interface{}{}
-
-	for k, v := range internal {
-		all[k] = v
-	}
-	for k, v := range user {
-		all[k] = v
 	}
 
 	var in []string

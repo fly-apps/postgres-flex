@@ -12,6 +12,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const (
+	transactionPooler = "transaction"
+	sessionPooler     = "session"
+	statementPooler   = "statement"
+)
+
 type PGBouncer struct {
 	PrivateIP   string
 	Credentials Credentials
@@ -66,6 +72,37 @@ func (p *PGBouncer) ConfigurePrimary(ctx context.Context, primary string, reload
 		}
 	}
 	return nil
+}
+
+func (p *PGBouncer) CurrentConfig() (ConfigMap, error) {
+	internal, err := ReadFromFile(p.InternalConfigFile())
+	if err != nil {
+		return nil, err
+	}
+	user, err := ReadFromFile(p.UserConfigFile())
+	if err != nil {
+		return nil, err
+	}
+
+	all := ConfigMap{}
+
+	for k, v := range internal {
+		all[k] = v
+	}
+	for k, v := range user {
+		all[k] = v
+	}
+
+	return all, nil
+}
+
+func (p *PGBouncer) poolMode() (string, error) {
+	conf, err := p.CurrentConfig()
+	if err != nil {
+		return "", err
+	}
+
+	return conf["pool_mode"].(string), nil
 }
 
 func (p *PGBouncer) initialize() error {
@@ -149,6 +186,40 @@ func (p *PGBouncer) forceReconnect(ctx context.Context, databases []string) erro
 
 	for _, db := range databases {
 		_, err = conn.Exec(ctx, fmt.Sprintf("RECONNECT %s;", db))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *PGBouncer) killConnections(ctx context.Context, databases []string) error {
+	conn, err := p.NewConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	for _, db := range databases {
+		_, err = conn.Exec(ctx, fmt.Sprintf("KILL %s;", db))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *PGBouncer) resumeConnections(ctx context.Context, databases []string) error {
+	conn, err := p.NewConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	for _, db := range databases {
+		_, err = conn.Exec(ctx, fmt.Sprintf("RESUME %s;", db))
 		if err != nil {
 			return err
 		}
