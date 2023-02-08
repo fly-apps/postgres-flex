@@ -1,7 +1,7 @@
 package flycheck
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -10,14 +10,23 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/superfly/fly-checks/check"
 )
 
 // CheckVM for system / disk checks
 func CheckVM(checks *check.CheckSuite) *check.CheckSuite {
+	ctx := context.Background()
 
+	node, err := flypg.NewNode()
+	if err != nil {
+		return checks
+	}
+
+	// Check that provides additional insight into disk capacity and
+	// how close we are to hitting the read-only threshold.
 	checks.AddCheck("checkDisk", func() (string, error) {
-		return checkDisk("/data/")
+		return checkDisk(ctx, node)
 	})
 
 	checks.AddCheck("checkLoad", func() (string, error) {
@@ -110,41 +119,50 @@ func checkLoad() (string, error) {
 	return fmt.Sprintf("load averages: %.2f %.2f %.2f", loadAverage10, loadAverage5, loadAverage1), nil
 }
 
-func checkDisk(dir string) (string, error) {
-	var stat syscall.Statfs_t
-
-	err := syscall.Statfs(dir, &stat)
-
+func checkDisk(ctx context.Context, node *flypg.Node) (string, error) {
+	// Calculate current disk usage
+	size, available, err := diskUsage("/data/")
 	if err != nil {
-		return "", fmt.Errorf("%s: %s", dir, err)
+		return "", fmt.Errorf("failed to calculate disk usage: %s", err)
 	}
 
-	// Available blocks * size per block = available space in bytes
-	size := stat.Blocks * uint64(stat.Bsize)
-	available := stat.Bavail * uint64(stat.Bsize)
-	pct := float64(available) / float64(size)
-	msg := fmt.Sprintf("%s (%.1f%%) free space on %s", dataSize(available), pct*100, dir)
+	usedPercentage := float64(size-available) / float64(size) * 100
 
-	if pct < 0.1 {
-		return "", errors.New(msg)
+	// Turn primary read-only
+	if usedPercentage > diskCapacityPercentageThreshold {
+		// If the read-only lock has already been set, we can assume that we've already broadcasted.
+		// TODO - This should be handled by the monitor service.
+		if !flypg.ReadOnlyLockExists() {
+			fmt.Println("Broadcasting read-only change to registered standbys")
+			if err := flypg.BroadcastReadonlyChange(ctx, node, true); err != nil {
+				fmt.Printf("errors with enable read-only broadcast: %s\n", err)
+			}
+		}
+
+		return "", fmt.Errorf("%0.1f%% capacity - extend your volume to re-enable writes", usedPercentage)
 	}
 
-	return msg, nil
+	// Don't attempt to disable read-only if there's a zombie.lock
+	if !flypg.ZombieLockExists() && flypg.ReadOnlyLockExists() {
+		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
+			fmt.Printf("errors with disable read-only broadcast: %s\n", err)
+		}
+	}
+
+	return fmt.Sprintf("%0.1f%% capacity", usedPercentage), nil
 }
 
 func diskUsage(dir string) (size uint64, available uint64, err error) {
 	var stat syscall.Statfs_t
 
-	err = syscall.Statfs(dir, &stat)
-
-	if err != nil {
+	if err = syscall.Statfs(dir, &stat); err != nil {
 		return 0, 0, fmt.Errorf("%s: %s", dir, err)
 	}
 
 	size = stat.Blocks * uint64(stat.Bsize)
 	available = stat.Bavail * uint64(stat.Bsize)
-	return size, available, nil
 
+	return size, available, nil
 }
 
 func round(val float64, roundOn float64, places int) (newVal float64) {

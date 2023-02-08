@@ -41,52 +41,29 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		repConn.Close(ctx)
 	}
 
+	checks.AddCheck("state", func() (string, error) {
+		if member.Role == flypg.PrimaryRoleName {
+			if flypg.ZombieLockExists() {
+				return "", fmt.Errorf("zombie lock detected")
+			}
+			if flypg.ReadOnlyLockExists() {
+				return "", fmt.Errorf("read-only lock detected")
+			}
+			return "read/write", nil
+		}
+
+		if member.Role == flypg.StandbyRoleName {
+			return "read-only", nil
+		}
+
+		return "", fmt.Errorf("this member is in an unknown state")
+	})
+
 	checks.AddCheck("connections", func() (string, error) {
 		return connectionCount(ctx, localConn)
 	})
 
-	if member.Role == flypg.PrimaryRoleName && member.Active {
-		// Check that provides additional insight into disk capacity and
-		// how close we are to hitting the readonly threshold.
-		checks.AddCheck("disk-capacity", func() (string, error) {
-			return diskCapacityCheck(ctx, node)
-		})
-	}
-
 	return checks, nil
-}
-
-func diskCapacityCheck(ctx context.Context, node *flypg.Node) (string, error) {
-	// Calculate current disk usage
-	size, available, err := diskUsage("/data/")
-	if err != nil {
-		return "", fmt.Errorf("failed to calculate disk usage: %s", err)
-	}
-
-	usedPercentage := float64(size-available) / float64(size) * 100
-
-	// Turn primary read-only
-	if usedPercentage > diskCapacityPercentageThreshold {
-		// If the read-only lock has already been set, we can assume that we've already
-		// broadcasted.
-		if !flypg.ReadOnlyLockExists() {
-			fmt.Println("Broadcasting readonly change to registered standbys")
-			if err := flypg.BroadcastReadonlyChange(ctx, node, true); err != nil {
-				fmt.Printf("errors with enable readonly broadcast: %s\n", err)
-			}
-		}
-
-		return "", fmt.Errorf("%0.1f%% - readonly mode enabled, extend your volume to re-enable writes", usedPercentage)
-	}
-
-	// Don't attempt to disable readonly if there's a zombie.lock
-	if !flypg.ZombieLockExists() && flypg.ReadOnlyLockExists() {
-		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
-			fmt.Printf("errors with disable readonly broadcast: %s\n", err)
-		}
-	}
-
-	return fmt.Sprintf("%0.1f%% - readonly mode will be enabled at %0.1f%%", usedPercentage, diskCapacityPercentageThreshold), nil
 }
 
 func connectionCount(ctx context.Context, local *pgx.Conn) (string, error) {
