@@ -13,9 +13,6 @@ import (
 const (
 	readOnlyLockFile = "/data/locks/readonly.lock"
 
-	readOnlyEnabled  = "on"
-	readOnlyDisabled = "off"
-
 	ReadOnlyStateEndpoint    = "commands/admin/readonly/state"
 	BroadcastEnableEndpoint  = "commands/admin/readonly/enable"
 	BroadcastDisableEndpoint = "commands/admin/readonly/disable"
