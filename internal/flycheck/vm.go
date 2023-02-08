@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"runtime"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -163,33 +161,6 @@ func diskUsage(dir string) (size uint64, available uint64, err error) {
 	available = stat.Bavail * uint64(stat.Bsize)
 
 	return size, available, nil
-}
-
-func round(val float64, roundOn float64, places int) (newVal float64) {
-	var round float64
-	pow := math.Pow(10, float64(places))
-	digit := pow * val
-	_, div := math.Modf(digit)
-	if div >= roundOn {
-		round = math.Ceil(digit)
-	} else {
-		round = math.Floor(digit)
-	}
-	newVal = round / pow
-	return
-}
-func dataSize(size uint64) string {
-	var suffixes [5]string
-	suffixes[0] = "B"
-	suffixes[1] = "KB"
-	suffixes[2] = "MB"
-	suffixes[3] = "GB"
-	suffixes[4] = "TB"
-
-	base := math.Log(float64(size)) / math.Log(1024)
-	getSize := round(math.Pow(1024, base-math.Floor(base)), .5, 2)
-	getSuffix := suffixes[int(math.Floor(base))]
-	return fmt.Sprint(strconv.FormatFloat(getSize, 'f', -1, 64) + " " + getSuffix)
 }
 
 func pressureToDuration(pressure float64, base float64) (time.Duration, error) {
