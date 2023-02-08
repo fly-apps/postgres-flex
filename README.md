@@ -4,20 +4,18 @@ This repo contains all the code and configuration necessary to run a [highly ava
 
 
 ## Getting started
-
-To get started, run the following:
 ```bash
 # Be sure you're running the latest version of flyctl.
 fly version update
 
 # Provision a 3 member cluster
-fly pg create --name <app-name> --initial-cluster-size 3 --region ord --repmgr
+fly pg create --name <app-name> --initial-cluster-size 3 --region ord --flex
 ```
 
 ## High Availability
-To ensure High Availability, it's recommended that your cluster has at least 3 members.
+For HA, it's recommended that you run at least 3 members.
 
-Automatic failovers will only consider members residing within your primary region.  The primary region is represented as an environment variable defined within the `fly.toml` file.  That being said, if you're running a 3 member setup at least 2 of the members should reside within your primary region.
+Automatic failovers will only consider members residing within your primary region.  The primary region is represented as an environment variable defined within the `fly.toml` file.  That being said, if you're running a 3 member setup at least 2 of your members should reside within your primary region.
 
 ## Horizontal scaling
 Use the clone command to scale up your cluster.
