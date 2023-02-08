@@ -128,6 +128,11 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
+	// Create locks directory if it doesn't already exist.
+	if err := createLocksDir(); err != nil {
+		return err
+	}
+
 	// Initiate a restore
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
 		// Check to see if there's an active restore.
@@ -737,4 +742,16 @@ func setDirOwnership() error {
 	cmd := exec.Command("sh", "-c", cmdStr)
 	_, err = cmd.Output()
 	return err
+}
+
+func createLocksDir() error {
+	_, err := os.Stat("/data/locks")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return utils.RunCommand("mkdir /data/locks")
+		}
+		return err
+	}
+
+	return nil
 }

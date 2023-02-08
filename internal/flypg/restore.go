@@ -12,9 +12,10 @@ import (
 )
 
 const (
+	restoreLockFile = "/data/locks/restore.lock"
+
 	pathToHBAFile   = "/data/postgresql/pg_hba.conf"
 	pathToHBABackup = "/data/postgresql/pg_hba.conf.bak"
-	restoreLockFile = "/data/restore.lock"
 )
 
 func Restore(ctx context.Context, node *Node) error {

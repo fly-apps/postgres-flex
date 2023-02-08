@@ -31,14 +31,14 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		localConn.Close(ctx)
 	}
 
-	checks.AddCheck("locks", func() (string, error) {
+	checks.AddCheck("alarms", func() (string, error) {
 		locks := []string{}
 
 		if flypg.ZombieLockExists() {
 			locks = append(locks, "zombie")
 		}
 		if flypg.ReadOnlyLockExists() {
-			locks = append(locks, "read-only")
+			locks = append(locks, "capacity")
 		}
 
 		if len(locks) > 0 {
@@ -46,7 +46,7 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 			return "", fmt.Errorf(lockStr)
 		}
 
-		return "no locks detected", nil
+		return "no alarms triggered", nil
 
 	})
 

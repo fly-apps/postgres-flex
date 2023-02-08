@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	zombieLockFile = "/data/locks/zombie.lock"
+
 	// ErrZombieLockRegionMismatch - The region associated with the resolved primary does not match our PRIMARY_REGION.
 	ErrZombieLockRegionMismatch = errors.New("resolved primary does not reside within our PRIMARY_REGION")
 	// ErrZombieLockPrimaryMismatch - The primary listed within the zombie.lock file is no longer identifying
@@ -22,7 +24,7 @@ var (
 )
 
 func ZombieLockExists() bool {
-	_, err := os.Stat("/data/zombie.lock")
+	_, err := os.Stat(zombieLockFile)
 	if os.IsNotExist(err) {
 		return false
 	}
@@ -30,7 +32,7 @@ func ZombieLockExists() bool {
 }
 
 func writeZombieLock(hostname string) error {
-	if err := os.WriteFile("/data/zombie.lock", []byte(hostname), 0644); err != nil {
+	if err := os.WriteFile(zombieLockFile, []byte(hostname), 0644); err != nil {
 		return err
 	}
 
@@ -38,7 +40,7 @@ func writeZombieLock(hostname string) error {
 }
 
 func RemoveZombieLock() error {
-	if err := os.Remove("/data/zombie.lock"); err != nil {
+	if err := os.Remove(zombieLockFile); err != nil {
 		return err
 	}
 
@@ -46,7 +48,7 @@ func RemoveZombieLock() error {
 }
 
 func ReadZombieLock() (string, error) {
-	body, err := os.ReadFile("/data/zombie.lock")
+	body, err := os.ReadFile(zombieLockFile)
 	if err != nil {
 		return "", err
 	}

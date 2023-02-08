@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	readOnlyLockFile = "/data/readonly.lock"
+	readOnlyLockFile = "/data/locks/readonly.lock"
+
 	readOnlyEnabled  = "on"
 	readOnlyDisabled = "off"
 
