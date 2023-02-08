@@ -26,20 +26,9 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		return checks, errors.Wrap(err, "failed to connect with local node")
 	}
 
-	repConn, err := node.RepMgr.NewLocalConnection(ctx)
-	if err != nil {
-		return checks, fmt.Errorf("failed to connect to repmgr node: %s", err)
-	}
-
-	member, err := node.RepMgr.Member(ctx, repConn)
-	if err != nil {
-		return checks, fmt.Errorf("failed to resolve local member role: %s", err)
-	}
-
 	// Cleanup connections
 	checks.OnCompletion = func() {
 		localConn.Close(ctx)
-		repConn.Close(ctx)
 	}
 
 	checks.AddCheck("locks", func() (string, error) {
