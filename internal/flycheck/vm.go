@@ -126,18 +126,32 @@ func checkDisk(ctx context.Context, node *flypg.Node) (string, error) {
 
 	usedPercentage := float64(size-available) / float64(size) * 100
 
-	// Turn primary read-only
 	if usedPercentage > diskCapacityPercentageThreshold {
-		// If the read-only lock has already been set, we can assume that we've already broadcasted.
-		// TODO - This should be handled by the monitor service.
-		if !flypg.ReadOnlyLockExists() {
-			fmt.Println("Broadcasting read-only change to registered standbys")
-			if err := flypg.BroadcastReadonlyChange(ctx, node, true); err != nil {
-				fmt.Printf("errors with enable read-only broadcast: %s\n", err)
-			}
+		repConn, err := node.RepMgr.NewLocalConnection(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to establish connection: %s", err)
 		}
 
-		return "", fmt.Errorf("%0.1f%% capacity - extend your volume to re-enable writes", usedPercentage)
+		member, err := node.RepMgr.Member(ctx, repConn)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve member: %s", err)
+		}
+
+		// Turn primary read-only
+		if member.Role == flypg.PrimaryRoleName && member.Active {
+			// If the read-only lock has already been set, we can assume that we've already broadcasted.
+			// TODO - This should be handled by the monitor service.
+			if !flypg.ReadOnlyLockExists() {
+				fmt.Println("Broadcasting read-only change to registered standbys")
+				if err := flypg.BroadcastReadonlyChange(ctx, node, true); err != nil {
+					fmt.Printf("errors with enable read-only broadcast: %s\n", err)
+				}
+			}
+
+			return "", fmt.Errorf("%0.1f%% capacity - extend your volume to re-enable writes", usedPercentage)
+		}
+
+		return "", fmt.Errorf("%0.1f%% capacity - consider extending your volume", usedPercentage)
 	}
 
 	// Don't attempt to disable read-only if there's a zombie.lock
