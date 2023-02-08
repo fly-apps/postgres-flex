@@ -7,7 +7,7 @@ This repo contains all the code and configuration necessary to run a [highly ava
 
 To get started, run the following:
 ```bash
-# Be sure you're running the latest version of flyct.
+# Be sure you're running the latest version of flyctl.
 fly version update
 
 # Provision a 3 member cluster
