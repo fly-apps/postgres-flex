@@ -3,6 +3,7 @@ package flycheck
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/jackc/pgx/v5"
@@ -41,22 +42,23 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		repConn.Close(ctx)
 	}
 
-	checks.AddCheck("state", func() (string, error) {
-		if member.Role == flypg.PrimaryRoleName {
-			if flypg.ZombieLockExists() {
-				return "", fmt.Errorf("zombie lock detected")
-			}
-			if flypg.ReadOnlyLockExists() {
-				return "", fmt.Errorf("read-only lock detected")
-			}
-			return "read/write", nil
+	checks.AddCheck("locks", func() (string, error) {
+		locks := []string{}
+
+		if flypg.ZombieLockExists() {
+			locks = append(locks, "zombie")
+		}
+		if flypg.ReadOnlyLockExists() {
+			locks = append(locks, "read-only")
 		}
 
-		if member.Role == flypg.StandbyRoleName {
-			return "read-only", nil
+		if len(locks) > 0 {
+			lockStr := strings.Join(locks, ", ")
+			return "", fmt.Errorf(lockStr)
 		}
 
-		return "", fmt.Errorf("this member is in an unknown state")
+		return "no locks detected", nil
+
 	})
 
 	checks.AddCheck("connections", func() (string, error) {
