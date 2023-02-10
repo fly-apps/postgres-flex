@@ -64,6 +64,7 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 		if lastSeen, ok := inactiveSlotStatus[int(slot.MemberID)]; ok {
 			// TODO - Consider creating a separate threshold for when the member exists.
 			// TODO - Consider being more aggressive with removing replication slots if disk capacity is at dangerous levels.
+			// TODO - Make inactiveSlotRemovalThreshold configurable.
 
 			// Remove the replication slot if it has been inactive for longer than the defined threshold
 			if time.Since(lastSeen) > defaultInactiveSlotRemovalThreshold {
