@@ -18,7 +18,7 @@ type FlyPGConfig struct {
 
 func (c *FlyPGConfig) SetDefaults() {
 	c.internalConfig = ConfigMap{
-		"standby_clean_interval": time.Hour * 24,
+		"deadMemberRemovalThreshold": time.Hour * 24,
 	}
 }
 
