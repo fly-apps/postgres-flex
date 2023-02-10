@@ -78,15 +78,15 @@ func DeleteDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 }
 
 type ReplicationSlot struct {
-	MemberID  int32
-	Name      string
-	Type      string
-	Active    bool
-	WalStatus string
+	MemberID           int32
+	Name               string
+	Active             bool
+	WalStatus          string
+	RetainedWalInBytes int
 }
 
 func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
-	sql := "SELECT slot_name, slot_type, active, wal_status from pg_replication_slots;"
+	sql := "SELECT slot_name, active, wal_status, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS retained_wal FROM pg_replication_slots;"
 	rows, err := pg.Query(ctx, sql)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot,
 
 	for rows.Next() {
 		var slot ReplicationSlot
-		if err := rows.Scan(&slot.Name, &slot.Type, &slot.Active, &slot.WalStatus); err != nil {
+		if err := rows.Scan(&slot.Name, &slot.Active, &slot.WalStatus, &slot.RetainedWalInBytes); err != nil {
 			return nil, err
 		}
 
