@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
@@ -21,15 +20,19 @@ var (
 
 func main() {
 	ctx := context.Background()
+
 	node, err := flypg.NewNode()
 	if err != nil {
-		fmt.Printf("failed to reference node: %s\n", err)
-		os.Exit(1)
+		panic(fmt.Sprintf("failed to reference node: %s\n", err))
 	}
 
 	// Dead member monitor
 	log.Println("Monitoring dead members")
-	go monitorDeadMembers(ctx, node)
+	go func() {
+		if err := monitorDeadMembers(ctx, node); err != nil {
+			panic(err)
+		}
+	}()
 
 	// Readonly monitor
 	log.Println("Monitoring readonly state")

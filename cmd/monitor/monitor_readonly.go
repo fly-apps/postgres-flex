@@ -15,7 +15,7 @@ type readonlyStateResponse struct {
 	Result bool
 }
 
-func monitorReadOnly(ctx context.Context, node *flypg.Node) error {
+func monitorReadOnly(ctx context.Context, node *flypg.Node) {
 	ticker := time.NewTicker(readonlyStateMonitorFrequency)
 	defer ticker.Stop()
 	for range ticker.C {
@@ -23,8 +23,6 @@ func monitorReadOnly(ctx context.Context, node *flypg.Node) error {
 			log.Printf("readOnlyMonitorTick failed with: %s", err)
 		}
 	}
-
-	return nil
 }
 
 func readonlyMonitorTick(ctx context.Context, node *flypg.Node) error {

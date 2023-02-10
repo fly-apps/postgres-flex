@@ -9,7 +9,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 )
 
-func monitorReplicationSlots(ctx context.Context, node *flypg.Node) error {
+func monitorReplicationSlots(ctx context.Context, node *flypg.Node) {
 	inactiveSlotStatus := map[int]time.Time{}
 
 	ticker := time.NewTicker(replicationStateMonitorFrequency)
@@ -19,8 +19,6 @@ func monitorReplicationSlots(ctx context.Context, node *flypg.Node) error {
 			log.Printf("replicationSlotMonitorTick failed with: %s", err)
 		}
 	}
-
-	return nil
 }
 
 func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveSlotStatus map[int]time.Time) error {
