@@ -47,33 +47,36 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 	}
 
 	for _, slot := range slots {
+		if slot.Active {
+			delete(inactiveSlotStatus, int(slot.MemberID))
+			continue
+		}
+
 		// Cleanup inactive replication slots so we don't inadvertantly run ourselves out of disk space.
-		if !slot.Active {
-			if slot.RetainedWalInBytes != 0 {
-				retainedWalInMB := slot.RetainedWalInBytes / 1024 / 1024
-				log.Printf("warning: inactive replication slot %s is retaining %d MB of WAL", slot.Name, retainedWalInMB)
-			}
+		if slot.RetainedWalInBytes != 0 {
+			retainedWalInMB := slot.RetainedWalInBytes / 1024 / 1024
+			log.Printf("warning: inactive replication slot %s is retaining %d MB of WAL", slot.Name, retainedWalInMB)
+		}
 
-			// Check to see if slot has already been registered as inactive.
-			if lastSeen, ok := inactiveSlotStatus[int(slot.MemberID)]; ok {
-				// TODO - Consider creating a separate threshold for when the member exists.
-				// TODO - Consider being more aggressive with removing replication slots if disk
-				// capacity is at dangerous levels.
+		// Check to see if slot has already been registered as inactive.
+		if lastSeen, ok := inactiveSlotStatus[int(slot.MemberID)]; ok {
+			// TODO - Consider creating a separate threshold for when the member exists.
+			// TODO - Consider being more aggressive with removing replication slots if disk
+			// capacity is at dangerous levels.
 
-				// Remove the replication slot if it has been inactive for longer than the defined threshold
-				if time.Since(lastSeen) > defaultInactiveSlotRemovalThreshold {
-					log.Printf("Dropping replication slot: %s\n", slot.Name)
-					if err := admin.DropReplicationSlot(ctx, conn, slot.Name); err != nil {
-						log.Printf("failed to drop replication slot %s: %v\n", slot.Name, err)
-						continue
-					}
-					delete(inactiveSlotStatus, int(slot.MemberID))
+			// Remove the replication slot if it has been inactive for longer than the defined threshold
+			if time.Since(lastSeen) > defaultInactiveSlotRemovalThreshold {
+				log.Printf("Dropping replication slot: %s\n", slot.Name)
+				if err := admin.DropReplicationSlot(ctx, conn, slot.Name); err != nil {
+					log.Printf("failed to drop replication slot %s: %v\n", slot.Name, err)
+					continue
 				}
+				delete(inactiveSlotStatus, int(slot.MemberID))
 			} else {
-				inactiveSlotStatus[int(slot.MemberID)] = time.Now()
+				log.Printf("Replication slot %s has been inactive for %v\n", slot.Name, time.Since(lastSeen).Round(time.Second))
 			}
 		} else {
-			delete(inactiveSlotStatus, int(slot.MemberID))
+			inactiveSlotStatus[int(slot.MemberID)] = time.Now()
 		}
 	}
 
