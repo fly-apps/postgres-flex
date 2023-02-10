@@ -52,17 +52,18 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 			continue
 		}
 
-		// Cleanup inactive replication slots so we don't inadvertantly run ourselves out of disk space.
+		// Log warning if inactive replication slot is holding onto more than 50MB worth of WAL.
 		if slot.RetainedWalInBytes != 0 {
 			retainedWalInMB := slot.RetainedWalInBytes / 1024 / 1024
-			log.Printf("warning: inactive replication slot %s is retaining %d MB of WAL", slot.Name, retainedWalInMB)
+			if retainedWalInMB > 50 {
+				log.Printf("Warning: Inactive replication slot %s is retaining %d MB of WAL", slot.Name, retainedWalInMB)
+			}
 		}
 
 		// Check to see if slot has already been registered as inactive.
 		if lastSeen, ok := inactiveSlotStatus[int(slot.MemberID)]; ok {
 			// TODO - Consider creating a separate threshold for when the member exists.
-			// TODO - Consider being more aggressive with removing replication slots if disk
-			// capacity is at dangerous levels.
+			// TODO - Consider being more aggressive with removing replication slots if disk capacity is at dangerous levels.
 
 			// Remove the replication slot if it has been inactive for longer than the defined threshold
 			if time.Since(lastSeen) > defaultInactiveSlotRemovalThreshold {
@@ -71,10 +72,12 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 					log.Printf("failed to drop replication slot %s: %v\n", slot.Name, err)
 					continue
 				}
+
 				delete(inactiveSlotStatus, int(slot.MemberID))
-			} else {
-				log.Printf("Replication slot %s has been inactive for %v\n", slot.Name, time.Since(lastSeen).Round(time.Second))
+				continue
 			}
+
+			log.Printf("Replication slot %s has been inactive for %v\n", slot.Name, time.Since(lastSeen).Round(time.Second))
 		} else {
 			inactiveSlotStatus[int(slot.MemberID)] = time.Now()
 		}
