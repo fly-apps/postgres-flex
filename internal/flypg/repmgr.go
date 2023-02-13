@@ -172,7 +172,7 @@ func (r *RepMgr) registerPrimary() error {
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
 	if err := utils.RunCommand(cmdStr); err != nil {
-		fmt.Printf("failed to unregister primary: %s", err)
+		return err
 	}
 
 	return nil
