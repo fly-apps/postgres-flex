@@ -147,7 +147,7 @@ func (p *PGBouncer) setDefaults() {
 		"auth_file":            fmt.Sprintf("%s/pgbouncer.auth", p.ConfigPath),
 		"admin_users":          "postgres",
 		"user":                 "postgres",
-		"pool_mode":            "transaction",
+		"pool_mode":            sessionPooler,
 		"min_pool_size":        "5",
 		"reserve_pool_size":    "5",
 		"reserve_pool_timeout": "3",
