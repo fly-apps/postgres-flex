@@ -240,7 +240,7 @@ func (c *PGConfig) SetDefaults() error {
 		"hot_standby":              true,
 		"archive_mode":             true,
 		"archive_command":          "'/bin/true'",
-		"shared_preload_libraries": strings.Join(sharedPreloadLibraries, ", "),
+		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
 	c.internalConfig = conf
