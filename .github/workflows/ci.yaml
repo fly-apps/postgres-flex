@@ -45,7 +45,7 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex:15
-            flyio/postgres-flex:15.1
+            flyio/postgres-flex:15.2
       -
         name: Build and push Postgres 15 Timescale DB
         id: docker_build_15_timescaledb
@@ -60,7 +60,7 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex-timescaledb:15
-            flyio/postgres-flex-timescaledb:15.1
+            flyio/postgres-flex-timescaledb:15.2
       -
         name: Postgres 15 Image digest
         run: echo ${{ steps.docker_build_15.outputs.digest }}
