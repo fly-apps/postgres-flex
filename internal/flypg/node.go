@@ -121,13 +121,7 @@ func NewNode() (*Node, error) {
 
 	return node, nil
 }
-
-func (n *Node) Init(ctx context.Context) error {
-	// Ensure directory and files have proper permissions
-	if err := setDirOwnership(); err != nil {
-		return err
-	}
-
+func (n *Node) PGInit(ctx context.Context, store *state.Store) error {
 	// Initiate a restore
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
 		// Check to see if there's an active restore.
@@ -204,20 +198,6 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	err := writeSSHKey()
-	if err != nil {
-		return fmt.Errorf("failed initialize ssh. %v", err)
-	}
-
-	store, err := state.NewStore()
-	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store: %s", err)
-	}
-
-	if err := n.configure(ctx, store); err != nil {
-		return fmt.Errorf("failed to configure node: %s", err)
-	}
-
 	if !n.isPGInitialized() {
 		// Check to see if repmgr cluster has been initialized.
 		clusterInitialized, err := store.IsInitializationFlagSet()
@@ -247,8 +227,38 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	if err := n.configurePostgres(store); err != nil {
-		return fmt.Errorf("failed to configure postgres: %s", err)
+	return nil
+}
+
+func (n *Node) StandardInit(ctx context.Context) error {
+	if err := setDirOwnership(); err != nil {
+		return err
+	}
+
+	err := writeSSHKey()
+	if err != nil {
+		return fmt.Errorf("failed initialize ssh. %v", err)
+	}
+
+	return nil
+}
+
+func (n *Node) Init(ctx context.Context) error {
+	if err := n.StandardInit(ctx); err != nil {
+		return err
+	}
+
+	store, err := state.NewStore()
+	if err != nil {
+		return fmt.Errorf("failed initialize cluster state store: %s", err)
+	}
+
+	if err := n.PGInit(ctx, store); err != nil {
+		return err
+	}
+
+	if err := n.configure(ctx, store); err != nil {
+		return fmt.Errorf("failed to configure node: %s", err)
 	}
 
 	if err := setDirOwnership(); err != nil {
@@ -463,6 +473,10 @@ func (n *Node) configure(ctx context.Context, store *state.Store) error {
 
 	if err := n.configurePGBouncer(store); err != nil {
 		return fmt.Errorf("failed to configure pgbouncer: %s", err)
+	}
+
+	if err := n.configurePostgres(store); err != nil {
+		return fmt.Errorf("failed to configure postgres: %s", err)
 	}
 
 	// Clear target and wait for primary resolution
