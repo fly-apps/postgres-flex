@@ -220,6 +220,12 @@ func (c *PGConfig) SetDefaults() error {
 	}
 	sharedBuffersMb := sharedBuffersBytes / (1024 * 1024)
 
+	sharedPreloadLibraries := []string{"repmgr"}
+	// preload timescaledb if enabled
+	if os.Getenv("TIMESCALEDB_ENABLED") == "true" {
+		sharedPreloadLibraries = append(sharedPreloadLibraries, "timescaledb")
+	}
+
 	conf := ConfigMap{
 		"random_page_cost":         "1.1",
 		"port":                     c.port,
@@ -234,7 +240,7 @@ func (c *PGConfig) SetDefaults() error {
 		"hot_standby":              true,
 		"archive_mode":             true,
 		"archive_command":          "'/bin/true'",
-		"shared_preload_libraries": "repmgr",
+		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
 	c.internalConfig = conf
