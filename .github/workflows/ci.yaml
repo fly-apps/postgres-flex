@@ -32,21 +32,6 @@ jobs:
         id: get-latest-tag
         uses: "WyriHaximus/github-action-get-previous-tag@v1"
       -
-        name: Build and push Postgres 14
-        id: docker_build_14
-        uses: docker/build-push-action@v3
-        with:
-          build-args: |
-            PG_VERSION=14.6
-            PG_MAJOR_VERSION=14
-            VERSION=${{ steps.get-latest-tag.outputs.tag }}
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            flyio/postgres-flex:14
-            flyio/postgres-flex:14.6
-      -
         name: Build and push Postgres 15
         id: docker_build_15
         uses: docker/build-push-action@v3
@@ -62,8 +47,23 @@ jobs:
             flyio/postgres-flex:15
             flyio/postgres-flex:15.1
       -
-        name: Postgres 14 Image digest
-        run: echo ${{ steps.docker_build_14.outputs.digest }}
+        name: Build and push Postgres 15 Timescale DB
+        id: docker_build_15_timescaledb
+        uses: docker/build-push-action@v3
+        with:
+          build-args: |
+            PG_VERSION=15.1
+            PG_MAJOR_VERSION=15
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./Dockerfile-timescaledb
+          push: true
+          tags: |
+            flyio/postgres-flex-timescaledb:15
+            flyio/postgres-flex-timescaledb:15.1
       -
         name: Postgres 15 Image digest
         run: echo ${{ steps.docker_build_15.outputs.digest }}
+      -
+        name: Postgres 15 TimescaleDB Image digest
+        run: echo ${{ steps.docker_build_15_timescaledb.outputs.digest }}
