@@ -2,14 +2,14 @@
 
 While automatic failures are already baked-in, there may be times where a manually issued failover is necessary. The steps to perform a manual failover are listed below:
 
-**Note: The promotion candidate must reside within your PRIMARY_REGION.**
+_**Note: The promotion candidate must reside within your PRIMARY_REGION.**_
 
-1. Connect to the Machine you wish to promote
+**1. Connect to the Machine you wish to promote**
 ```
 fly ssh console -s <app-name>
 ```
 
-2. Confirm the member is healthy.
+**2. Confirm the member is healthy**
 ```
 # Switch to the postgres user and move to the home directory.
 su postgres
@@ -30,7 +30,8 @@ Node "fdaa:0:2e26:a7b:7d17:9b36:6e4b:2":
 
 ```
 
-2. Stop the Machine running as primary
+**2. Stop the Machine running as primary**
+
 Open up a separate terminal and stop the Machine running `primary`.
 
 ```
@@ -46,10 +47,9 @@ ID            	STATE  	ROLE   	REGION	HEALTH CHECKS     	IMAGE                  
 fly machines stop 6e82931b729087 --app <app-name>
 ```
 
-3. Run the standby promotion command
+**3. Run the standby promotion command**
 Go back to the first terminal you opened that's connected to your promotion candidate.
 
-**WARNING: It's important that you specify `--siblings-follow`, otherwise any other standbys will not be reconfigured to follow the new primary.**
 ```
 # Issue a dry-run to ensure our candidate is eligible for promotion.
 repmgr standby promote --siblings-follow --dry-run
@@ -62,6 +62,8 @@ INFO: 1 replication slots required, 10 available
 INFO: node will be promoted using the "pg_promote()" function
 INFO: prerequisites for executing STANDBY PROMOTE are met
 ```
+
+**WARNING: It's important that you specify `--siblings-follow`, otherwise any other standbys will not be reconfigured to follow the new primary.**
 
 If everything looks good, go ahead and re-run the command without the `--dry-run` argument.
 ```
@@ -79,7 +81,7 @@ NOTICE: executing STANDBY FOLLOW on 1 of 1 siblings
 INFO: STANDBY FOLLOW successfully executed on all reachable sibling nodes
 ```
 
-4. Start the Machine that was previously operating as Primary
+**4. Start the Machine that was previously operating as Primary**
 ```
 fly machines start 6e82931b729087 --app <app-name>
 ```
