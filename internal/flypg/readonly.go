@@ -102,7 +102,7 @@ func writeReadOnlyLock() error {
 		return err
 	}
 
-	pgUID, pgGID, err := utils.UserSystemIDS("postgres")
+	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
 	if err != nil {
 		return err
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 func RunCommand(cmdStr string) error {
-	pgUID, pgGID, err := UserSystemIDS("postgres")
+	pgUID, pgGID, err := SystemUserIDs("postgres")
 	if err != nil {
 		return err
 	}
@@ -20,7 +20,7 @@ func RunCommand(cmdStr string) error {
 	return err
 }
 
-func UserSystemIDS(usr string) (int, int, error) {
+func SystemUserIDs(usr string) (int, int, error) {
 	pgUser, err := user.Lookup(usr)
 	if err != nil {
 		return 0, 0, err
