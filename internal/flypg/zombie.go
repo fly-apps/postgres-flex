@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -21,8 +22,10 @@ var (
 	ErrZombieDiagnosisUndecided = errors.New("unable to confirm we are the true primary")
 )
 
+const zombieLockFile = "/data/zombie.lock"
+
 func ZombieLockExists() bool {
-	_, err := os.Stat("/data/zombie.lock")
+	_, err := os.Stat(zombieLockFile)
 	if os.IsNotExist(err) {
 		return false
 	}
@@ -30,15 +33,24 @@ func ZombieLockExists() bool {
 }
 
 func writeZombieLock(hostname string) error {
-	if err := os.WriteFile("/data/zombie.lock", []byte(hostname), 0644); err != nil {
+	if err := os.WriteFile(zombieLockFile, []byte(hostname), 0644); err != nil {
 		return err
+	}
+
+	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
+	if err != nil {
+		return err
+	}
+
+	if err := os.Chown(zombieLockFile, pgUID, pgGID); err != nil {
+		return fmt.Errorf("failed to set zombie.lock owner: %s", err)
 	}
 
 	return nil
 }
 
 func RemoveZombieLock() error {
-	if err := os.Remove("/data/zombie.lock"); err != nil {
+	if err := os.Remove(zombieLockFile); err != nil {
 		return err
 	}
 
@@ -46,7 +58,7 @@ func RemoveZombieLock() error {
 }
 
 func ReadZombieLock() (string, error) {
-	body, err := os.ReadFile("/data/zombie.lock")
+	body, err := os.ReadFile(zombieLockFile)
 	if err != nil {
 		return "", err
 	}

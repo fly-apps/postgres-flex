@@ -8,15 +8,7 @@ import (
 )
 
 func RunCommand(cmdStr string) error {
-	pgUser, err := user.Lookup("postgres")
-	if err != nil {
-		return err
-	}
-	pgUID, err := strconv.Atoi(pgUser.Uid)
-	if err != nil {
-		return err
-	}
-	pgGID, err := strconv.Atoi(pgUser.Gid)
+	pgUID, pgGID, err := SystemUserIDs("postgres")
 	if err != nil {
 		return err
 	}
@@ -26,4 +18,21 @@ func RunCommand(cmdStr string) error {
 	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(pgUID), Gid: uint32(pgGID)}
 	_, err = cmd.Output()
 	return err
+}
+
+func SystemUserIDs(usr string) (int, int, error) {
+	pgUser, err := user.Lookup(usr)
+	if err != nil {
+		return 0, 0, err
+	}
+	pgUID, err := strconv.Atoi(pgUser.Uid)
+	if err != nil {
+		return 0, 0, err
+	}
+	pgGID, err := strconv.Atoi(pgUser.Gid)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return pgUID, pgGID, nil
 }
