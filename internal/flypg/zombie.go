@@ -37,7 +37,7 @@ func writeZombieLock(hostname string) error {
 		return err
 	}
 
-	pgUID, pgGID, err := utils.SystemUserIDS("postgres")
+	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
 	if err != nil {
 		return err
 	}
