@@ -11,7 +11,6 @@ import (
 
 func GrantAccess(ctx context.Context, pg *pgx.Conn, username string) error {
 	sql := fmt.Sprintf("GRANT pg_read_all_data, pg_write_all_data TO %q", username)
-
 	_, err := pg.Exec(ctx, sql)
 	return err
 }
@@ -63,6 +62,16 @@ func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 
 	sql := fmt.Sprintf("CREATE DATABASE %s;", name)
 	_, err = pg.Exec(ctx, sql)
+	return err
+}
+
+// PG 15 by default removes the ability for normal users to create
+// tables within the public schema. This re-enables it to keep the
+// experience consistent for users.  We should explore create user
+// schemas for better isolation in the future.
+func GrantCreateOnPublic(ctx context.Context, pg *pgx.Conn) error {
+	sql := fmt.Sprintf(`GRANT CREATE on SCHEMA PUBLIC to PUBLIC;`)
+	_, err := pg.Exec(ctx, sql)
 	return err
 }
 

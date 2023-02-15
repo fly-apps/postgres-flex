@@ -65,22 +65,31 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer close()
 
-	input := createDatabaseRequest{}
-	err = json.NewDecoder(r.Body).Decode(&input)
-	if err != nil {
+	var input createDatabaseRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		renderErr(w, err)
 		return
 	}
 	defer r.Body.Close()
 
-	err = admin.CreateDatabase(ctx, conn, input.Name)
+	if err := admin.CreateDatabase(ctx, conn, input.Name); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	dbConn, close, err := localConnection(ctx, input.Name)
 	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer close()
+
+	if err = admin.GrantCreateOnPublic(ctx, dbConn); err != nil {
 		renderErr(w, err)
 		return
 	}
 
 	res := &Response{Result: true}
-
 	renderJSON(w, res, http.StatusOK)
 }
 
