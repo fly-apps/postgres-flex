@@ -32,5 +32,3 @@ You will need to stop and start your machine to increase the size of the FS
 ```
 fly machines restart 9185340f4d3383 --app flex-testing
 ```
-
-
