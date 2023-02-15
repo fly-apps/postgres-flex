@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
+	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 const (
@@ -99,6 +100,15 @@ func writeReadOnlyLock() error {
 
 	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0644); err != nil {
 		return err
+	}
+
+	pgUID, pgGID, err := utils.UserSystemIDS("postgres")
+	if err != nil {
+		return err
+	}
+
+	if err := os.Chown(readOnlyLockFile, pgUID, pgGID); err != nil {
+		return fmt.Errorf("failed to set readonly.lock owner: %s", err)
 	}
 
 	return nil
