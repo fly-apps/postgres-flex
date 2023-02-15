@@ -164,7 +164,7 @@ func Quarantine(ctx context.Context, conn *pgx.Conn, n *Node, primary string) er
 	}
 
 	fmt.Println("Writing zombie.lock file.")
-	if err := writeZombieLock(""); err != nil {
+	if err := writeZombieLock(primary); err != nil {
 		return fmt.Errorf("failed to set zombie lock: %s", err)
 	}
 
