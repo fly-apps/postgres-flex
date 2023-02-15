@@ -65,12 +65,10 @@ func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 	return err
 }
 
-// PG 15 by default removes the ability for normal users to create
-// tables within the public schema. This re-enables it to keep the
-// experience consistent for users.  We should explore create user
-// schemas for better isolation in the future.
+// GrantCreateOnPublic re-enables the public schema for normal users.
+// We should look into creating better isolation in the future.
 func GrantCreateOnPublic(ctx context.Context, pg *pgx.Conn) error {
-	sql := fmt.Sprintf(`GRANT CREATE on SCHEMA PUBLIC to PUBLIC;`)
+	sql := "GRANT CREATE on SCHEMA PUBLIC to PUBLIC;"
 	_, err := pg.Exec(ctx, sql)
 	return err
 }

@@ -84,7 +84,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer close()
 
-	if err = admin.GrantCreateOnPublic(ctx, dbConn); err != nil {
+	if err := admin.GrantCreateOnPublic(ctx, dbConn); err != nil {
 		renderErr(w, err)
 		return
 	}
