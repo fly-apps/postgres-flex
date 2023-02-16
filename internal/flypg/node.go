@@ -326,30 +326,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		switch role {
 		case PrimaryRoleName:
-			standbys, err := repmgr.StandbyMembers(ctx, conn)
-			if err != nil {
-				if !errors.Is(err, pgx.ErrNoRows) {
-					return fmt.Errorf("failed to query standbys")
-				}
-			}
-
-			// Collect sample data from registered standbys
-			sample, err := TakeDNASample(ctx, n, standbys)
-			if err != nil {
-				return fmt.Errorf("failed to resolve cluster metrics: %s", err)
-			}
-
-			fmt.Println(DNASampleString(sample))
-
-			// Evaluate whether we are a zombie or not.
-			primary, err := ZombieDiagnosis(sample)
+			primary, err := n.EvaluateClusterState(ctx, conn)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
-
 				if err := Quarantine(ctx, conn, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
-
 			} else if errors.Is(err, ErrZombieDiscovered) {
 				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
 
@@ -677,4 +659,22 @@ func setDirOwnership() error {
 	cmd := exec.Command("sh", "-c", cmdStr)
 	_, err = cmd.Output()
 	return err
+}
+
+func (n *Node) EvaluateClusterState(ctx context.Context, conn *pgx.Conn) (string, error) {
+	standbys, err := n.RepMgr.StandbyMembers(ctx, conn)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("failed to query standbys")
+		}
+	}
+
+	sample, err := TakeDNASample(ctx, n, standbys)
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate cluster data: %s", err)
+	}
+
+	fmt.Println(DNASampleString(sample))
+
+	return ZombieDiagnosis(sample)
 }

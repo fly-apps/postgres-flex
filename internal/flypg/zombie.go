@@ -157,6 +157,10 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 }
 
 func Quarantine(ctx context.Context, conn *pgx.Conn, n *Node, primary string) error {
+	if ZombieLockExists() {
+		return nil
+	}
+
 	fmt.Println("Writing zombie.lock file.")
 	if err := writeZombieLock(primary); err != nil {
 		return fmt.Errorf("failed to set zombie lock: %s", err)
