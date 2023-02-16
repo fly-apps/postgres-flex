@@ -133,19 +133,11 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 		conn *pgx.Conn
 	)
 
-	if n.PGBouncerEnabled {
-		conn, err = n.NewPrimaryConnection(ctx, "postgres")
-		if err != nil {
-			return fmt.Errorf("failed to establish connection: %s", err)
-		}
-		defer conn.Close(ctx)
-	} else {
-		conn, err = n.NewLocalConnection(ctx, "postgres")
-		if err != nil {
-			return fmt.Errorf("failed to establish connection: %s", err)
-		}
-		defer conn.Close(ctx)
+	conn, err = n.NewLocalConnection(ctx, "postgres")
+	if err != nil {
+		return fmt.Errorf("failed to establish connection: %s", err)
 	}
+	defer conn.Close(ctx)
 
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -167,38 +159,8 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 		dbNames = append(dbNames, db.Name)
 	}
 
-	if n.PGBouncerEnabled {
-		bConn, err := n.PGBouncer.NewConnection(ctx)
-		if err != err {
-			return fmt.Errorf("failed to establish connection to pgbouncer: %s", err)
-		}
-		defer bConn.Close(ctx)
-
-		poolMode, err := n.PGBouncer.poolMode()
-		if err != nil {
-			return fmt.Errorf("failed to resolve active pool mode: %s", err)
-		}
-
-		switch poolMode {
-		case transactionPooler, statementPooler:
-			if err := n.PGBouncer.forceReconnect(ctx, dbNames); err != nil {
-				return fmt.Errorf("failed to force connection reset: %s", err)
-			}
-		case sessionPooler:
-			if err := n.PGBouncer.killConnections(ctx, dbNames); err != nil {
-				return fmt.Errorf("failed to kill connections: %s", err)
-			}
-
-			if err := n.PGBouncer.resumeConnections(ctx, dbNames); err != nil {
-				return fmt.Errorf("failed to resume connections: %s", err)
-			}
-		default:
-			return fmt.Errorf("failed to resolve valid pooler. found: %s", poolMode)
-		}
-	} else {
-		if err := utils.RunCommand("restart-haproxy", "root"); err != nil {
-			return fmt.Errorf("failed to restart haproxy: %s", err)
-		}
+	if err := utils.RunCommand("restart-haproxy", "root"); err != nil {
+		return fmt.Errorf("failed to restart haproxy: %s", err)
 	}
 
 	return nil

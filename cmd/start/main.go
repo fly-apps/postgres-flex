@@ -53,11 +53,8 @@ func main() {
 		"PRIMARY_REGION":    os.Getenv("PRIMARY_REGION"),
 		"PG_LISTEN_ADDRESS": node.PrivateIP,
 	}
-	svisor.AddProcess("proxy", "/usr/sbin/haproxy -W -db -f /fly/haproxy.cfg", supervisor.WithEnv(proxyEnv), supervisor.WithRestart(0, 1*time.Second))
+	svisor.AddProcess("proxy", "/etc/init.d/haproxy -W -db -f /fly/haproxy.cfg", supervisor.WithEnv(proxyEnv), supervisor.WithRestart(0, 1*time.Second))
 
-	// svisor.AddProcess("pgbouncer", fmt.Sprintf("pgbouncer %s/pgbouncer.ini", node.PGBouncer.ConfigPath),
-	// 	supervisor.WithRestart(0, 1*time.Second),
-	// )
 	svisor.AddProcess("repmgrd", fmt.Sprintf("gosu postgres repmgrd -f %s --daemonize=false", node.RepMgr.ConfigPath),
 		supervisor.WithRestart(0, 5*time.Second),
 	)

@@ -51,7 +51,6 @@ func (s *Server) Handler() http.Handler {
 
 		r.Get("/role", handleRole)
 		r.Get("/settings/view/postgres", s.handleViewPostgresSettings)
-		r.Get("/settings/view/pgbouncer", s.handleViewBouncerSettings)
 		r.Get("/settings/view/repmgr", s.handleViewRepmgrSettings)
 		r.Post("/settings/update/postgres", s.handleUpdatePostgresSettings)
 		r.Post("/settings/apply", s.handleApplyConfig)

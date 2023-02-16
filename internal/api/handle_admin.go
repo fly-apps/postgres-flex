@@ -251,33 +251,6 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 	renderJSON(w, resp, http.StatusOK)
 }
 
-func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Request) {
-	all, err := s.node.PGBouncer.CurrentConfig()
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	var in []string
-
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	out := map[string]interface{}{}
-
-	for key := range all {
-		val := all[key]
-		if slices.Contains(in, key) {
-			out[key] = val
-		}
-	}
-
-	resp := &Response{Result: out}
-	renderJSON(w, resp, http.StatusOK)
-}
-
 func (s *Server) handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
 	all, err := s.node.RepMgr.CurrentConfig()
 	if err != nil {

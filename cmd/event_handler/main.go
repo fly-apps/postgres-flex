@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/jackc/pgx/v5"
@@ -47,67 +45,8 @@ func main() {
 
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
-		// TODO - Need to figure out what to do when success == 0.
-		if !node.PGBouncerEnabled {
-			os.Exit(0)
-		}
-
-		retry := 0
-		maxRetries := 5
-		success := false
-
-		for retry < maxRetries {
-			if err := reconfigurePGBouncer(*nodeID); err != nil {
-				log.Printf("%s - failed to reconfigure pgbouncer: %s. (attempt: %d)\n", *event, err, retry)
-				retry++
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			success = true
-			break
-		}
-
-		if success {
-			log.Printf("%s - successfully reconfigured pgbouncer to target: %d\n", *event, *nodeID)
-			os.Exit(0)
-		} else {
-			log.Printf("%s - failed to reconfigured pgbouncer to target: %d\n", *event, *nodeID)
-			os.Exit(1)
-		}
 
 	case "standby_follow":
-		if !node.PGBouncerEnabled {
-			os.Exit(0)
-		}
-
-		newMemberID, err := strconv.Atoi(*newPrimary)
-		if err != nil {
-			log.Printf("failed to parse newMemberID %s: %s\n", *newPrimary, err)
-			os.Exit(1)
-		}
-
-		retry := 0
-		maxRetries := 5
-		success := false
-
-		for retry < maxRetries {
-			if err := reconfigurePGBouncer(newMemberID); err != nil {
-				log.Printf("%s - failed to reconfigure pgbouncer: %s. (attempt: %d)\n", *event, err, retry)
-				retry++
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			success = true
-			break
-		}
-
-		if success {
-			log.Printf("%s - successfully reconfigured pgbouncer to target: %d\n", *event, newMemberID)
-			os.Exit(0)
-		} else {
-			log.Printf("%s - failed to reconfigured pgbouncer to target: %d\n", *event, newMemberID)
-			os.Exit(1)
-		}
 
 	case "child_node_disconnect", "child_node_reconnect", "child_node_new_connect":
 		conn, err := node.RepMgr.NewLocalConnection(ctx)
@@ -138,29 +77,6 @@ func main() {
 	default:
 		// noop
 	}
-}
-
-func reconfigurePGBouncer(id int) error {
-	node, err := flypg.NewNode()
-	if err != nil {
-		return fmt.Errorf("failed to reference node: %s", err)
-	}
-
-	conn, err := node.RepMgr.NewLocalConnection(context.TODO())
-	if err != nil {
-		return fmt.Errorf("failed to establish connection with local pg: %s", err)
-	}
-
-	member, err := node.RepMgr.MemberByID(context.TODO(), conn, id)
-	if err != nil {
-		return err
-	}
-
-	if err := node.PGBouncer.ConfigurePrimary(context.TODO(), member.Hostname, true); err != nil {
-		return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
-	}
-
-	return nil
 }
 
 func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {
@@ -200,12 +116,6 @@ func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node)
 		log.Println("Broadcasting readonly state change")
 		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
 			log.Printf("errors while disabling readonly: %s", err)
-		}
-	}
-
-	if node.PGBouncerEnabled {
-		if err := node.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-			return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
 		}
 	}
 
