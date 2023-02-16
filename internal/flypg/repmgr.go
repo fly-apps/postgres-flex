@@ -145,7 +145,7 @@ func (r *RepMgr) setDefaults() {
 		"promote_command":              fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", r.ConfigPath),
 		"follow_command":               fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", r.ConfigPath),
 		"event_notification_command":   fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\" -new-node-id \\'%%p\\''"),
-		"event_notifications":          "'repmgrd_failover_promote,standby_promote,standby_follow,child_node_disconnect,child_node_reconnect,child_node_new_connect'",
+		"event_notifications":          "'child_node_disconnect,child_node_reconnect,child_node_new_connect'",
 		"location":                     r.Region,
 		"primary_visibility_consensus": true,
 		"failover_validation_command":  fmt.Sprintf("'/usr/local/bin/failover_validation -visible-nodes %%v -total-nodes %%t'"),
@@ -162,7 +162,7 @@ func (r *RepMgr) setDefaults() {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -171,7 +171,7 @@ func (r *RepMgr) registerPrimary() error {
 
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -189,7 +189,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 
 	fmt.Println(cmdStr)
 
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -199,7 +199,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -208,7 +208,7 @@ func (r *RepMgr) registerStandby() error {
 
 func (r *RepMgr) unregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to unregister standby: %s", err)
 	}
 
@@ -217,7 +217,7 @@ func (r *RepMgr) unregisterStandby(id int) error {
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -229,7 +229,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	return utils.RunCommand(cmdStr)
+	return utils.RunCommand(cmdStr, "postgres")
 }
 
 func (r *RepMgr) writePasswdConf() error {

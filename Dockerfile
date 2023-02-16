@@ -31,7 +31,7 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim procps jq pgbouncer ssh \
+    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim haproxy socat procps ssh \
     && apt autoremove -y
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -46,6 +46,5 @@ RUN mkdir -p /run/haproxy/
 RUN usermod -d /data postgres
 
 EXPOSE 5432
-
 
 CMD ["start"]

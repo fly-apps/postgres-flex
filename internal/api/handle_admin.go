@@ -24,6 +24,19 @@ func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, res, http.StatusOK)
 }
 
+func handleHaproxyRestart(w http.ResponseWriter, r *http.Request) {
+	if err := flypg.RestartHaproxy(); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	res := &Response{
+		Result: true,
+	}
+
+	renderJSON(w, res, http.StatusOK)
+}
+
 func handleEnableReadonly(w http.ResponseWriter, r *http.Request) {
 	res := &Response{
 		Result: true,
@@ -248,33 +261,6 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 	}
 
 	resp := &Response{Result: PGSettingsResponse{Settings: out}}
-	renderJSON(w, resp, http.StatusOK)
-}
-
-func (s *Server) handleViewBouncerSettings(w http.ResponseWriter, r *http.Request) {
-	all, err := s.node.PGBouncer.CurrentConfig()
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	var in []string
-
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	out := map[string]interface{}{}
-
-	for key := range all {
-		val := all[key]
-		if slices.Contains(in, key) {
-			out[key] = val
-		}
-	}
-
-	resp := &Response{Result: out}
 	renderJSON(w, resp, http.StatusOK)
 }
 

@@ -38,7 +38,6 @@ type Node struct {
 	OperatorCredentials Credentials
 	ReplCredentials     Credentials
 
-	PGBouncer      PGBouncer
 	RepMgr         RepMgr
 	InternalConfig FlyPGConfig
 }
@@ -87,14 +86,6 @@ func NewNode() (*Node, error) {
 	node.ReplCredentials = Credentials{
 		Username: "repmgr",
 		Password: os.Getenv("REPL_PASSWORD"),
-	}
-
-	node.PGBouncer = PGBouncer{
-		PrivateIP:   node.PrivateIP,
-		Port:        5432,
-		ForwardPort: 5433,
-		ConfigPath:  "/data/pgbouncer",
-		Credentials: node.OperatorCredentials,
 	}
 
 	// Generate a random, reconstructable signed int32
@@ -196,7 +187,7 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 			// Ensure the single instance created with the --force-rewind process is cleaned up properly.
-			utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
+			utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
 		} else {
 			// TODO - Provide link to documention on how to address this
 			fmt.Println("Zombie lock file does not contain a hostname.")
@@ -377,10 +368,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen", primary, n.PrivateIP)
 			}
 
-			if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-				return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
-			}
-
 			// Readonly lock is set by healthchecks when disk capacity is dangerously high.
 			if !ReadOnlyLockExists() {
 				if err := BroadcastReadonlyChange(ctx, n, false); err != nil {
@@ -401,32 +388,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 	}
 
-	// Reconfigure PGBouncer
-	repConn, err := repmgr.NewLocalConnection(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
-	}
-	defer repConn.Close(ctx)
-
-	member, err := n.RepMgr.PrimaryMember(ctx, repConn)
-	if err != nil {
-		return fmt.Errorf("failed to find primary: %s", err)
-	}
-
-	if err := n.PGBouncer.ConfigurePrimary(ctx, member.Hostname, true); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
-	}
-
 	return nil
 }
 
 func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, database, n.OperatorCredentials)
-}
-
-func (n *Node) NewPrimaryConnection(ctx context.Context, database string) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.PGBouncer.Port))
 	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
@@ -459,16 +425,6 @@ func (n *Node) configure(ctx context.Context, store *state.Store) error {
 
 	if err := n.configureRepmgr(store); err != nil {
 		return fmt.Errorf("failed to configure repmgr config: %s", err)
-	}
-
-	if err := n.configurePGBouncer(store); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer: %s", err)
-	}
-
-	// Clear target and wait for primary resolution
-	fmt.Println("Disabling PGBouncer until primary is resolved")
-	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
-		return fmt.Errorf("failed to set pgbouncer target: %s", err)
 	}
 
 	return nil
@@ -544,29 +500,13 @@ func (n *Node) configureRepmgr(store *state.Store) error {
 	return nil
 }
 
-func (n *Node) configurePGBouncer(store *state.Store) error {
-	if err := n.PGBouncer.initialize(); err != nil {
-		return fmt.Errorf("failed to initialize PGBouncer config: %s", err)
-	}
-
-	if err := SyncUserConfig(&n.PGBouncer, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for pgbouncer: %s", err)
-	}
-
-	if err := WriteConfigFiles(&n.PGBouncer); err != nil {
-		return fmt.Errorf("failed to write config files for pgbouncer: %s", err)
-	}
-
-	return nil
-}
-
 func (n *Node) configurePostgres(store *state.Store) error {
 	if err := n.PGConfig.initialize(); err != nil {
 		return fmt.Errorf("failed to initialize pg config: %s", err)
 	}
 
 	if err := SyncUserConfig(n.PGConfig, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for pgbouncer: %s", err.Error())
+		return fmt.Errorf("failed to sync user config from consul for postgres: %s", err.Error())
 	}
 
 	if err := WriteConfigFiles(n.PGConfig); err != nil {

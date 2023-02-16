@@ -1,0 +1,4 @@
+#!/bin/bash
+
+PID=$(echo "show info" | socat /var/run/haproxy/haproxy.sock stdio | grep Pid | awk  '{print $2}')
+kill -SIGTERM $PID

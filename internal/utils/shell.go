@@ -7,8 +7,8 @@ import (
 	"syscall"
 )
 
-func RunCommand(cmdStr string) error {
-	pgUID, pgGID, err := SystemUserIDs("postgres")
+func RunCommand(cmdStr, user string) error {
+	pgUID, pgGID, err := SystemUserIDs(user)
 	if err != nil {
 		return err
 	}

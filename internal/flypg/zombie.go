@@ -157,12 +157,6 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 }
 
 func Quarantine(ctx context.Context, conn *pgx.Conn, n *Node, primary string) error {
-	if primary != "" {
-		if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-			return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
-		}
-	}
-
 	fmt.Println("Writing zombie.lock file.")
 	if err := writeZombieLock(primary); err != nil {
 		return fmt.Errorf("failed to set zombie lock: %s", err)
