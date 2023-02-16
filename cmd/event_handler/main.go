@@ -21,7 +21,6 @@ func main() {
 	// old primary. In the events that we subscribe to it's always either empty or the new primary.
 	// In the future if we subscribe to repmgrd_failover_promote, then we would have to change this
 	// name.
-	newPrimary := flag.String("new-node-id", "", "the new primary node id")
 	success := flag.String("success", "", "success (1) failure (0)")
 	details := flag.String("details", "", "details")
 	flag.Parse()
@@ -44,10 +43,6 @@ func main() {
 	}
 
 	switch *event {
-	case "repmgrd_failover_promote", "standby_promote":
-
-	case "standby_follow":
-
 	case "child_node_disconnect", "child_node_reconnect", "child_node_new_connect":
 		conn, err := node.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
