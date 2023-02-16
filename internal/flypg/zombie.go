@@ -89,7 +89,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		// Check for connectivity
 		mConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
 		if err != nil {
-			fmt.Printf("failed to connect to %s", standby.Hostname)
+			fmt.Printf("failed to connect to %s\n", standby.Hostname)
 			sample.totalInactive++
 			continue
 		}
@@ -98,7 +98,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		// Verify the primary
 		primary, err := node.RepMgr.PrimaryMember(ctx, mConn)
 		if err != nil {
-			fmt.Printf("failed to resolve primary from standby %s", standby.Hostname)
+			fmt.Printf("failed to resolve primary from standby %s\n", standby.Hostname)
 			sample.totalInactive++
 			continue
 		}
