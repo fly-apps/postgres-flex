@@ -37,7 +37,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=15.1
+            PG_VERSION=15.2
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -52,7 +52,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=15.1
+            PG_VERSION=15.2
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
