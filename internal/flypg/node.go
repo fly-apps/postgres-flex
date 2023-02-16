@@ -38,16 +38,18 @@ type Node struct {
 	OperatorCredentials Credentials
 	ReplCredentials     Credentials
 
-	PGBouncer      PGBouncer
-	RepMgr         RepMgr
-	InternalConfig FlyPGConfig
+	PGBouncerEnabled bool
+	PGBouncer        PGBouncer
+	RepMgr           RepMgr
+	InternalConfig   FlyPGConfig
 }
 
 func NewNode() (*Node, error) {
 	node := &Node{
-		AppName: "local",
-		Port:    5433,
-		DataDir: "/data/postgresql",
+		AppName:          "local",
+		Port:             5433,
+		DataDir:          "/data/postgresql",
+		PGBouncerEnabled: false,
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -67,6 +69,10 @@ func NewNode() (*Node, error) {
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.Port = port
+	}
+
+	if os.Getenv("PGBOUNCER_ENABLED") == "true" {
+		node.PGBouncerEnabled = true
 	}
 
 	// Stub configuration
@@ -89,12 +95,14 @@ func NewNode() (*Node, error) {
 		Password: os.Getenv("REPL_PASSWORD"),
 	}
 
-	node.PGBouncer = PGBouncer{
-		PrivateIP:   node.PrivateIP,
-		Port:        5432,
-		ForwardPort: 5433,
-		ConfigPath:  "/data/pgbouncer",
-		Credentials: node.OperatorCredentials,
+	if node.PGBouncerEnabled {
+		node.PGBouncer = PGBouncer{
+			PrivateIP:   node.PrivateIP,
+			Port:        5432,
+			ForwardPort: 5433,
+			ConfigPath:  "/data/pgbouncer",
+			Credentials: node.OperatorCredentials,
+		}
 	}
 
 	// Generate a random, reconstructable signed int32
@@ -196,7 +204,7 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 			// Ensure the single instance created with the --force-rewind process is cleaned up properly.
-			utils.RunCommand("pg_ctl -D /data/postgresql/ stop")
+			utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
 		} else {
 			// TODO - Provide link to documention on how to address this
 			fmt.Println("Zombie lock file does not contain a hostname.")
@@ -377,8 +385,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen", primary, n.PrivateIP)
 			}
 
-			if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-				return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+			if n.PGBouncerEnabled {
+				if err := n.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+					return fmt.Errorf("failed to reconfigure pgbouncer: %s", err)
+				}
 			}
 
 			// Readonly lock is set by healthchecks when disk capacity is dangerously high.
@@ -413,8 +423,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("failed to find primary: %s", err)
 	}
 
-	if err := n.PGBouncer.ConfigurePrimary(ctx, member.Hostname, true); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
+	if n.PGBouncerEnabled {
+		if err := n.PGBouncer.ConfigurePrimary(ctx, member.Hostname, true); err != nil {
+			return fmt.Errorf("failed to configure pgbouncer's primary: %s", err)
+		}
 	}
 
 	return nil
@@ -461,14 +473,16 @@ func (n *Node) configure(ctx context.Context, store *state.Store) error {
 		return fmt.Errorf("failed to configure repmgr config: %s", err)
 	}
 
-	if err := n.configurePGBouncer(store); err != nil {
-		return fmt.Errorf("failed to configure pgbouncer: %s", err)
-	}
+	if n.PGBouncerEnabled {
+		if err := n.configurePGBouncer(store); err != nil {
+			return fmt.Errorf("failed to configure pgbouncer: %s", err)
+		}
 
-	// Clear target and wait for primary resolution
-	fmt.Println("Disabling PGBouncer until primary is resolved")
-	if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
-		return fmt.Errorf("failed to set pgbouncer target: %s", err)
+		// Clear target and wait for primary resolution
+		fmt.Println("Disabling PGBouncer until primary is resolved")
+		if err := n.PGBouncer.ConfigurePrimary(ctx, "", false); err != nil {
+			return fmt.Errorf("failed to set pgbouncer target: %s", err)
+		}
 	}
 
 	return nil

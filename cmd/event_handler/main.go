@@ -39,9 +39,19 @@ func main() {
 	log.SetOutput(logFile)
 	log.Printf("event: %s, node: %d, success: %s, details: %s\n", *event, *nodeID, *success, *details)
 
+	node, err := flypg.NewNode()
+	if err != nil {
+		log.Printf("failed to initialize node: %s", err)
+		os.Exit(1)
+	}
+
 	switch *event {
 	case "repmgrd_failover_promote", "standby_promote":
 		// TODO - Need to figure out what to do when success == 0.
+		if !node.PGBouncerEnabled {
+			os.Exit(0)
+		}
+
 		retry := 0
 		maxRetries := 5
 		success := false
@@ -66,6 +76,10 @@ func main() {
 		}
 
 	case "standby_follow":
+		if !node.PGBouncerEnabled {
+			os.Exit(0)
+		}
+
 		newMemberID, err := strconv.Atoi(*newPrimary)
 		if err != nil {
 			log.Printf("failed to parse newMemberID %s: %s\n", *newPrimary, err)
@@ -96,12 +110,6 @@ func main() {
 		}
 
 	case "child_node_disconnect", "child_node_reconnect", "child_node_new_connect":
-		node, err := flypg.NewNode()
-		if err != nil {
-			log.Printf("failed to initialize node: %s", err)
-			os.Exit(1)
-		}
-
 		conn, err := node.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
 			log.Printf("failed to open local connection: %s", err)
@@ -195,8 +203,10 @@ func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node)
 		}
 	}
 
-	if err := node.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
-		return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
+	if node.PGBouncerEnabled {
+		if err := node.PGBouncer.ConfigurePrimary(ctx, primary, true); err != nil {
+			return fmt.Errorf("failed to reconfigure pgbouncer primary %s", err)
+		}
 	}
 
 	return nil

@@ -107,7 +107,7 @@ func (p *PGBouncer) poolMode() (string, error) {
 
 func (p *PGBouncer) initialize() error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", p.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 

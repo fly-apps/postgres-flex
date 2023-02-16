@@ -162,7 +162,7 @@ func (r *RepMgr) setDefaults() {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -171,7 +171,7 @@ func (r *RepMgr) registerPrimary() error {
 
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -189,7 +189,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 
 	fmt.Println(cmdStr)
 
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -199,7 +199,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -208,7 +208,7 @@ func (r *RepMgr) registerStandby() error {
 
 func (r *RepMgr) unregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to unregister standby: %s", err)
 	}
 
@@ -217,7 +217,7 @@ func (r *RepMgr) unregisterStandby(id int) error {
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if err := utils.RunCommand(cmdStr); err != nil {
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
@@ -229,7 +229,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	return utils.RunCommand(cmdStr)
+	return utils.RunCommand(cmdStr, "postgres")
 }
 
 func (r *RepMgr) writePasswdConf() error {
