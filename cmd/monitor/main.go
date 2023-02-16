@@ -12,7 +12,7 @@ import (
 var (
 	deadMemberMonitorFrequency       = time.Hour * 1
 	replicationStateMonitorFrequency = time.Hour * 1
-	readonlyStateMonitorFrequency    = time.Minute * 1
+	clusterStateMonitorFrequency     = time.Minute * 15
 
 	defaultDeadMemberRemovalThreshold   = time.Hour * 12
 	defaultInactiveSlotRemovalThreshold = time.Hour * 12
@@ -35,8 +35,8 @@ func main() {
 	}()
 
 	// Readonly monitor
-	log.Println("Monitoring readonly state")
-	go monitorReadOnly(ctx, node)
+	log.Println("Monitoring cluster state")
+	go monitorClusterState(ctx, node)
 
 	// Replication slot monitor
 	log.Println("Monitoring replication slots")
