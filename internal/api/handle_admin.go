@@ -24,6 +24,19 @@ func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, res, http.StatusOK)
 }
 
+func handleHaproxyRestart(w http.ResponseWriter, r *http.Request) {
+	if err := flypg.RestartHaproxy(); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	res := &Response{
+		Result: true,
+	}
+
+	renderJSON(w, res, http.StatusOK)
+}
+
 func handleEnableReadonly(w http.ResponseWriter, r *http.Request) {
 	res := &Response{
 		Result: true,

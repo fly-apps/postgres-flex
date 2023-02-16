@@ -20,15 +20,16 @@ const (
 	ReadOnlyStateEndpoint    = "commands/admin/readonly/state"
 	BroadcastEnableEndpoint  = "commands/admin/readonly/enable"
 	BroadcastDisableEndpoint = "commands/admin/readonly/disable"
+	RestartHaproxyEndpoint   = "commands/admin/haproxy/restart"
 )
 
 func EnableReadonly(ctx context.Context, n *Node) error {
 	if err := writeReadOnlyLock(); err != nil {
-		return fmt.Errorf("failed to set readonly lock: %s", err)
+		return fmt.Errorf("failed to set read-only lock: %s", err)
 	}
 
 	if err := changeReadOnlyState(ctx, n, true); err != nil {
-		return fmt.Errorf("failed to change readonly state to false: %s", err)
+		return fmt.Errorf("failed to enable read-only mode: %s", err)
 	}
 
 	return nil
@@ -40,11 +41,11 @@ func DisableReadonly(ctx context.Context, n *Node) error {
 	}
 
 	if err := changeReadOnlyState(ctx, n, false); err != nil {
-		return fmt.Errorf("failed to change readonly state to false: %s", err)
+		return fmt.Errorf("failed to disabe read-only mode: %s", err)
 	}
 
 	if err := removeReadOnlyLock(); err != nil {
-		return fmt.Errorf("failed to remove readonly lock: %s", err)
+		return fmt.Errorf("failed to remove read-only lock: %s", err)
 	}
 
 	return nil
@@ -69,16 +70,32 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 	}
 
 	for _, member := range members {
-		endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, target)
+		if member.Role == PrimaryRoleName {
+			endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, target)
+			resp, err := http.Get(endpoint)
+			if err != nil {
+				fmt.Printf("failed to broadcast readonly state change to member %s: %s", member.Hostname, err)
+				continue
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode > 299 {
+				fmt.Printf("failed to broadcast readonly state change to member %s: %d\n", member.Hostname, resp.StatusCode)
+			}
+		}
+	}
+
+	for _, member := range members {
+		endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, RestartHaproxyEndpoint)
 		resp, err := http.Get(endpoint)
 		if err != nil {
-			fmt.Printf("failed to broadcast readonly state to member %s: %s", member.Hostname, err)
+			fmt.Printf("failed restart haproxy on member %s: %s", member.Hostname, err)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode > 299 {
-			fmt.Printf("failed to broadcast readonly state to member %s: %d\n", member.Hostname, resp.StatusCode)
+			fmt.Printf("failed to restart haproxy on member %s: %d\n", member.Hostname, resp.StatusCode)
 		}
 	}
 
@@ -133,34 +150,38 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 		conn *pgx.Conn
 	)
 
-	conn, err = n.NewLocalConnection(ctx, "postgres")
+	conn, err = n.RepMgr.NewLocalConnection(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection: %s", err)
 	}
 	defer conn.Close(ctx)
 
-	databases, err := admin.ListDatabases(ctx, conn)
+	member, err := n.RepMgr.Member(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("failed to list database: %s", err)
+		return fmt.Errorf("failed to resolve member: %s", err)
 	}
 
-	var dbNames []string
-	for _, db := range databases {
-		// exclude administrative dbs
-		if db.Name == "repmgr" || db.Name == "postgres" {
-			continue
+	// No need to enable read-only on standby's.
+	if member.Role == PrimaryRoleName {
+		databases, err := admin.ListDatabases(ctx, conn)
+		if err != nil {
+			return fmt.Errorf("failed to list database: %s", err)
 		}
 
-		sql := fmt.Sprintf("ALTER DATABASE %s SET default_transaction_read_only=%v;", db.Name, enable)
-		if _, err = conn.Exec(ctx, sql); err != nil {
-			return fmt.Errorf("failed to unset readonly on db %s: %s", db.Name, err)
+		var dbNames []string
+		for _, db := range databases {
+			// exclude administrative dbs
+			if db.Name == "repmgr" || db.Name == "postgres" {
+				continue
+			}
+
+			sql := fmt.Sprintf("ALTER DATABASE %s SET default_transaction_read_only=%v;", db.Name, enable)
+			if _, err = conn.Exec(ctx, sql); err != nil {
+				return fmt.Errorf("failed to alter readonly state on db %s: %s", db.Name, err)
+			}
+
+			dbNames = append(dbNames, db.Name)
 		}
-
-		dbNames = append(dbNames, db.Name)
-	}
-
-	if err := utils.RunCommand("restart-haproxy", "root"); err != nil {
-		return fmt.Errorf("failed to restart haproxy: %s", err)
 	}
 
 	return nil

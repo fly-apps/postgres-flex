@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/readonly/enable", handleEnableReadonly)
 		r.Get("/readonly/disable", handleDisableReadonly)
 		r.Get("/readonly/state", handleReadonlyState)
+		r.Get("/haproxy/restart", handleHaproxyRestart)
 
 		r.Get("/role", handleRole)
 		r.Get("/settings/view/postgres", s.handleViewPostgresSettings)
