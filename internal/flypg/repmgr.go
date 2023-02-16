@@ -144,7 +144,7 @@ func (r *RepMgr) setDefaults() {
 		"use_replication_slots":        "yes",
 		"promote_command":              fmt.Sprintf("'repmgr standby promote -f %s --log-to-file'", r.ConfigPath),
 		"follow_command":               fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", r.ConfigPath),
-		"event_notification_command":   fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\" -new-node-id \\'%%p\\''"),
+		"event_notification_command":   fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\"'"),
 		"event_notifications":          "'child_node_disconnect,child_node_reconnect,child_node_new_connect'",
 		"location":                     r.Region,
 		"primary_visibility_consensus": true,
