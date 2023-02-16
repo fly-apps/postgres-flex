@@ -17,10 +17,6 @@ const eventLogFile = "/data/event.log"
 func main() {
 	event := flag.String("event", "", "event type")
 	nodeID := flag.Int("node-id", 0, "the node id")
-	// This might not actually always be the new primary. %p from repmgr is variably the new or
-	// old primary. In the events that we subscribe to it's always either empty or the new primary.
-	// In the future if we subscribe to repmgrd_failover_promote, then we would have to change this
-	// name.
 	success := flag.String("success", "", "success (1) failure (0)")
 	details := flag.String("details", "", "details")
 	flag.Parse()
