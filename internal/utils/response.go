@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 )
 
 type Response struct {
@@ -35,5 +34,4 @@ func sendToStdout(resp *Response) {
 		fmt.Println(err.Error())
 	}
 	fmt.Println(string(e))
-	os.Exit(0)
 }
