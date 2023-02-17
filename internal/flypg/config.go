@@ -122,7 +122,7 @@ func WriteConfigFiles(c Config) error {
 		internalFile.Write([]byte(entry))
 	}
 
-	return nil
+	return userFile.Sync()
 }
 
 func ReadFromFile(path string) (ConfigMap, error) {
@@ -141,5 +141,5 @@ func ReadFromFile(path string) (ConfigMap, error) {
 		conf[key] = value
 	}
 
-	return conf, nil
+	return conf, file.Sync()
 }

@@ -517,7 +517,7 @@ func (n *Node) setDefaultHBA() error {
 		}
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func openConnection(parentCtx context.Context, host string, database string, creds Credentials) (*pgx.Conn, error) {
