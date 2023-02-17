@@ -251,7 +251,7 @@ func (c *PGConfig) initialize() error {
 func (c *PGConfig) writePGConfigEntries(entries []string) error {
 	f, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
-		return nil
+		return err
 	}
 	defer f.Close()
 
@@ -266,7 +266,6 @@ func (c *PGConfig) writePGConfigEntries(entries []string) error {
 
 func memTotalInBytes() (int64, error) {
 	memoryStr := os.Getenv("FLY_VM_MEMORY_MB")
-
 	if memoryStr == "" {
 		return 0, fmt.Errorf("FLY_VM_MEMORY_MB envvar has not been set")
 	}
