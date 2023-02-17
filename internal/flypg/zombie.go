@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/fly-apps/postgres-flex/internal/utils"
@@ -64,6 +65,24 @@ func ReadZombieLock() (string, error) {
 	}
 
 	return string(body), nil
+}
+
+func PerformScreening(ctx context.Context, conn *pgx.Conn, n *Node) (string, error) {
+	standbys, err := n.RepMgr.StandbyMembers(ctx, conn)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("failed to query standbys")
+		}
+	}
+
+	sample, err := TakeDNASample(ctx, n, standbys)
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate cluster data: %s", err)
+	}
+
+	fmt.Println(DNASampleString(sample))
+
+	return ZombieDiagnosis(sample)
 }
 
 type DNASample struct {
@@ -175,4 +194,67 @@ func DNASampleString(s *DNASample) string {
 		s.totalInactive,
 		s.totalConflicts,
 	)
+}
+
+func manageBootingZombie(ctx context.Context, n *Node) error {
+	fmt.Println("Zombie lock detected!")
+	primaryStr, err := ReadZombieLock()
+	if err != nil {
+		return fmt.Errorf("failed to read zombie lock: %s", primaryStr)
+	}
+
+	// If the zombie lock contains a hostname, it means we were able to
+	// resolve the real primary and will attempt to rejoin it.
+	if primaryStr != "" {
+		ip := net.ParseIP(primaryStr)
+		if ip == nil {
+			return fmt.Errorf("zombie.lock file contains an invalid ipv6 address")
+		}
+
+		conn, err := n.RepMgr.NewRemoteConnection(ctx, ip.String())
+		if err != nil {
+			return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", ip.String(), err)
+		}
+		defer conn.Close(ctx)
+
+		primary, err := n.RepMgr.PrimaryMember(ctx, conn)
+		if err != nil {
+			return fmt.Errorf("failed to confirm primary on recover target %s: %s", ip.String(), err)
+		}
+
+		// Confirm that our rejoin target still identifies itself as the primary.
+		if primary.Hostname != ip.String() {
+			// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
+			if err := RemoveZombieLock(); err != nil {
+				return fmt.Errorf("failed to remove zombie lock: %s", err)
+			}
+
+			return ErrZombieLockPrimaryMismatch
+		}
+
+		// If the primary does not reside within our primary region, we cannot rejoin until it is.
+		if primary.Region != n.PrimaryRegion {
+			fmt.Printf("Primary region mismatch detected. The primary lives in '%s', while PRIMARY_REGION is set to '%s'\n", primary.Region, n.PrimaryRegion)
+			return ErrZombieLockRegionMismatch
+		}
+
+		if err := n.RepMgr.rejoinCluster(primary.Hostname); err != nil {
+			return fmt.Errorf("failed to rejoin cluster: %s", err)
+		}
+
+		// TODO - Wait for target cluster to register self as a standby.
+
+		if err := RemoveZombieLock(); err != nil {
+			return fmt.Errorf("failed to remove zombie lock: %s", err)
+		}
+
+		// Ensure the single instance created with the --force-rewind process is cleaned up properly.
+		utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
+	} else {
+		// TODO - Provide link to documention on how to address this
+		fmt.Println("Zombie lock file does not contain a hostname.")
+		fmt.Println("This likely means that we were unable to determine who the real primary is.")
+	}
+
+	return nil
 }

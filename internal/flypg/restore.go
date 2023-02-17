@@ -92,6 +92,8 @@ func isRestoreActive() (bool, error) {
 			return false, err
 		}
 
+		// TODO: This will cause problems if the backup originated
+		// from an app with the same name.
 		if string(val) == os.Getenv("FLY_APP_NAME") {
 			return false, nil
 		}
@@ -177,9 +179,7 @@ func setRestoreLock() error {
 }
 
 func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
-	mode := "any"
-
-	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=%s", n.PrivateIP, mode)
+	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=any", n.PrivateIP)
 	conf, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, err
