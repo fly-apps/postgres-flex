@@ -196,7 +196,7 @@ func DNASampleString(s *DNASample) string {
 	)
 }
 
-func manageBootingZombie(ctx context.Context, n *Node) error {
+func handleZombieLock(ctx context.Context, n *Node) error {
 	fmt.Println("Zombie lock detected!")
 	primaryStr, err := ReadZombieLock()
 	if err != nil {

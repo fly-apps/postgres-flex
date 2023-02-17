@@ -135,7 +135,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Verify whether we are a booting zombie.
 	if ZombieLockExists() {
-		if err := manageBootingZombie(ctx, n); err != nil {
+		if err := handleZombieLock(ctx, n); err != nil {
 			return err
 		}
 	}
