@@ -182,7 +182,6 @@ func FindDatabase(ctx context.Context, pg *pgx.Conn, name string) (*DbInfo, erro
 	`
 
 	sql = fmt.Sprintf(sql, name)
-
 	row := pg.QueryRow(ctx, sql)
 
 	db := new(DbInfo)

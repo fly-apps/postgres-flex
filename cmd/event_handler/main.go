@@ -71,7 +71,7 @@ func main() {
 }
 
 func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {
-	primary, err := node.EvaluateClusterState(ctx, conn)
+	primary, err := flypg.PerformScreening(ctx, conn, node)
 	if errors.Is(err, flypg.ErrZombieDiagnosisUndecided) || errors.Is(err, flypg.ErrZombieDiscovered) {
 		if err := flypg.Quarantine(ctx, conn, node, primary); err != nil {
 			return fmt.Errorf("failed to quarantine failed primary: %s", err)

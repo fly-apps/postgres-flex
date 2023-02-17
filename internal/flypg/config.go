@@ -102,6 +102,7 @@ func WriteConfigFiles(c Config) error {
 		return err
 	}
 	defer internalFile.Close()
+
 	userFile, err := os.OpenFile(c.UserConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err

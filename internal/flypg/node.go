@@ -5,12 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
 	"os/exec"
-	"os/user"
 	"strconv"
 	"time"
 
@@ -119,7 +117,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Initiate a restore
+	// Check to see if we were just restored
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
 		// Check to see if there's an active restore.
 		active, err := isRestoreActive()
@@ -134,64 +132,10 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
+	// Verify whether we are a booting zombie.
 	if ZombieLockExists() {
-		fmt.Println("Zombie lock detected!")
-		primaryStr, err := ReadZombieLock()
-		if err != nil {
-			return fmt.Errorf("failed to read zombie lock: %s", primaryStr)
-		}
-
-		// If the zombie lock contains a hostname, it means we were able to resolve the real primary and
-		// will attempt to rejoin it.
-		if primaryStr != "" {
-			ip := net.ParseIP(primaryStr)
-			if ip == nil {
-				return fmt.Errorf("zombie.lock file contains an invalid ipv6 address")
-			}
-
-			conn, err := n.RepMgr.NewRemoteConnection(ctx, ip.String())
-			if err != nil {
-				return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", ip.String(), err)
-			}
-			defer conn.Close(ctx)
-
-			primary, err := n.RepMgr.PrimaryMember(ctx, conn)
-			if err != nil {
-				return fmt.Errorf("failed to confirm primary on recover target %s: %s", ip.String(), err)
-			}
-
-			// Confirm that our rejoin target still identifies itself as the primary.
-			if primary.Hostname != ip.String() {
-				// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
-				if err := RemoveZombieLock(); err != nil {
-					return fmt.Errorf("failed to remove zombie lock: %s", err)
-				}
-
-				return ErrZombieLockPrimaryMismatch
-			}
-
-			// If the primary does not reside within our primary region, we cannot rejoin until it is.
-			if primary.Region != n.PrimaryRegion {
-				fmt.Printf("Primary region mismatch detected. The primary lives in '%s', while PRIMARY_REGION is set to '%s'\n", primary.Region, n.PrimaryRegion)
-				return ErrZombieLockRegionMismatch
-			}
-
-			if err := n.RepMgr.rejoinCluster(primary.Hostname); err != nil {
-				return fmt.Errorf("failed to rejoin cluster: %s", err)
-			}
-
-			// TODO - Wait for target cluster to register self as a standby.
-
-			if err := RemoveZombieLock(); err != nil {
-				return fmt.Errorf("failed to remove zombie lock: %s", err)
-			}
-
-			// Ensure the single instance created with the --force-rewind process is cleaned up properly.
-			utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
-		} else {
-			// TODO - Provide link to documention on how to address this
-			fmt.Println("Zombie lock file does not contain a hostname.")
-			fmt.Println("This likely means that we were unable to determine who the real primary is.")
+		if err := handleZombieLock(ctx, n); err != nil {
+			return err
 		}
 	}
 
@@ -205,18 +149,24 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	if err := n.configure(ctx, store); err != nil {
-		return fmt.Errorf("failed to configure node: %s", err)
+	if err := n.configureInternal(store); err != nil {
+		return fmt.Errorf("failed to set internal config: %s", err)
+	}
+
+	if err := n.configureRepmgr(store); err != nil {
+		return fmt.Errorf("failed to configure repmgr config: %s", err)
 	}
 
 	if !n.isPGInitialized() {
-		// Check to see if repmgr cluster has been initialized.
+		// Check to see if cluster has already been initialized.
 		clusterInitialized, err := store.IsInitializationFlagSet()
 		if err != nil {
 			return fmt.Errorf("failed to verify cluster state %s", err)
 		}
 
 		if !clusterInitialized {
+			fmt.Println("Provisioning primary")
+
 			// Initialize ourselves as the primary.
 			if err := n.initializePG(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
@@ -227,6 +177,8 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 		} else {
+			fmt.Println("Provisioning standby")
+			// Initialize ourselves as a standby
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
 				return err
@@ -300,7 +252,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to register repmgr primary: %s", err)
 		}
 
-		// Set flag within consul to let future new members that the cluster exists
+		// Set initialization flag within consul so future members know they are joining
+		// an existing cluster.
 		if err := store.SetInitializationFlag(); err != nil {
 			return fmt.Errorf("failed to register cluster with consul")
 		}
@@ -326,7 +279,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		switch role {
 		case PrimaryRoleName:
-			primary, err := n.EvaluateClusterState(ctx, conn)
+			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
 				if err := Quarantine(ctx, conn, n, primary); err != nil {
@@ -383,13 +336,15 @@ func (n *Node) initializePG() error {
 		return nil
 	}
 
-	if err := ioutil.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
+	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
 		return err
 	}
 	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-	_, err := cmd.CombinedOutput()
+	if _, err := cmd.CombinedOutput(); err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 func (n *Node) isPGInitialized() bool {
@@ -398,56 +353,6 @@ func (n *Node) isPGInitialized() bool {
 		return false
 	}
 	return true
-}
-
-func (n *Node) configure(ctx context.Context, store *state.Store) error {
-	if err := n.configureInternal(store); err != nil {
-		return fmt.Errorf("failed to set internal config: %s", err)
-	}
-
-	if err := n.configureRepmgr(store); err != nil {
-		return fmt.Errorf("failed to configure repmgr config: %s", err)
-	}
-
-	return nil
-}
-
-func writeSSHKey() error {
-	err := os.Mkdir("/data/.ssh", 0700)
-	if err != nil && !os.IsExist(err) {
-		return err
-	}
-
-	key := os.Getenv("SSH_KEY")
-
-	keyFile, err := os.Create("/data/.ssh/id_rsa")
-	if err != nil {
-		return err
-	}
-	defer keyFile.Close()
-	_, err = keyFile.Write([]byte(key))
-	if err != nil {
-		return err
-	}
-
-	cert := os.Getenv("SSH_CERT")
-
-	certFile, err := os.Create("/data/.ssh/id_rsa-cert.pub")
-	if err != nil {
-		return err
-	}
-	defer certFile.Close()
-	_, err = certFile.Write([]byte(cert))
-	if err != nil {
-		return err
-	}
-
-	err = setSSHOwnership()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (n *Node) configureInternal(store *state.Store) error {
@@ -605,6 +510,7 @@ func (n *Node) setDefaultHBA() error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	for _, entry := range entries {
 		str := fmt.Sprintf("%s %s %s %s %s\n", entry.Type, entry.Database, entry.User, entry.Address, entry.Method)
@@ -634,47 +540,17 @@ func openConnection(parentCtx context.Context, host string, database string, cre
 	return pgx.ConnectConfig(ctx, conf)
 }
 
-func setSSHOwnership() error {
-	cmdStr := fmt.Sprintf("chmod 600 %s %s", "/data/.ssh/id_rsa", "/data/.ssh/id_rsa-cert.pub")
-	cmd := exec.Command("sh", "-c", cmdStr)
-	_, err := cmd.Output()
-	return err
-}
-
 func setDirOwnership() error {
-	pgUser, err := user.Lookup("postgres")
+	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
 	if err != nil {
-		return err
-	}
-	pgUID, err := strconv.Atoi(pgUser.Uid)
-	if err != nil {
-		return err
-	}
-	pgGID, err := strconv.Atoi(pgUser.Gid)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to find postgres user ids: %s", err)
 	}
 
 	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
 	cmd := exec.Command("sh", "-c", cmdStr)
-	_, err = cmd.Output()
-	return err
-}
-
-func (n *Node) EvaluateClusterState(ctx context.Context, conn *pgx.Conn) (string, error) {
-	standbys, err := n.RepMgr.StandbyMembers(ctx, conn)
-	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return "", fmt.Errorf("failed to query standbys")
-		}
+	if _, err = cmd.Output(); err != nil {
+		return err
 	}
 
-	sample, err := TakeDNASample(ctx, n, standbys)
-	if err != nil {
-		return "", fmt.Errorf("failed to evaluate cluster data: %s", err)
-	}
-
-	fmt.Println(DNASampleString(sample))
-
-	return ZombieDiagnosis(sample)
+	return nil
 }

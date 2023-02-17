@@ -97,16 +97,16 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 func (r *RepMgr) initialize() error {
 	r.setDefaults()
 
-	f, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer file.Close()
 
 	entries := []string{"include 'repmgr.internal.conf'\n", "include 'repmgr.user.conf'\n"}
 
 	for _, entry := range entries {
-		if _, err := f.WriteString(entry); err != nil {
+		if _, err := file.WriteString(entry); err != nil {
 			return fmt.Errorf("failed append configuration entry: %s", err)
 		}
 	}
@@ -238,6 +238,7 @@ func (r *RepMgr) writePasswdConf() error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	entries := []string{
 		fmt.Sprintf("*:*:*:%s:%s", r.Credentials.Username, r.Credentials.Password),
@@ -268,6 +269,7 @@ func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var members []Member
 
@@ -316,7 +318,6 @@ func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, 
 	}
 
 	var standbys []Member
-
 	for _, member := range members {
 		if member.Role == StandbyRoleName {
 			standbys = append(standbys, member)
@@ -391,7 +392,6 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 
 func (r *RepMgr) InRegionPeerIPs(ctx context.Context) ([]net.IPAddr, error) {
 	targets := fmt.Sprintf("%s.%s", r.PrimaryRegion, r.AppName)
-
 	return privnet.AllPeers(ctx, targets)
 }
 

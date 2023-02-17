@@ -3,7 +3,6 @@ package flypg
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -56,6 +55,7 @@ func Restore(ctx context.Context, node *Node) error {
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
+	defer conn.Close(ctx)
 
 	// Drop repmgr database to clear any metadata that belonged to the old cluster.
 	sql := "DROP DATABASE repmgr;"
@@ -92,6 +92,8 @@ func isRestoreActive() (bool, error) {
 			return false, err
 		}
 
+		// TODO: This will cause problems if the backup originated
+		// from an app with the same name.
 		if string(val) == os.Getenv("FLY_APP_NAME") {
 			return false, nil
 		}
@@ -110,7 +112,7 @@ func backupHBAFile() error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(pathToHBABackup, val, 0644); err != nil {
+	if err = os.WriteFile(pathToHBABackup, val, 0644); err != nil {
 		return err
 	}
 
@@ -177,9 +179,7 @@ func setRestoreLock() error {
 }
 
 func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
-	mode := "any"
-
-	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=%s", n.PrivateIP, mode)
+	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=any", n.PrivateIP)
 	conf, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, err
@@ -199,6 +199,7 @@ func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
 			if err == nil {
 				return conn, err
 			}
+
 		}
 	}
 }
