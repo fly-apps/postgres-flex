@@ -39,7 +39,7 @@ func (c *FlyPGConfig) UserConfig() ConfigMap {
 	return c.userConfig
 }
 
-func (c *FlyPGConfig) ConsulKey() string {
+func (*FlyPGConfig) ConsulKey() string {
 	return "FlyPGConfig"
 }
 
