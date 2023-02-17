@@ -132,7 +132,7 @@ func grantLocalAccess() error {
 		return err
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func restoreHBAFile() error {
@@ -160,7 +160,7 @@ func restoreHBAFile() error {
 		return err
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func setRestoreLock() error {
@@ -175,7 +175,7 @@ func setRestoreLock() error {
 		return err
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {

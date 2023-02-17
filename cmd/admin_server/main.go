@@ -5,5 +5,7 @@ import (
 )
 
 func main() {
-	api.StartHttpServer()
+	if err := api.StartHttpServer(); err != nil {
+		panic(err)
+	}
 }

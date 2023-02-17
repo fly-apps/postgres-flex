@@ -14,7 +14,7 @@ import (
 
 const Port = 5500
 
-func StartHttpServer() {
+func StartHttpServer() error {
 	r := chi.NewMux()
 	r.Mount("/flycheck", flycheck.Handler())
 	r.Mount("/commands", Handler())
@@ -24,9 +24,7 @@ func StartHttpServer() {
 		ReadHeaderTimeout: 3 * time.Second,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
-		panic(err)
-	}
+	return server.ListenAndServe()
 }
 
 func Handler() http.Handler {
