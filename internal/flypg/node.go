@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -253,7 +252,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to register repmgr primary: %s", err)
 		}
 
-		// Set flag within consul to let future new members that the cluster exists
+		// Set initialization flag within consul so future members know they are joining
+		// an existing cluster.
 		if err := store.SetInitializationFlag(); err != nil {
 			return fmt.Errorf("failed to register cluster with consul")
 		}
@@ -336,13 +336,15 @@ func (n *Node) initializePG() error {
 		return nil
 	}
 
-	if err := ioutil.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
+	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
 		return err
 	}
 	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-	_, err := cmd.CombinedOutput()
+	if _, err := cmd.CombinedOutput(); err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 func (n *Node) isPGInitialized() bool {

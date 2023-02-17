@@ -3,7 +3,6 @@ package flypg
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -56,6 +55,7 @@ func Restore(ctx context.Context, node *Node) error {
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
+	defer conn.Close(ctx)
 
 	// Drop repmgr database to clear any metadata that belonged to the old cluster.
 	sql := "DROP DATABASE repmgr;"
@@ -112,7 +112,7 @@ func backupHBAFile() error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(pathToHBABackup, val, 0644); err != nil {
+	if err = os.WriteFile(pathToHBABackup, val, 0644); err != nil {
 		return err
 	}
 
@@ -199,6 +199,7 @@ func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
 			if err == nil {
 				return conn, err
 			}
+
 		}
 	}
 }

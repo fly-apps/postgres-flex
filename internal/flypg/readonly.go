@@ -58,6 +58,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to establish connection: %s", err)
 	}
+	defer conn.Close(ctx)
 
 	members, err := n.RepMgr.Members(ctx, conn)
 	if err != nil {
