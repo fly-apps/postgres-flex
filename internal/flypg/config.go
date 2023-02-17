@@ -23,25 +23,30 @@ type Config interface {
 }
 
 func WriteUserConfig(c Config, consul *state.Store) error {
-	if c.UserConfig() != nil {
-		if err := pushToConsul(c, consul); err != nil {
-			return fmt.Errorf("failed to write to consul: %s", err)
-		}
+	if c.UserConfig() == nil {
+		return nil
+	}
 
-		if err := WriteConfigFiles(c); err != nil {
-			return fmt.Errorf("failed to write to pg config file: %s", err)
-		}
+	if err := pushToConsul(c, consul); err != nil {
+		return fmt.Errorf("failed to write to consul: %s", err)
+	}
+
+	if err := WriteConfigFiles(c); err != nil {
+		return fmt.Errorf("failed to write to pg config file: %s", err)
 	}
 
 	return nil
 }
 
 func PushUserConfig(c Config, consul *state.Store) error {
-	if c.UserConfig() != nil {
-		if err := pushToConsul(c, consul); err != nil {
-			return fmt.Errorf("failed to write to consul: %s", err)
-		}
+	if c.UserConfig() == nil {
+		return nil
 	}
+
+	if err := pushToConsul(c, consul); err != nil {
+		return fmt.Errorf("failed to write to consul: %s", err)
+	}
+
 	return nil
 }
 
