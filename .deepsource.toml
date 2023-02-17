@@ -1,0 +1,8 @@
+[[analyzers]]
+name = "shell"
+
+[[analyzers]]
+name = "go"
+
+  [analyzers.meta]
+  import_root = "github.com/fly-apps/postgres-flex"
