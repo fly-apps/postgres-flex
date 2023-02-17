@@ -97,11 +97,11 @@ func pullFromConsul(c Config, consul *state.Store) (ConfigMap, error) {
 }
 
 func WriteConfigFiles(c Config) error {
-	if err := writeUserConfig(c); err != nil {
+	if err := writeUserConfigFile(c); err != nil {
 		return fmt.Errorf("failed to write user config: %s", err)
 	}
 
-	if err := writeInternalConfig(c); err != nil {
+	if err := writeInternalConfigFile(c); err != nil {
 		return fmt.Errorf("failed to write internal config: %s", err)
 	}
 
@@ -127,7 +127,7 @@ func ReadFromFile(path string) (ConfigMap, error) {
 	return conf, file.Sync()
 }
 
-func writeInternalConfig(c Config) error {
+func writeInternalConfigFile(c Config) error {
 	file, err := os.OpenFile(c.InternalConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func writeInternalConfig(c Config) error {
 	return file.Sync()
 }
 
-func writeUserConfig(c Config) error {
+func writeUserConfigFile(c Config) error {
 	file, err := os.OpenFile(c.UserConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
