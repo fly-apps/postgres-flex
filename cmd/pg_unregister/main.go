@@ -34,6 +34,7 @@ func main() {
 		os.Exit(1)
 		return
 	}
+	defer conn.Close(ctx)
 
 	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
 	if err != nil {
