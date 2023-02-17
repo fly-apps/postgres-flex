@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
+	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 type ConfigMap map[string]interface{}
@@ -133,7 +134,7 @@ func ReadFromFile(path string) (ConfigMap, error) {
 }
 
 func writeInternalConfigFile(c Config) error {
-	file, err := os.OpenFile(c.InternalConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	file, err := os.Create(c.InternalConfigFile())
 	if err != nil {
 		return err
 	}
@@ -146,11 +147,15 @@ func writeInternalConfigFile(c Config) error {
 		file.Write([]byte(entry))
 	}
 
+	if err := utils.SetFileOwnership(c.InternalConfigFile(), "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership on %s: %s", c.InternalConfigFile(), err)
+	}
+
 	return file.Sync()
 }
 
 func writeUserConfigFile(c Config) error {
-	file, err := os.OpenFile(c.UserConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	file, err := os.Create(c.UserConfigFile())
 	if err != nil {
 		return err
 	}
@@ -162,6 +167,10 @@ func writeUserConfigFile(c Config) error {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
 		delete(internal, key)
 		file.Write([]byte(entry))
+	}
+
+	if err := utils.SetFileOwnership(c.UserConfigFile(), "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership on %s: %s", c.UserConfigFile(), err)
 	}
 
 	return file.Sync()

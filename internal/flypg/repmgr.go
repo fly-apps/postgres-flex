@@ -97,7 +97,7 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 func (r *RepMgr) initialize() error {
 	r.setDefaults()
 
-	file, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.Create(r.ConfigPath)
 	if err != nil {
 		return nil
 	}
@@ -115,8 +115,8 @@ func (r *RepMgr) initialize() error {
 		return fmt.Errorf("failed creating pgpass file: %s", err)
 	}
 
-	if err := setDirOwnership(); err != nil {
-		return fmt.Errorf("failed to set dir ownership: %s", err)
+	if err := utils.SetFileOwnership(r.ConfigPath, "postgres"); err != nil {
+		return fmt.Errorf("failed to set repmgr.conf ownership: %s", err)
 	}
 
 	return file.Sync()
@@ -162,12 +162,16 @@ func (r *RepMgr) setDefaults() {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	return utils.RunCommand(cmdStr, "postgres")
+	_, err := utils.RunCommand(cmdStr, "postgres")
+
+	return err
 }
 
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
-	return utils.RunCommand(cmdStr, "postgres")
+	_, err := utils.RunCommand(cmdStr, "postgres")
+
+	return err
 }
 
 func (r *RepMgr) rejoinCluster(hostname string) error {
@@ -180,14 +184,15 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 	)
 
 	fmt.Println(cmdStr)
+	_, err := utils.RunCommand(cmdStr, "postgres")
 
-	return utils.RunCommand(cmdStr, "postgres")
+	return err
 }
 
 func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -196,7 +201,7 @@ func (r *RepMgr) registerStandby() error {
 
 func (r *RepMgr) unregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to unregister standby: %s", err)
 	}
 
@@ -205,7 +210,7 @@ func (r *RepMgr) unregisterStandby(id int) error {
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
@@ -217,7 +222,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to clone primary: %s", err)
 	}
 
@@ -228,9 +233,13 @@ func (r *RepMgr) writePasswdConf() error {
 	path := "/data/.pgpass"
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open repmgr password file: %s", err)
 	}
 	defer file.Close()
+
+	if err := utils.SetFileOwnership(path, "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
+	}
 
 	entries := []string{
 		fmt.Sprintf("*:*:*:%s:%s", r.Credentials.Username, r.Credentials.Password),

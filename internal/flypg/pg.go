@@ -203,7 +203,7 @@ func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
 func (c *PGConfig) initialize() error {
 	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
-			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath), "postgres"); err != nil {
+			if _, err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath), "postgres"); err != nil {
 				return err
 			}
 		} else {
@@ -213,7 +213,7 @@ func (c *PGConfig) initialize() error {
 
 	if _, err := os.Stat(c.userConfigFilePath); err != nil {
 		if os.IsNotExist(err) {
-			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.userConfigFilePath), "postgres"); err != nil {
+			if _, err := utils.RunCommand(fmt.Sprintf("touch %s", c.userConfigFilePath), "postgres"); err != nil {
 				return err
 			}
 		} else {

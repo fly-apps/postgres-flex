@@ -31,17 +31,12 @@ func ZombieLockExists() bool {
 }
 
 func writeZombieLock(hostname string) error {
-	if err := os.WriteFile(zombieLockFile, []byte(hostname), 0644); err != nil {
+	if err := os.WriteFile(zombieLockFile, []byte(hostname), 0600); err != nil {
 		return err
 	}
 
-	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
-	if err != nil {
-		return err
-	}
-
-	if err := os.Chown(zombieLockFile, pgUID, pgGID); err != nil {
-		return fmt.Errorf("failed to set zombie.lock owner: %s", err)
+	if err := utils.SetFileOwnership(zombieLockFile, "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
 	}
 
 	return nil

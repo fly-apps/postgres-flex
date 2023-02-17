@@ -176,7 +176,6 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 		} else {
 			fmt.Println("Provisioning standby")
-			// Initialize ourselves as a standby
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to resolve member over dns: %s", err)
@@ -339,22 +338,25 @@ func (n *Node) initializePG() error {
 		return nil
 	}
 
-	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0600); err != nil {
-		return fmt.Errorf("failed to write default password: %s", err)
-	}
-
-	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
-	if err != nil {
-		return err
-	}
-
-	if err := os.Chown("/data/.default_password", pgUID, pgGID); err != nil {
-		return fmt.Errorf("failed to set .default_password owner: %s", err)
+	if err := writePasswordFile(n.OperatorCredentials.Password); err != nil {
+		return fmt.Errorf("failed to write pg password file: %s", err)
 	}
 
 	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=/data/.default_password", n.DataDir)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to run postgres initdb: %s", err)
+	}
+
+	return nil
+}
+
+func writePasswordFile(pwd string) error {
+	if err := os.WriteFile("/data/.default_password", []byte(pwd), 0600); err != nil {
+		return fmt.Errorf("failed to write default password: %s", err)
+	}
+
+	if err := utils.SetFileOwnership("/data/.default_password", "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
 	}
 
 	return nil
@@ -371,11 +373,11 @@ func (n *Node) configureInternal(store *state.Store) error {
 	}
 
 	if err := SyncUserConfig(&n.InternalConfig, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for internal config: %s", err)
+		return fmt.Errorf("failed to sync internal config from consul: %s", err)
 	}
 
 	if err := WriteConfigFiles(&n.InternalConfig); err != nil {
-		return fmt.Errorf("failed to write config files for internal config: %s", err)
+		return fmt.Errorf("failed to write internal config files: %s", err)
 	}
 
 	return nil
