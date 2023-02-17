@@ -20,7 +20,7 @@ func RunCommand(cmdStr, user string) error {
 	return err
 }
 
-func SystemUserIDs(usr string) (uid int, gid int, err error) {
+func SystemUserIDs(usr string) (int, int, error) {
 	pgUser, err := user.Lookup(usr)
 	if err != nil {
 		return 0, 0, err
