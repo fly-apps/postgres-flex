@@ -37,7 +37,6 @@ func CheckVM(checks *check.CheckSuite) *check.CheckSuite {
 
 func checkPressure(name string) (string, error) {
 	var avg10, avg60, avg300, counter float64
-	//var rest string
 	raw, err := ioutil.ReadFile("/proc/pressure/" + name)
 	if err != nil {
 		return "", err

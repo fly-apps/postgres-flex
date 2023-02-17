@@ -171,11 +171,7 @@ func (r *RepMgr) registerPrimary() error {
 
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
-
-	return nil
+	return utils.RunCommand(cmdStr, "postgres")
 }
 
 func (r *RepMgr) rejoinCluster(hostname string) error {
@@ -189,11 +185,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 
 	fmt.Println(cmdStr)
 
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
-
-	return nil
+	return utils.RunCommand(cmdStr, "postgres")
 }
 
 func (r *RepMgr) registerStandby() error {

@@ -181,7 +181,7 @@ func (n *Node) Init(ctx context.Context) error {
 			// Initialize ourselves as a standby
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to resolve member over dns: %s", err)
 			}
 
 			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
@@ -195,7 +195,7 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	if err := setDirOwnership(); err != nil {
-		return err
+		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
 	return nil
@@ -394,7 +394,7 @@ func (n *Node) configurePostgres(store *state.Store) error {
 	}
 
 	if err := WriteConfigFiles(n.PGConfig); err != nil {
-		return err
+		return fmt.Errorf("failed to write pg config files: %s", err)
 	}
 
 	return nil

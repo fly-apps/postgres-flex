@@ -48,11 +48,7 @@ func writeZombieLock(hostname string) error {
 }
 
 func RemoveZombieLock() error {
-	if err := os.Remove(zombieLockFile); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Remove(zombieLockFile)
 }
 
 func ReadZombieLock() (string, error) {

@@ -134,11 +134,7 @@ func removeReadOnlyLock() error {
 		return nil
 	}
 
-	if err := os.Remove(readOnlyLockFile); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Remove(readOnlyLockFile)
 }
 
 func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {

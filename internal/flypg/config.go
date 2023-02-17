@@ -69,11 +69,11 @@ func pushToConsul(c Config, consul *state.Store) error {
 
 	configBytes, err := json.Marshal(c.UserConfig())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal user config: %s", err)
 	}
 
 	if err := consul.PushUserConfig(c.ConsulKey(), configBytes); err != nil {
-		return err
+		return fmt.Errorf("failed to push user config to consul: %s", err)
 	}
 
 	return nil
