@@ -15,17 +15,24 @@ import (
 const eventLogFile = "/data/event.log"
 
 func main() {
+	ctx := context.Background()
+
+	if err := processEvent(ctx); err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+}
+
+func processEvent(ctx context.Context) error {
 	event := flag.String("event", "", "event type")
 	nodeID := flag.Int("node-id", 0, "the node id")
 	success := flag.String("success", "", "success (1) failure (0)")
 	details := flag.String("details", "", "details")
 	flag.Parse()
 
-	ctx := context.Background()
-
 	logFile, err := os.OpenFile(eventLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
-		fmt.Printf("failed to open event log: %s", err)
+		return fmt.Errorf("failed to open event log: %s", err)
 	}
 	defer logFile.Close()
 
@@ -34,40 +41,34 @@ func main() {
 
 	node, err := flypg.NewNode()
 	if err != nil {
-		logFile.Close()
-		log.Printf("failed to initialize node: %s", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize node: %s", err)
 	}
 
 	switch *event {
 	case "child_node_disconnect", "child_node_reconnect", "child_node_new_connect":
 		conn, err := node.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
-			log.Printf("failed to open local connection: %s", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to open local connection: %s", err)
 		}
 		defer conn.Close(ctx)
 
 		member, err := node.RepMgr.Member(ctx, conn)
 		if err != nil {
-			log.Printf("failed to resolve member: %s", err)
-			conn.Close(ctx)
-			os.Exit(1)
+			return fmt.Errorf("failed to resolve member: %s", err)
 		}
 
 		if member.Role != flypg.PrimaryRoleName {
 			// We should never get here.
 			log.Println("skipping since we are not the primary")
+			return nil
 		}
 
 		if err := evaluateClusterState(ctx, conn, node); err != nil {
-			log.Printf("failed to evaluate cluster state: %s", err)
+			return fmt.Errorf("failed to evaluate cluster state: %s", err)
 		}
-
-		return
-	default:
-		// noop
 	}
+
+	return nil
 }
 
 func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {
