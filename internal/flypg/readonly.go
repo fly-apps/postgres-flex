@@ -165,7 +165,6 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 			return fmt.Errorf("failed to list database: %s", err)
 		}
 
-		var dbNames []string
 		for _, db := range databases {
 			// exclude administrative dbs
 			if db.Name == "repmgr" || db.Name == "postgres" {
@@ -176,8 +175,6 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 			if _, err = conn.Exec(ctx, sql); err != nil {
 				return fmt.Errorf("failed to alter readonly state on db %s: %s", db.Name, err)
 			}
-
-			dbNames = append(dbNames, db.Name)
 		}
 	}
 
