@@ -14,7 +14,7 @@ import (
 
 const Port = 5500
 
-func StartHttpServer(node *flypg.Node) {
+func StartHttpServer() {
 	r := chi.NewMux()
 	r.Mount("/flycheck", flycheck.Handler())
 	r.Mount("/commands", Handler())
