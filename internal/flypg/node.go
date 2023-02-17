@@ -150,6 +150,14 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
+	if err := n.configureInternal(store); err != nil {
+		return fmt.Errorf("failed to set internal config: %s", err)
+	}
+
+	if err := n.configureRepmgr(store); err != nil {
+		return fmt.Errorf("failed to configure repmgr config: %s", err)
+	}
+
 	if !n.isPGInitialized() {
 		// Check to see if cluster has already been initialized.
 		clusterInitialized, err := store.IsInitializationFlagSet()
@@ -158,6 +166,8 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if !clusterInitialized {
+			fmt.Println("Provisioning primary")
+
 			// Initialize ourselves as the primary.
 			if err := n.initializePG(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
@@ -168,6 +178,7 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 		} else {
+			fmt.Println("Provisioning standby")
 			// Initialize ourselves as a standby
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
@@ -178,14 +189,6 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
-	}
-
-	if err := n.configureInternal(store); err != nil {
-		return fmt.Errorf("failed to set internal config: %s", err)
-	}
-
-	if err := n.configureRepmgr(store); err != nil {
-		return fmt.Errorf("failed to configure repmgr config: %s", err)
 	}
 
 	if err := n.configurePostgres(store); err != nil {
