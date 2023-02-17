@@ -162,11 +162,7 @@ func (r *RepMgr) setDefaults() {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
-
-	return nil
+	return utils.RunCommand(cmdStr, "postgres")
 }
 
 func (r *RepMgr) unregisterPrimary(id int) error {
@@ -330,7 +326,7 @@ func (*RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, e
 	return &member, nil
 }
 
-func (r *RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
+func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_name = '%s';", hostname)
 
