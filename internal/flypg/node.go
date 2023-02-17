@@ -343,6 +343,15 @@ func (n *Node) initializePG() error {
 		return fmt.Errorf("failed to write default password: %s", err)
 	}
 
+	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
+	if err != nil {
+		return err
+	}
+
+	if err := os.Chown("/data/.default_password", pgUID, pgGID); err != nil {
+		return fmt.Errorf("failed to set .default_password owner: %s", err)
+	}
+
 	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=/data/.default_password", n.DataDir)
 	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to run postgres initdb: %s", err)
