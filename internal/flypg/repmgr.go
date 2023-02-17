@@ -410,7 +410,7 @@ func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error
 	return false, nil
 }
 
-func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
+func (r *RepMgr) UnregisterMember(member Member) error {
 	if member.Role == PrimaryRoleName {
 		if err := r.unregisterPrimary(member.ID); err != nil {
 			return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)

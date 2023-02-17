@@ -105,11 +105,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 
 func ReadOnlyLockExists() bool {
 	_, err := os.Stat(readOnlyLockFile)
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	return true
+	return !os.IsNotExist(err)
 }
 
 func writeReadOnlyLock() error {

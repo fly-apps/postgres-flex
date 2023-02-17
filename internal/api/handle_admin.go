@@ -12,7 +12,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
+func handleReadonlyState(w http.ResponseWriter, _ *http.Request) {
 	res := &Response{
 		Result: false,
 	}
@@ -24,7 +24,7 @@ func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, res, http.StatusOK)
 }
 
-func handleHaproxyRestart(w http.ResponseWriter, r *http.Request) {
+func handleHaproxyRestart(w http.ResponseWriter, _ *http.Request) {
 	if err := flypg.RestartHaproxy(); err != nil {
 		renderErr(w, err)
 		return

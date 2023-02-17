@@ -43,7 +43,7 @@ func main() {
 		return
 	}
 
-	if err := node.RepMgr.UnregisterMember(ctx, *member); err != nil {
+	if err := node.RepMgr.UnregisterMember(*member); err != nil {
 		utils.WriteError(fmt.Errorf("failed to unregister member: %v", err))
 		os.Exit(1)
 		return

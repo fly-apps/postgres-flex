@@ -27,10 +27,7 @@ const zombieLockFile = "/data/zombie.lock"
 
 func ZombieLockExists() bool {
 	_, err := os.Stat(zombieLockFile)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
+	return !os.IsNotExist(err)
 }
 
 func writeZombieLock(hostname string) error {
@@ -175,7 +172,7 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 	return "", ErrZombieDiagnosisUndecided
 }
 
-func Quarantine(ctx context.Context, conn *pgx.Conn, n *Node, primary string) error {
+func Quarantine(ctx context.Context, n *Node, primary string) error {
 	if err := writeZombieLock(primary); err != nil {
 		return fmt.Errorf("failed to set zombie lock: %s", err)
 	}

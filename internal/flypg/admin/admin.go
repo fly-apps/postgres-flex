@@ -140,7 +140,7 @@ func DropReplicationSlot(ctx context.Context, pg *pgx.Conn, name string) error {
 
 func EnableExtension(ctx context.Context, pg *pgx.Conn, extension string) error {
 	sql := fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s;", extension)
-	_, err := pg.Exec(context.Background(), sql)
+	_, err := pg.Exec(ctx, sql)
 	return err
 }
 

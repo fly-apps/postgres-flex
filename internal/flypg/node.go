@@ -282,13 +282,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
-				if err := Quarantine(ctx, conn, n, primary); err != nil {
+				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 			} else if errors.Is(err, ErrZombieDiscovered) {
 				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
 
-				if err := Quarantine(ctx, conn, n, primary); err != nil {
+				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 				// Issue panic to force a process restart so we can attempt to rejoin
@@ -336,7 +336,7 @@ func (n *Node) initializePG() error {
 		return nil
 	}
 
-	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
+	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0600); err != nil {
 		return err
 	}
 	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
@@ -349,10 +349,7 @@ func (n *Node) initializePG() error {
 
 func (n *Node) isPGInitialized() bool {
 	_, err := os.Stat(n.DataDir)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
+	return !os.IsNotExist(err)
 }
 
 func (n *Node) configureInternal(store *state.Store) error {
