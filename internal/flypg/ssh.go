@@ -6,18 +6,38 @@ import (
 	"os/exec"
 )
 
-func writeSSHKey() error {
-	var (
-		key  = os.Getenv("SSH_KEY")
-		cert = os.Getenv("SSH_CERT")
-	)
+const (
+	privateKeyFile = "/data/.ssh/id_rsa"
+	publicKeyFile  = "/data/.ssh/id_rsa-cert.pub"
+)
 
+func writeSSHKey() error {
 	err := os.Mkdir("/data/.ssh", 0700)
 	if err != nil && !os.IsExist(err) {
 		return err
 	}
 
-	keyFile, err := os.Create("/data/.ssh/id_rsa")
+	if err := writePrivateKey(); err != nil {
+		return fmt.Errorf("failed to write private key: %s", err)
+	}
+
+	if err := writePublicKey(); err != nil {
+		return fmt.Errorf("failed to write cert: %s", err)
+	}
+
+	cmdStr := fmt.Sprintf("chmod 600 %s %s", privateKeyFile, publicKeyFile)
+	cmd := exec.Command("sh", "-c", cmdStr)
+	if _, err := cmd.Output(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writePrivateKey() error {
+	key := os.Getenv("SSH_KEY")
+
+	keyFile, err := os.Create(privateKeyFile)
 	if err != nil {
 		return err
 	}
@@ -27,7 +47,13 @@ func writeSSHKey() error {
 		return err
 	}
 
-	certFile, err := os.Create("/data/.ssh/id_rsa-cert.pub")
+	return keyFile.Sync()
+}
+
+func writePublicKey() error {
+	cert := os.Getenv("SSH_CERT")
+
+	certFile, err := os.Create(publicKeyFile)
 	if err != nil {
 		return err
 	}
@@ -38,11 +64,5 @@ func writeSSHKey() error {
 		return err
 	}
 
-	cmdStr := fmt.Sprintf("chmod 600 %s %s", "/data/.ssh/id_rsa", "/data/.ssh/id_rsa-cert.pub")
-	cmd := exec.Command("sh", "-c", cmdStr)
-	if _, err := cmd.Output(); err != nil {
-		return err
-	}
-
-	return nil
+	return certFile.Sync()
 }

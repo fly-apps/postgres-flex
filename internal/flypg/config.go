@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
+	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 type ConfigMap map[string]interface{}
@@ -23,25 +24,30 @@ type Config interface {
 }
 
 func WriteUserConfig(c Config, consul *state.Store) error {
-	if c.UserConfig() != nil {
-		if err := pushToConsul(c, consul); err != nil {
-			return fmt.Errorf("failed to write to consul: %s", err)
-		}
+	if c.UserConfig() == nil {
+		return nil
+	}
 
-		if err := WriteConfigFiles(c); err != nil {
-			return fmt.Errorf("failed to write to pg config file: %s", err)
-		}
+	if err := pushToConsul(c, consul); err != nil {
+		return fmt.Errorf("failed to write to consul: %s", err)
+	}
+
+	if err := WriteConfigFiles(c); err != nil {
+		return fmt.Errorf("failed to write to pg config file: %s", err)
 	}
 
 	return nil
 }
 
 func PushUserConfig(c Config, consul *state.Store) error {
-	if c.UserConfig() != nil {
-		if err := pushToConsul(c, consul); err != nil {
-			return fmt.Errorf("failed to write to consul: %s", err)
-		}
+	if c.UserConfig() == nil {
+		return nil
 	}
+
+	if err := pushToConsul(c, consul); err != nil {
+		return fmt.Errorf("failed to write to consul: %s", err)
+	}
+
 	return nil
 }
 
@@ -69,11 +75,11 @@ func pushToConsul(c Config, consul *state.Store) error {
 
 	configBytes, err := json.Marshal(c.UserConfig())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal user config: %s", err)
 	}
 
 	if err := consul.PushUserConfig(c.ConsulKey(), configBytes); err != nil {
-		return err
+		return fmt.Errorf("failed to push user config to consul: %s", err)
 	}
 
 	return nil
@@ -97,29 +103,12 @@ func pullFromConsul(c Config, consul *state.Store) (ConfigMap, error) {
 }
 
 func WriteConfigFiles(c Config) error {
-	internalFile, err := os.OpenFile(c.InternalConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer internalFile.Close()
-
-	userFile, err := os.OpenFile(c.UserConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer userFile.Close()
-
-	internal := c.InternalConfig()
-
-	for key, value := range c.UserConfig() {
-		entry := fmt.Sprintf("%s = %v\n", key, value)
-		delete(internal, key)
-		userFile.Write([]byte(entry))
+	if err := writeUserConfigFile(c); err != nil {
+		return fmt.Errorf("failed to write user config: %s", err)
 	}
 
-	for key, value := range internal {
-		entry := fmt.Sprintf("%s = %v\n", key, value)
-		internalFile.Write([]byte(entry))
+	if err := writeInternalConfigFile(c); err != nil {
+		return fmt.Errorf("failed to write internal config: %s", err)
 	}
 
 	return nil
@@ -141,5 +130,48 @@ func ReadFromFile(path string) (ConfigMap, error) {
 		conf[key] = value
 	}
 
-	return conf, nil
+	return conf, file.Sync()
+}
+
+func writeInternalConfigFile(c Config) error {
+	file, err := os.Create(c.InternalConfigFile())
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	internal := c.InternalConfig()
+
+	for key, value := range internal {
+		entry := fmt.Sprintf("%s = %v\n", key, value)
+		file.Write([]byte(entry))
+	}
+
+	if err := utils.SetFileOwnership(c.InternalConfigFile(), "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership on %s: %s", c.InternalConfigFile(), err)
+	}
+
+	return file.Sync()
+}
+
+func writeUserConfigFile(c Config) error {
+	file, err := os.Create(c.UserConfigFile())
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	internal := c.InternalConfig()
+
+	for key, value := range c.UserConfig() {
+		entry := fmt.Sprintf("%s = %v\n", key, value)
+		delete(internal, key)
+		file.Write([]byte(entry))
+	}
+
+	if err := utils.SetFileOwnership(c.UserConfigFile(), "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership on %s: %s", c.UserConfigFile(), err)
+	}
+
+	return file.Sync()
 }

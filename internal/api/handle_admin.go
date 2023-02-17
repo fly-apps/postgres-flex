@@ -12,7 +12,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
+func handleReadonlyState(w http.ResponseWriter, _ *http.Request) {
 	res := &Response{
 		Result: false,
 	}
@@ -24,7 +24,7 @@ func handleReadonlyState(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, res, http.StatusOK)
 }
 
-func handleHaproxyRestart(w http.ResponseWriter, r *http.Request) {
+func handleHaproxyRestart(w http.ResponseWriter, _ *http.Request) {
 	if err := flypg.RestartHaproxy(); err != nil {
 		renderErr(w, err)
 		return
@@ -78,18 +78,18 @@ func handleDisableReadonly(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRole(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-	defer close()
-
 	node, err := flypg.NewNode()
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
+
+	conn, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer conn.Close(r.Context())
 
 	member, err := node.RepMgr.Member(r.Context(), conn)
 	if err != nil {
@@ -118,13 +118,19 @@ type SettingsUpdate struct {
 	RestartRequired bool   `json:"restart_required"`
 }
 
-func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
+	node, err := flypg.NewNode()
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+
+	conn, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer conn.Close(r.Context())
 
 	consul, err := state.NewStore()
 	if err != nil {
@@ -132,7 +138,7 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user, err := flypg.ReadFromFile(s.node.PGConfig.UserConfigFile())
+	user, err := flypg.ReadFromFile(node.PGConfig.UserConfigFile())
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -158,7 +164,7 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 		user[k] = v
 	}
 
-	s.node.PGConfig.SetUserConfig(user)
+	node.PGConfig.SetUserConfig(user)
 
 	var requiresRestart []string
 
@@ -185,7 +191,7 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 		}}
 	}
 
-	err = flypg.PushUserConfig(s.node.PGConfig, consul)
+	err = flypg.PushUserConfig(node.PGConfig, consul)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -194,13 +200,19 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 	renderJSON(w, res, http.StatusOK)
 }
 
-func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+func handleApplyConfig(w http.ResponseWriter, r *http.Request) {
+	node, err := flypg.NewNode()
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+
+	conn, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer conn.Close(r.Context())
 
 	consul, err := state.NewStore()
 	if err != nil {
@@ -208,7 +220,7 @@ func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = flypg.SyncUserConfig(s.node.PGConfig, consul)
+	err = flypg.SyncUserConfig(node.PGConfig, consul)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -225,16 +237,21 @@ type PGSettingsResponse struct {
 	Settings []admin.PGSetting `json:"settings"`
 }
 
-func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+func handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
+	node, err := flypg.NewNode()
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 
-	defer close()
+	conn, err := localConnection(r.Context(), "postgres")
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+	defer conn.Close(r.Context())
 
-	all, err := s.node.PGConfig.CurrentConfig()
+	all, err := node.PGConfig.CurrentConfig()
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -264,8 +281,14 @@ func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Reque
 	renderJSON(w, resp, http.StatusOK)
 }
 
-func (s *Server) handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
-	all, err := s.node.RepMgr.CurrentConfig()
+func handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
+	node, err := flypg.NewNode()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	all, err := node.RepMgr.CurrentConfig()
 	if err != nil {
 		renderErr(w, err)
 		return

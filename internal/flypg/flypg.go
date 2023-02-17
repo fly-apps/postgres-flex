@@ -39,7 +39,7 @@ func (c *FlyPGConfig) UserConfig() ConfigMap {
 	return c.userConfig
 }
 
-func (c *FlyPGConfig) ConsulKey() string {
+func (*FlyPGConfig) ConsulKey() string {
 	return "FlyPGConfig"
 }
 
@@ -84,13 +84,21 @@ func (c *FlyPGConfig) initialize() error {
 	if err != nil {
 		return err
 	}
-	defer internal.Close()
+	defer func() {
+		if err := internal.Close(); err != nil {
+			fmt.Printf("failed to close file: %s\n", err)
+		}
+	}()
 
 	user, err := os.Create(c.userConfigFilePath)
 	if err != nil {
 		return err
 	}
-	defer user.Close()
+	defer func() {
+		if err := user.Close(); err != nil {
+			fmt.Printf("failed to close file: %s\n", err)
+		}
+	}()
 
 	return nil
 }

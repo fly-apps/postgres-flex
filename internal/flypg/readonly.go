@@ -105,11 +105,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 
 func ReadOnlyLockExists() bool {
 	_, err := os.Stat(readOnlyLockFile)
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	return true
+	return !os.IsNotExist(err)
 }
 
 func writeReadOnlyLock() error {
@@ -117,17 +113,12 @@ func writeReadOnlyLock() error {
 		return nil
 	}
 
-	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0644); err != nil {
+	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0600); err != nil {
 		return err
 	}
 
-	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
-	if err != nil {
-		return err
-	}
-
-	if err := os.Chown(readOnlyLockFile, pgUID, pgGID); err != nil {
-		return fmt.Errorf("failed to set readonly.lock owner: %s", err)
+	if err := utils.SetFileOwnership(readOnlyLockFile, "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
 	}
 
 	return nil
@@ -138,11 +129,7 @@ func removeReadOnlyLock() error {
 		return nil
 	}
 
-	if err := os.Remove(readOnlyLockFile); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Remove(readOnlyLockFile)
 }
 
 func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
@@ -169,7 +156,6 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 			return fmt.Errorf("failed to list database: %s", err)
 		}
 
-		var dbNames []string
 		for _, db := range databases {
 			// exclude administrative dbs
 			if db.Name == "repmgr" || db.Name == "postgres" {
@@ -180,8 +166,6 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 			if _, err = conn.Exec(ctx, sql); err != nil {
 				return fmt.Errorf("failed to alter readonly state on db %s: %s", db.Name, err)
 			}
-
-			dbNames = append(dbNames, db.Name)
 		}
 	}
 

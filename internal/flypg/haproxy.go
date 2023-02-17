@@ -7,7 +7,7 @@ import (
 )
 
 func RestartHaproxy() error {
-	if err := utils.RunCommand("restart-haproxy", "root"); err != nil {
+	if _, err := utils.RunCommand("restart-haproxy", "root"); err != nil {
 		return fmt.Errorf("failed to restart haproxy: %s", err)
 	}
 

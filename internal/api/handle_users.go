@@ -12,12 +12,12 @@ import (
 func handleListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	users, err := admin.ListUsers(ctx, conn)
 	if err != nil {
@@ -38,12 +38,12 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
 		name = chi.URLParam(r, "name")
 	)
 
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	user, err := admin.FindUser(ctx, conn, name)
 	if err != nil {
@@ -59,12 +59,12 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
 func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	var input createUserRequest
 	err = json.NewDecoder(r.Body).Decode(&input)
@@ -107,12 +107,12 @@ func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		name = chi.URLParam(r, "name")
 	)
 
-	conn, close, err := localConnection(r.Context(), "postgres")
+	conn, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -121,12 +121,12 @@ func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, database := range databases {
-		dbConn, close, err := localConnection(r.Context(), database.Name)
+		dbConn, err := localConnection(r.Context(), database.Name)
 		if err != nil {
 			renderErr(w, err)
 			return
 		}
-		defer close()
+		defer dbConn.Close(r.Context())
 
 		if err := admin.ReassignOwnership(ctx, dbConn, name, "postgres"); err != nil {
 			renderErr(w, fmt.Errorf("failed to reassign ownership: %s", err))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flycheck"
 	"github.com/fly-apps/postgres-flex/internal/flypg"
@@ -13,21 +14,21 @@ import (
 
 const Port = 5500
 
-type Server struct {
-	node *flypg.Node
-}
-
-func StartHttpServer(node *flypg.Node) {
-	server := &Server{node: node}
+func StartHttpServer() error {
 	r := chi.NewMux()
-
 	r.Mount("/flycheck", flycheck.Handler())
-	r.Mount("/commands", server.Handler())
+	r.Mount("/commands", Handler())
 
-	http.ListenAndServe(fmt.Sprintf(":%d", Port), r)
+	server := &http.Server{
+		Handler:           r,
+		Addr:              fmt.Sprintf(":%v", Port),
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+
+	return server.ListenAndServe()
 }
 
-func (s *Server) Handler() http.Handler {
+func Handler() http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/users", func(r chi.Router) {
@@ -51,28 +52,25 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/haproxy/restart", handleHaproxyRestart)
 
 		r.Get("/role", handleRole)
-		r.Get("/settings/view/postgres", s.handleViewPostgresSettings)
-		r.Get("/settings/view/repmgr", s.handleViewRepmgrSettings)
-		r.Post("/settings/update/postgres", s.handleUpdatePostgresSettings)
-		r.Post("/settings/apply", s.handleApplyConfig)
+		r.Get("/settings/view/postgres", handleViewPostgresSettings)
+		r.Get("/settings/view/repmgr", handleViewRepmgrSettings)
+		r.Post("/settings/update/postgres", handleUpdatePostgresSettings)
+		r.Post("/settings/apply", handleApplyConfig)
 	})
 
 	return r
 }
 
-func localConnection(ctx context.Context, database string) (*pgx.Conn, func() error, error) {
+func localConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	node, err := flypg.NewNode()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	pg, err := node.NewLocalConnection(ctx, database)
 	if err != nil {
-		return nil, nil, err
-	}
-	close := func() error {
-		return pg.Close(ctx)
+		return nil, err
 	}
 
-	return pg, close, nil
+	return pg, nil
 }

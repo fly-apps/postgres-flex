@@ -11,43 +11,42 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
+
+	if err := processUnregistration(ctx); err != nil {
+		utils.WriteError(err)
+		os.Exit(1)
+	}
+
+	utils.WriteOutput("Member has been succesfully unregistered", "")
+}
+
+func processUnregistration(ctx context.Context) error {
 	encodedArg := os.Args[1]
 	hostnameBytes, err := base64.StdEncoding.DecodeString(encodedArg)
 	if err != nil {
-		utils.WriteError(fmt.Errorf("failed to decode hostname: %v", err))
-		os.Exit(1)
-		return
+		return fmt.Errorf("failed to decode hostname: %v", err)
 	}
-
-	ctx := context.Background()
 
 	node, err := flypg.NewNode()
 	if err != nil {
-		utils.WriteError(err)
-		os.Exit(1)
-		return
+		return fmt.Errorf("faied to initialize node: %s", err)
 	}
 
 	conn, err := node.RepMgr.NewLocalConnection(ctx)
 	if err != nil {
-		utils.WriteError(fmt.Errorf("failed to connect to local db: %s", err))
-		os.Exit(1)
-		return
+		return fmt.Errorf("failed to connect to local db: %s", err)
 	}
 	defer conn.Close(ctx)
 
 	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
 	if err != nil {
-		utils.WriteError(fmt.Errorf("failed to resolve member: %s", err))
-		os.Exit(1)
-		return
+		return fmt.Errorf("failed to resolve member: %s", err)
 	}
 
-	if err := node.RepMgr.UnregisterMember(ctx, *member); err != nil {
-		utils.WriteError(fmt.Errorf("failed to unregister member: %v", err))
-		os.Exit(1)
-		return
+	if err := node.RepMgr.UnregisterMember(*member); err != nil {
+		return fmt.Errorf("failed to unregister member: %v", err)
 	}
 
-	utils.WriteOutput("Member has been succesfully unregistered", "")
+	return nil
 }

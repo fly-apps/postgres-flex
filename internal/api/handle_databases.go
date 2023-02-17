@@ -11,12 +11,12 @@ import (
 func handleListDatabases(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	dbs, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -36,12 +36,12 @@ func handleGetDatabase(w http.ResponseWriter, r *http.Request) {
 		name = chi.URLParam(r, "name")
 	)
 
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	db, err := admin.FindDatabase(ctx, conn, name)
 	if err != nil {
@@ -58,12 +58,12 @@ func handleGetDatabase(w http.ResponseWriter, r *http.Request) {
 func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	var input createDatabaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -77,12 +77,12 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbConn, close, err := localConnection(ctx, input.Name)
+	dbConn, err := localConnection(ctx, input.Name)
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	if err := admin.GrantCreateOnPublic(ctx, dbConn); err != nil {
 		renderErr(w, err)
@@ -98,12 +98,12 @@ func handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		ctx  = r.Context()
 		name = chi.URLParam(r, "name")
 	)
-	conn, close, err := localConnection(ctx, "postgres")
+	conn, err := localConnection(ctx, "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	err = admin.DeleteDatabase(ctx, conn, name)
 	if err != nil {

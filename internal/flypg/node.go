@@ -114,7 +114,7 @@ func NewNode() (*Node, error) {
 func (n *Node) Init(ctx context.Context) error {
 	// Ensure directory and files have proper permissions
 	if err := setDirOwnership(); err != nil {
-		return err
+		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
 	// Check to see if we were just restored
@@ -122,7 +122,7 @@ func (n *Node) Init(ctx context.Context) error {
 		// Check to see if there's an active restore.
 		active, err := isRestoreActive()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to verify active restore: %s", err)
 		}
 
 		if active {
@@ -135,13 +135,13 @@ func (n *Node) Init(ctx context.Context) error {
 	// Verify whether we are a booting zombie.
 	if ZombieLockExists() {
 		if err := handleZombieLock(ctx, n); err != nil {
-			return err
+			return fmt.Errorf("failed to handle zombie lock: %s", err)
 		}
 	}
 
 	err := writeSSHKey()
 	if err != nil {
-		return fmt.Errorf("failed initialize ssh. %v", err)
+		return fmt.Errorf("failed write ssh keys: %s", err)
 	}
 
 	store, err := state.NewStore()
@@ -166,7 +166,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 		if !clusterInitialized {
 			fmt.Println("Provisioning primary")
-
 			// Initialize ourselves as the primary.
 			if err := n.initializePG(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
@@ -175,16 +174,19 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := n.setDefaultHBA(); err != nil {
 				return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 			}
-
 		} else {
 			fmt.Println("Provisioning standby")
-			// Initialize ourselves as a standby
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to resolve member over dns: %s", err)
 			}
 
 			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
+				// Clean-up the directory so it can be retried.
+				if rErr := os.Remove(n.DataDir); rErr != nil {
+					fmt.Printf("failed to cleanup postgresql dir after clone error: %s\n", rErr)
+				}
+
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
@@ -195,7 +197,7 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	if err := setDirOwnership(); err != nil {
-		return err
+		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
 	return nil
@@ -282,13 +284,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
-				if err := Quarantine(ctx, conn, n, primary); err != nil {
+				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 			} else if errors.Is(err, ErrZombieDiscovered) {
 				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
 
-				if err := Quarantine(ctx, conn, n, primary); err != nil {
+				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 				// Issue panic to force a process restart so we can attempt to rejoin
@@ -336,12 +338,25 @@ func (n *Node) initializePG() error {
 		return nil
 	}
 
-	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0644); err != nil {
-		return err
+	if err := writePasswordFile(n.OperatorCredentials.Password); err != nil {
+		return fmt.Errorf("failed to write pg password file: %s", err)
 	}
-	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-	if _, err := cmd.CombinedOutput(); err != nil {
-		return err
+
+	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=/data/.default_password", n.DataDir)
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to run postgres initdb: %s", err)
+	}
+
+	return nil
+}
+
+func writePasswordFile(pwd string) error {
+	if err := os.WriteFile("/data/.default_password", []byte(pwd), 0600); err != nil {
+		return fmt.Errorf("failed to write default password: %s", err)
+	}
+
+	if err := utils.SetFileOwnership("/data/.default_password", "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
 	}
 
 	return nil
@@ -349,10 +364,7 @@ func (n *Node) initializePG() error {
 
 func (n *Node) isPGInitialized() bool {
 	_, err := os.Stat(n.DataDir)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
+	return !os.IsNotExist(err)
 }
 
 func (n *Node) configureInternal(store *state.Store) error {
@@ -361,11 +373,11 @@ func (n *Node) configureInternal(store *state.Store) error {
 	}
 
 	if err := SyncUserConfig(&n.InternalConfig, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for internal config: %s", err)
+		return fmt.Errorf("failed to sync internal config from consul: %s", err)
 	}
 
 	if err := WriteConfigFiles(&n.InternalConfig); err != nil {
-		return fmt.Errorf("failed to write config files for internal config: %s", err)
+		return fmt.Errorf("failed to write internal config files: %s", err)
 	}
 
 	return nil
@@ -397,7 +409,7 @@ func (n *Node) configurePostgres(store *state.Store) error {
 	}
 
 	if err := WriteConfigFiles(n.PGConfig); err != nil {
-		return err
+		return fmt.Errorf("failed to write pg config files: %s", err)
 	}
 
 	return nil
@@ -506,7 +518,7 @@ func (n *Node) setDefaultHBA() error {
 	}
 
 	path := fmt.Sprintf("%s/pg_hba.conf", n.DataDir)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -520,7 +532,7 @@ func (n *Node) setDefaultHBA() error {
 		}
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func openConnection(parentCtx context.Context, host string, database string, creds Credentials) (*pgx.Conn, error) {

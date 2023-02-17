@@ -112,15 +112,11 @@ func backupHBAFile() error {
 		return err
 	}
 
-	if err = os.WriteFile(pathToHBABackup, val, 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(pathToHBABackup, val, 0600)
 }
 
 func grantLocalAccess() error {
-	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -132,7 +128,7 @@ func grantLocalAccess() error {
 		return err
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func restoreHBAFile() error {
@@ -143,7 +139,7 @@ func restoreHBAFile() error {
 	}
 
 	// open the main pg_hba
-	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -160,11 +156,11 @@ func restoreHBAFile() error {
 		return err
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func setRestoreLock() error {
-	file, err := os.OpenFile(restoreLockFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(restoreLockFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -175,7 +171,7 @@ func setRestoreLock() error {
 		return err
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {

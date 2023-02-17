@@ -80,7 +80,7 @@ func (r *RepMgr) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func (r *RepMgr) ConsulKey() string {
+func (*RepMgr) ConsulKey() string {
 	return "repmgr"
 }
 
@@ -97,7 +97,7 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 func (r *RepMgr) initialize() error {
 	r.setDefaults()
 
-	file, err := os.OpenFile(r.ConfigPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.Create(r.ConfigPath)
 	if err != nil {
 		return nil
 	}
@@ -115,11 +115,11 @@ func (r *RepMgr) initialize() error {
 		return fmt.Errorf("failed creating pgpass file: %s", err)
 	}
 
-	if err := setDirOwnership(); err != nil {
-		return fmt.Errorf("failed to set dir ownership: %s", err)
+	if err := utils.SetFileOwnership(r.ConfigPath, "postgres"); err != nil {
+		return fmt.Errorf("failed to set repmgr.conf ownership: %s", err)
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
@@ -162,20 +162,16 @@ func (r *RepMgr) setDefaults() {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
+	_, err := utils.RunCommand(cmdStr, "postgres")
 
-	return nil
+	return err
 }
 
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
+	_, err := utils.RunCommand(cmdStr, "postgres")
 
-	return nil
+	return err
 }
 
 func (r *RepMgr) rejoinCluster(hostname string) error {
@@ -188,18 +184,15 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 	)
 
 	fmt.Println(cmdStr)
+	_, err := utils.RunCommand(cmdStr, "postgres")
 
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to register standby: %s", err)
 	}
 
@@ -208,7 +201,7 @@ func (r *RepMgr) registerStandby() error {
 
 func (r *RepMgr) unregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		fmt.Printf("failed to unregister standby: %s", err)
 	}
 
@@ -217,8 +210,8 @@ func (r *RepMgr) unregisterStandby(id int) error {
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
 	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -F",
@@ -229,16 +222,24 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	return utils.RunCommand(cmdStr, "postgres")
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to clone primary: %s", err)
+	}
+
+	return nil
 }
 
 func (r *RepMgr) writePasswdConf() error {
 	path := "/data/.pgpass"
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open repmgr password file: %s", err)
 	}
 	defer file.Close()
+
+	if err := utils.SetFileOwnership(path, "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
+	}
 
 	entries := []string{
 		fmt.Sprintf("*:*:*:%s:%s", r.Credentials.Username, r.Credentials.Password),
@@ -252,7 +253,7 @@ func (r *RepMgr) writePasswdConf() error {
 		}
 	}
 
-	return nil
+	return file.Sync()
 }
 
 type Member struct {
@@ -263,7 +264,7 @@ type Member struct {
 	Role     string
 }
 
-func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
+func (*RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes;"
 	rows, err := pg.Query(ctx, sql)
 	if err != nil {
@@ -272,7 +273,6 @@ func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	defer rows.Close()
 
 	var members []Member
-
 	for rows.Next() {
 		var member Member
 		if err := rows.Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role); err != nil {
@@ -282,7 +282,7 @@ func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 		members = append(members, member)
 	}
 
-	return members, err
+	return members, nil
 }
 
 func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
@@ -300,7 +300,7 @@ func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
 	return nil, pgx.ErrNoRows
 }
 
-func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
+func (*RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
 	var member Member
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes where type = 'primary' and active = true;"
 	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
@@ -327,7 +327,7 @@ func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, 
 	return standbys, nil
 }
 
-func (r *RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
+func (*RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_id = %d;", id)
 
@@ -339,7 +339,7 @@ func (r *RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member,
 	return &member, nil
 }
 
-func (r *RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
+func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_name = '%s';", hostname)
 
@@ -410,7 +410,7 @@ func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error
 	return false, nil
 }
 
-func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
+func (r *RepMgr) UnregisterMember(member Member) error {
 	if member.Role == PrimaryRoleName {
 		if err := r.unregisterPrimary(member.ID); err != nil {
 			return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)
