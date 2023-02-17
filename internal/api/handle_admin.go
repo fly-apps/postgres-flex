@@ -78,12 +78,12 @@ func handleDisableReadonly(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRole(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	conn, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	node, err := flypg.NewNode()
 	if err != nil {
@@ -119,12 +119,12 @@ type SettingsUpdate struct {
 }
 
 func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	conn, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	consul, err := state.NewStore()
 	if err != nil {
@@ -195,12 +195,12 @@ func (s *Server) handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	conn, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-	defer close()
+	defer conn.Close(r.Context())
 
 	consul, err := state.NewStore()
 	if err != nil {
@@ -226,13 +226,12 @@ type PGSettingsResponse struct {
 }
 
 func (s *Server) handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
-	conn, close, err := localConnection(r.Context(), "postgres")
+	conn, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
-
-	defer close()
+	defer conn.Close(r.Context())
 
 	all, err := s.node.PGConfig.CurrentConfig()
 	if err != nil {

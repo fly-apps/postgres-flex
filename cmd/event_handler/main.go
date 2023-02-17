@@ -34,6 +34,7 @@ func main() {
 
 	node, err := flypg.NewNode()
 	if err != nil {
+		logFile.Close()
 		log.Printf("failed to initialize node: %s", err)
 		os.Exit(1)
 	}
@@ -50,21 +51,20 @@ func main() {
 		member, err := node.RepMgr.Member(ctx, conn)
 		if err != nil {
 			log.Printf("failed to resolve member: %s", err)
+			conn.Close(ctx)
 			os.Exit(1)
 		}
 
 		if member.Role != flypg.PrimaryRoleName {
 			// We should never get here.
 			log.Println("skipping since we are not the primary")
-			os.Exit(0)
 		}
 
 		if err := evaluateClusterState(ctx, conn, node); err != nil {
 			log.Printf("failed to evaluate cluster state: %s", err)
-			os.Exit(0)
 		}
 
-		os.Exit(0)
+		return
 	default:
 		// noop
 	}

@@ -60,19 +60,16 @@ func (s *Server) Handler() http.Handler {
 	return r
 }
 
-func localConnection(ctx context.Context, database string) (*pgx.Conn, func() error, error) {
+func localConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 	node, err := flypg.NewNode()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	pg, err := node.NewLocalConnection(ctx, database)
 	if err != nil {
-		return nil, nil, err
-	}
-	close := func() error {
-		return pg.Close(ctx)
+		return nil, err
 	}
 
-	return pg, close, nil
+	return pg, nil
 }
