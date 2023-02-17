@@ -206,7 +206,7 @@ func (r *RepMgr) unregisterStandby(id int) error {
 func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
 	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
+		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
 	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -F",
@@ -217,7 +217,11 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.ConfigPath)
 
 	fmt.Println(cmdStr)
-	return utils.RunCommand(cmdStr, "postgres")
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to clone primary: %s", err)
+	}
+
+	return nil
 }
 
 func (r *RepMgr) writePasswdConf() error {

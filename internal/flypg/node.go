@@ -114,7 +114,7 @@ func NewNode() (*Node, error) {
 func (n *Node) Init(ctx context.Context) error {
 	// Ensure directory and files have proper permissions
 	if err := setDirOwnership(); err != nil {
-		return err
+		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
 	// Check to see if we were just restored
@@ -122,7 +122,7 @@ func (n *Node) Init(ctx context.Context) error {
 		// Check to see if there's an active restore.
 		active, err := isRestoreActive()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to verify active restore: %s", err)
 		}
 
 		if active {
@@ -135,13 +135,13 @@ func (n *Node) Init(ctx context.Context) error {
 	// Verify whether we are a booting zombie.
 	if ZombieLockExists() {
 		if err := handleZombieLock(ctx, n); err != nil {
-			return err
+			return fmt.Errorf("failed to handle zombie lock: %s", err)
 		}
 	}
 
 	err := writeSSHKey()
 	if err != nil {
-		return fmt.Errorf("failed initialize ssh. %v", err)
+		return fmt.Errorf("failed write ssh keys: %s", err)
 	}
 
 	store, err := state.NewStore()
@@ -166,7 +166,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 		if !clusterInitialized {
 			fmt.Println("Provisioning primary")
-
 			// Initialize ourselves as the primary.
 			if err := n.initializePG(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
@@ -175,7 +174,6 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := n.setDefaultHBA(); err != nil {
 				return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 			}
-
 		} else {
 			fmt.Println("Provisioning standby")
 			// Initialize ourselves as a standby
@@ -185,6 +183,11 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
+				// Clean-up the directory so it can be retried.
+				if rErr := os.Remove(n.DataDir); rErr != nil {
+					fmt.Printf("failed to cleanup postgresql dir after clone error: %s\n", rErr)
+				}
+
 				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
