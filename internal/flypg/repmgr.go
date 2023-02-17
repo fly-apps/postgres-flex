@@ -119,7 +119,7 @@ func (r *RepMgr) initialize() error {
 		return fmt.Errorf("failed to set dir ownership: %s", err)
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
@@ -252,7 +252,7 @@ func (r *RepMgr) writePasswdConf() error {
 		}
 	}
 
-	return nil
+	return file.Sync()
 }
 
 type Member struct {
@@ -272,7 +272,6 @@ func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	defer rows.Close()
 
 	var members []Member
-
 	for rows.Next() {
 		var member Member
 		if err := rows.Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role); err != nil {
@@ -282,7 +281,7 @@ func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 		members = append(members, member)
 	}
 
-	return members, err
+	return members, nil
 }
 
 func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
