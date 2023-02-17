@@ -38,7 +38,7 @@ func (c *PGConfig) UserConfig() ConfigMap {
 	return c.userConfig
 }
 
-func (c *PGConfig) ConsulKey() string {
+func (*PGConfig) ConsulKey() string {
 	return "PGConfig"
 }
 

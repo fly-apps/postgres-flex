@@ -97,32 +97,15 @@ func pullFromConsul(c Config, consul *state.Store) (ConfigMap, error) {
 }
 
 func WriteConfigFiles(c Config) error {
-	internalFile, err := os.OpenFile(c.InternalConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer internalFile.Close()
-
-	userFile, err := os.OpenFile(c.UserConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer userFile.Close()
-
-	internal := c.InternalConfig()
-
-	for key, value := range c.UserConfig() {
-		entry := fmt.Sprintf("%s = %v\n", key, value)
-		delete(internal, key)
-		userFile.Write([]byte(entry))
+	if err := writeUserConfig(c); err != nil {
+		return fmt.Errorf("failed to write user config: %s", err)
 	}
 
-	for key, value := range internal {
-		entry := fmt.Sprintf("%s = %v\n", key, value)
-		internalFile.Write([]byte(entry))
+	if err := writeInternalConfig(c); err != nil {
+		return fmt.Errorf("failed to write internal config: %s", err)
 	}
 
-	return userFile.Sync()
+	return nil
 }
 
 func ReadFromFile(path string) (ConfigMap, error) {
@@ -142,4 +125,39 @@ func ReadFromFile(path string) (ConfigMap, error) {
 	}
 
 	return conf, file.Sync()
+}
+
+func writeInternalConfig(c Config) error {
+	file, err := os.OpenFile(c.InternalConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	internal := c.InternalConfig()
+
+	for key, value := range internal {
+		entry := fmt.Sprintf("%s = %v\n", key, value)
+		file.Write([]byte(entry))
+	}
+
+	return file.Sync()
+}
+
+func writeUserConfig(c Config) error {
+	file, err := os.OpenFile(c.UserConfigFile(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	internal := c.InternalConfig()
+
+	for key, value := range c.UserConfig() {
+		entry := fmt.Sprintf("%s = %v\n", key, value)
+		delete(internal, key)
+		file.Write([]byte(entry))
+	}
+
+	return file.Sync()
 }

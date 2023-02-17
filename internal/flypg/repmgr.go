@@ -80,7 +80,7 @@ func (r *RepMgr) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func (r *RepMgr) ConsulKey() string {
+func (*RepMgr) ConsulKey() string {
 	return "repmgr"
 }
 
@@ -263,7 +263,7 @@ type Member struct {
 	Role     string
 }
 
-func (r *RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
+func (*RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes;"
 	rows, err := pg.Query(ctx, sql)
 	if err != nil {
@@ -299,7 +299,7 @@ func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
 	return nil, pgx.ErrNoRows
 }
 
-func (r *RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
+func (*RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
 	var member Member
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes where type = 'primary' and active = true;"
 	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
@@ -326,7 +326,7 @@ func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, 
 	return standbys, nil
 }
 
-func (r *RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
+func (*RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_id = %d;", id)
 
