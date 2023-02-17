@@ -20,6 +20,7 @@ func StartHttpServer() error {
 	r.Mount("/commands", Handler())
 
 	server := &http.Server{
+		Handler:           r,
 		Addr:              fmt.Sprintf(":%v", Port),
 		ReadHeaderTimeout: 3 * time.Second,
 	}

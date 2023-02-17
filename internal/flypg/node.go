@@ -337,11 +337,12 @@ func (n *Node) initializePG() error {
 	}
 
 	if err := os.WriteFile("/data/.default_password", []byte(n.OperatorCredentials.Password), 0600); err != nil {
-		return err
+		return fmt.Errorf("failed to write default password: %s", err)
 	}
-	cmd := exec.Command("gosu", "postgres", "initdb", "--pgdata", n.DataDir, "--pwfile=/data/.default_password")
-	if _, err := cmd.CombinedOutput(); err != nil {
-		return err
+
+	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=/data/.default_password", n.DataDir)
+	if err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to run postgres initdb: %s", err)
 	}
 
 	return nil
