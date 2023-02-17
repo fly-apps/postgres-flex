@@ -13,7 +13,6 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
-	"github.com/pkg/errors"
 )
 
 type PGConfig struct {
@@ -119,65 +118,6 @@ func (c *PGConfig) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-// Setup will ensure the required configuration files are stubbed and the parent
-// postgresql.conf file includes them.
-func (c *PGConfig) initialize() error {
-	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
-		if os.IsNotExist(err) {
-			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath), "postgres"); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-
-	if _, err := os.Stat(c.userConfigFilePath); err != nil {
-		if os.IsNotExist(err) {
-			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.userConfigFilePath), "postgres"); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-
-	b, err := os.ReadFile(c.configFilePath)
-	if err != nil {
-		return err
-	}
-
-	var entries []string
-	if !strings.Contains(string(b), "postgresql.internal.conf") {
-		entries = append(entries, "include 'postgresql.internal.conf'\n")
-	}
-
-	if !strings.Contains(string(b), "postgresql.user.conf") {
-		entries = append(entries, "include 'postgresql.user.conf'\n")
-	}
-
-	if len(entries) > 0 {
-		f, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err != nil {
-			return nil
-		}
-		defer f.Close()
-
-		for _, entry := range entries {
-			if _, err := f.WriteString(entry); err != nil {
-				return fmt.Errorf("failed append configuration entry: %s", err)
-			}
-		}
-	}
-
-	err = c.SetDefaults()
-	if err != nil {
-		return errors.New("Failed to set PG defaults")
-	}
-
-	return nil
-}
-
 // SetDefaults WriteDefaults will resolve the default configuration settings and write them to the
 // internal config file.
 func (c *PGConfig) SetDefaults() error {
@@ -256,6 +196,72 @@ func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	return nil
+}
+
+// initialize will ensure the required configuration files are stubbed and the parent
+// postgresql.conf file includes them.
+func (c *PGConfig) initialize() error {
+	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
+		if os.IsNotExist(err) {
+			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath), "postgres"); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	if _, err := os.Stat(c.userConfigFilePath); err != nil {
+		if os.IsNotExist(err) {
+			if err := utils.RunCommand(fmt.Sprintf("touch %s", c.userConfigFilePath), "postgres"); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	b, err := os.ReadFile(c.configFilePath)
+	if err != nil {
+		return err
+	}
+
+	var entries []string
+	if !strings.Contains(string(b), "postgresql.internal.conf") {
+		entries = append(entries, "include 'postgresql.internal.conf'\n")
+	}
+
+	if !strings.Contains(string(b), "postgresql.user.conf") {
+		entries = append(entries, "include 'postgresql.user.conf'\n")
+	}
+
+	if len(entries) > 0 {
+		if err := c.writePGConfigEntries(entries); err != nil {
+			return fmt.Errorf("failed to write pg entries: %s", err)
+		}
+	}
+
+	if err := c.SetDefaults(); err != nil {
+		return fmt.Errorf("failed to set pg defaults: %s", err)
+	}
+
+	return nil
+}
+
+func (c *PGConfig) writePGConfigEntries(entries []string) error {
+	f, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	for _, entry := range entries {
+		if _, err := f.WriteString(entry); err != nil {
+			return fmt.Errorf("failed append configuration entry: %s", err)
+		}
+	}
+
+	return f.Sync()
 }
 
 func memTotalInBytes() (int64, error) {

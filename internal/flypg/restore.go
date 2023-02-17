@@ -112,11 +112,7 @@ func backupHBAFile() error {
 		return err
 	}
 
-	if err = os.WriteFile(pathToHBABackup, val, 0600); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(pathToHBABackup, val, 0600)
 }
 
 func grantLocalAccess() error {
