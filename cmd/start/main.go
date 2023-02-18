@@ -72,7 +72,7 @@ func main() {
 		"PG_EXPORTER_EXCLUDE_DATABASE":        "template0,template1",
 		"PG_EXPORTER_AUTO_DISCOVER_DATABASES": "true",
 	}
-	svisor.AddProcess("exporter", "postgres_exporter",
+	svisor.AddProcess("exporter", "postgres_exporter --log.level=warn ",
 		supervisor.WithEnv(exporterEnv),
 		supervisor.WithRestart(0, 1*time.Second),
 	)
@@ -83,7 +83,6 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
 }
 
 func panicHandler(err error) {
