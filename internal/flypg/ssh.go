@@ -37,32 +37,33 @@ func writeSSHKey() error {
 func writePrivateKey() error {
 	key := os.Getenv("SSH_KEY")
 
-	keyFile, err := os.Create(privateKeyFile)
+	file, err := os.Create(privateKeyFile)
 	if err != nil {
 		return err
 	}
-	defer keyFile.Close()
-	_, err = keyFile.Write([]byte(key))
+	defer func() { _ = file.Close() }()
+
+	_, err = file.Write([]byte(key))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write contents to pvt key: %s", err)
 	}
 
-	return keyFile.Sync()
+	return file.Sync()
 }
 
 func writePublicKey() error {
 	cert := os.Getenv("SSH_CERT")
 
-	certFile, err := os.Create(publicKeyFile)
+	file, err := os.Create(publicKeyFile)
 	if err != nil {
 		return err
 	}
-	defer certFile.Close()
+	defer func() { _ = file.Close() }()
 
-	_, err = certFile.Write([]byte(cert))
+	_, err = file.Write([]byte(cert))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write contents to pub key: %s", err)
 	}
 
-	return certFile.Sync()
+	return file.Sync()
 }

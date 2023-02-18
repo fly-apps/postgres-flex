@@ -120,7 +120,7 @@ func grantLocalAccess() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	perm := []byte("host all postgres ::0/0 trust")
 	_, err = file.Write(perm)

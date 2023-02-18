@@ -138,7 +138,7 @@ func writeInternalConfigFile(c Config) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	internal := c.InternalConfig()
 
@@ -147,11 +147,17 @@ func writeInternalConfigFile(c Config) error {
 		file.Write([]byte(entry))
 	}
 
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
+	}
+
 	if err := utils.SetFileOwnership(c.InternalConfigFile(), "postgres"); err != nil {
 		return fmt.Errorf("failed to set file ownership on %s: %s", c.InternalConfigFile(), err)
 	}
 
-	return file.Sync()
+	return nil
 }
 
 func writeUserConfigFile(c Config) error {
@@ -159,7 +165,7 @@ func writeUserConfigFile(c Config) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	internal := c.InternalConfig()
 
@@ -169,9 +175,15 @@ func writeUserConfigFile(c Config) error {
 		file.Write([]byte(entry))
 	}
 
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
+	}
+
 	if err := utils.SetFileOwnership(c.UserConfigFile(), "postgres"); err != nil {
 		return fmt.Errorf("failed to set file ownership on %s: %s", c.UserConfigFile(), err)
 	}
 
-	return file.Sync()
+	return nil
 }

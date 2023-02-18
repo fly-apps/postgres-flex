@@ -101,14 +101,19 @@ func (r *RepMgr) initialize() error {
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	entries := []string{"include 'repmgr.internal.conf'\n", "include 'repmgr.user.conf'\n"}
-
 	for _, entry := range entries {
 		if _, err := file.WriteString(entry); err != nil {
 			return fmt.Errorf("failed append configuration entry: %s", err)
 		}
+	}
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
 	}
 
 	if err := r.writePasswdConf(); err != nil {
