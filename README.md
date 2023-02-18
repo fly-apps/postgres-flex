@@ -1,3 +1,5 @@
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/fly-apps/postgres-flex)
+[![DeepSource](https://deepsource.io/gh/fly-apps/postgres-flex.svg/?label=active+issues&token=VOdkBvMAf90cLzNVB3k0WpJC)](https://deepsource.io/gh/fly-apps/postgres-flex/?ref=repository-badge)
 
 # High Availability Postgres on Fly.io
 This repo contains all the code and configuration necessary to run a [highly available Postgres cluster](https://fly.io/docs/postgres/) in a Fly.io organization's private network. This source is packaged into [Docker images](https://hub.docker.com/r/flyio/postgres-flex/tags) which allow you to track and upgrade versions cleanly as new features are added.
