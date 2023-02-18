@@ -119,7 +119,7 @@ func ReadFromFile(path string) (ConfigMap, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	conf := ConfigMap{}
 	scanner := bufio.NewScanner(file)
