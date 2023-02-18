@@ -20,9 +20,7 @@ func CheckVM(checks *check.CheckSuite) *check.CheckSuite {
 		return checkDisk("/data/")
 	})
 
-	checks.AddCheck("checkLoad", func() (string, error) {
-		return checkLoad()
-	})
+	checks.AddCheck("checkLoad", checkLoad)
 
 	pressureNames := []string{"memory", "cpu", "io"}
 	for _, n := range pressureNames {

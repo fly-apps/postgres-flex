@@ -101,14 +101,19 @@ func (r *RepMgr) initialize() error {
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	entries := []string{"include 'repmgr.internal.conf'\n", "include 'repmgr.user.conf'\n"}
-
 	for _, entry := range entries {
 		if _, err := file.WriteString(entry); err != nil {
 			return fmt.Errorf("failed append configuration entry: %s", err)
 		}
+	}
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
 	}
 
 	if err := r.writePasswdConf(); err != nil {
@@ -231,11 +236,11 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 
 func (r *RepMgr) writePasswdConf() error {
 	path := "/data/.pgpass"
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	file, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("failed to open repmgr password file: %s", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if err := utils.SetFileOwnership(path, "postgres"); err != nil {
 		return fmt.Errorf("failed to set file ownership: %s", err)

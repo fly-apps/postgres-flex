@@ -80,25 +80,29 @@ func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 func (c *FlyPGConfig) initialize() error {
 	c.SetDefaults()
 
-	internal, err := os.Create(c.internalConfigFilePath)
+	file, err := os.Create(c.internalConfigFilePath)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := internal.Close(); err != nil {
-			fmt.Printf("failed to close file: %s\n", err)
-		}
-	}()
+	defer func() { _ = file.Close() }()
 
-	user, err := os.Create(c.userConfigFilePath)
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
+	}
+
+	file, err = os.Create(c.userConfigFilePath)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := user.Close(); err != nil {
-			fmt.Printf("failed to close file: %s\n", err)
-		}
-	}()
+	defer func() { _ = file.Close() }()
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
+	}
 
 	return nil
 }

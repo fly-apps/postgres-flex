@@ -14,5 +14,5 @@ func fatalOnErr(err error) {
 func fatal(i ...interface{}) {
 	fmt.Fprint(os.Stderr, "hivemind: ")
 	fmt.Fprintln(os.Stderr, i...)
-	os.Exit(1)
+	panic(i)
 }

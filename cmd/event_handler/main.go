@@ -34,7 +34,7 @@ func processEvent(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open event log: %s", err)
 	}
-	defer logFile.Close()
+	defer func() { _ = logFile.Close() }()
 
 	log.SetOutput(logFile)
 	log.Printf("event: %s, node: %d, success: %s, details: %s\n", *event, *nodeID, *success, *details)
@@ -68,7 +68,7 @@ func processEvent(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return logFile.Sync()
 }
 
 func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {

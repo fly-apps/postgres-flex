@@ -120,7 +120,7 @@ func grantLocalAccess() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	perm := []byte("host all postgres ::0/0 trust")
 	_, err = file.Write(perm)
@@ -143,7 +143,7 @@ func restoreHBAFile() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// revert back to our original config
 	_, err = file.Write(data)
@@ -160,11 +160,11 @@ func restoreHBAFile() error {
 }
 
 func setRestoreLock() error {
-	file, err := os.OpenFile(restoreLockFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.Create(restoreLockFile)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	_, err = file.WriteString(os.Getenv("FLY_APP_NAME"))
 	if err != nil {
