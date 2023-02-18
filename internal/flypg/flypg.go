@@ -98,5 +98,11 @@ func (c *FlyPGConfig) initialize() error {
 	}
 	defer func() { _ = file.Close() }()
 
-	return file.Sync()
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %s", err)
+	}
+
+	return nil
 }
