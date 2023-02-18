@@ -238,12 +238,6 @@ type PGSettingsResponse struct {
 }
 
 func handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
-	node, err := flypg.NewNode()
-	if err != nil {
-		renderErr(w, err)
-		return
-	}
-
 	conn, err := localConnection(r.Context(), "postgres")
 	if err != nil {
 		renderErr(w, err)
@@ -251,33 +245,27 @@ func handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close(r.Context())
 
-	all, err := node.PGConfig.CurrentConfig()
-	if err != nil {
+	var requestedSettings []string
+	if err := json.NewDecoder(r.Body).Decode(&requestedSettings); err != nil {
 		renderErr(w, err)
 		return
 	}
 
-	var in []string
-
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		renderErr(w, err)
-		return
-	}
-
-	var out []admin.PGSetting
-
-	for key := range all {
-		if slices.Contains(in, key) {
-			setting, err := admin.GetSetting(r.Context(), conn, key)
-			if err != nil {
-				renderErr(w, err)
-				return
-			}
-			out = append(out, *setting)
+	var settings []admin.PGSetting
+	for _, key := range requestedSettings {
+		setting, err := admin.GetSetting(r.Context(), conn, key)
+		if err != nil {
+			renderErr(w, err)
+			return
 		}
+		settings = append(settings, *setting)
 	}
 
-	resp := &Response{Result: PGSettingsResponse{Settings: out}}
+	resp := &Response{
+		Result: PGSettingsResponse{
+			Settings: settings,
+		},
+	}
 	renderJSON(w, resp, http.StatusOK)
 }
 
