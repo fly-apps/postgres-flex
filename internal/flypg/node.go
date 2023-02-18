@@ -92,7 +92,7 @@ func NewNode() (*Node, error) {
 	rand.Seed(int64(seed))
 
 	node.RepMgr = RepMgr{
-		ID:                 rand.Int31(),
+		ID:                 rand.Int31(), // skipcq: GSC-G404
 		AppName:            node.AppName,
 		PrimaryRegion:      node.PrimaryRegion,
 		Region:             os.Getenv("FLY_REGION"),
