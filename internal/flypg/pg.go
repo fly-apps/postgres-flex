@@ -249,19 +249,19 @@ func (c *PGConfig) initialize() error {
 }
 
 func (c *PGConfig) writePGConfigEntries(entries []string) error {
-	f, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	file, err := os.Create(c.configFilePath)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = file.Close() }()
 
 	for _, entry := range entries {
-		if _, err := f.WriteString(entry); err != nil {
+		if _, err := file.WriteString(entry); err != nil {
 			return fmt.Errorf("failed append configuration entry: %s", err)
 		}
 	}
 
-	return f.Sync()
+	return file.Sync()
 }
 
 func memTotalInBytes() (int64, error) {

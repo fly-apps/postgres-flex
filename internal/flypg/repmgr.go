@@ -236,11 +236,11 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 
 func (r *RepMgr) writePasswdConf() error {
 	path := "/data/.pgpass"
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	file, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("failed to open repmgr password file: %s", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if err := utils.SetFileOwnership(path, "postgres"); err != nil {
 		return fmt.Errorf("failed to set file ownership: %s", err)
