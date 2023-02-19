@@ -59,16 +59,16 @@ func TestPGSettingOverride(t *testing.T) {
 		configFilePath:         pgConfigFilePath,
 		internalConfigFilePath: pgInternalConfigFilePath,
 		userConfigFilePath:     pgUserConfigFilePath,
-		userConfig: ConfigMap{
-			"log_statement": "ddl",
-			"port":          "10000",
-		},
-		internalConfig: ConfigMap{},
 	}
 
 	if err := pgConf.initialize(); err != nil {
 		t.Error(err)
 	}
+
+	pgConf.SetUserConfig(ConfigMap{
+		"log_statement": "ddl",
+		"port":          "10000",
+	})
 
 	if err := WriteConfigFiles(pgConf); err != nil {
 		t.Error(err)
@@ -87,6 +87,14 @@ func TestPGSettingOverride(t *testing.T) {
 		t.Fatalf("expected log_statement to be ddl, got %v", cfg["log_statement"])
 	}
 
+	// Ensure defaults were not touched
+	if cfg["max_connections"] != "300" {
+		t.Fatalf("expected max_connections to be 300, got %v", cfg["max_connections"])
+	}
+
+	if cfg["hot_standby"] != "true" {
+		t.Fatalf("expected hot_standby to be true, got %v", cfg["hot_standby"])
+	}
 }
 
 func setup(t *testing.T) error {

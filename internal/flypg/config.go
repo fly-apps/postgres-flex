@@ -107,10 +107,8 @@ func WriteConfigFiles(c Config) error {
 		return fmt.Errorf("failed to write user config: %s", err)
 	}
 
-	if c.InternalConfig() != nil {
-		if err := writeInternalConfigFile(c); err != nil {
-			return fmt.Errorf("failed to write internal config: %s", err)
-		}
+	if err := writeInternalConfigFile(c); err != nil {
+		return fmt.Errorf("failed to write internal config: %s", err)
 	}
 
 	return nil
@@ -169,11 +167,8 @@ func writeUserConfigFile(c Config) error {
 	}
 	defer func() { _ = file.Close() }()
 
-	internal := c.InternalConfig()
-
 	for key, value := range c.UserConfig() {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
-		delete(internal, key)
 		file.Write([]byte(entry))
 	}
 
