@@ -10,15 +10,6 @@ import (
 )
 
 func RunCommand(cmdStr, usr string) ([]byte, error) {
-	if os.Getenv("UNIT_TESTING") != "" {
-		u, err := user.Current()
-		if err != nil {
-			return nil, err
-		}
-
-		usr = u.Username
-	}
-
 	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {
 		return nil, err
