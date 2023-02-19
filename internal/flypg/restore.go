@@ -160,7 +160,7 @@ func restoreHBAFile() error {
 }
 
 func setRestoreLock() error {
-	file, err := os.Create(restoreLockFile)
+	file, err := os.OpenFile(restoreLockFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
