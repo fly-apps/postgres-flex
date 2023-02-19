@@ -61,7 +61,7 @@ func SyncUserConfig(c Config, consul *state.Store) error {
 	}
 	c.SetUserConfig(cfg)
 
-	if err := WriteConfigFiles(c); err != nil {
+	if err := writeUserConfigFile(c); err != nil {
 		return fmt.Errorf("failed to write user config: %s", err)
 	}
 
