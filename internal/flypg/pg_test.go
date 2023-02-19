@@ -95,7 +95,7 @@ func setup(t *testing.T) error {
 
 	if _, err := os.Stat(pgTestDirectory); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.Mkdir(pgTestDirectory, 0755); err != nil {
+			if err := os.Mkdir(pgTestDirectory, 0750); err != nil {
 				return err
 			}
 		} else {

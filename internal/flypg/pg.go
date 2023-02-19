@@ -184,7 +184,7 @@ func (c *PGConfig) SetDefaults() error {
 	}
 
 	if err := writeInternalConfigFile(c); err != nil {
-		return err
+		return fmt.Errorf("failed to write internal config file: %s", err)
 	}
 
 	return nil
