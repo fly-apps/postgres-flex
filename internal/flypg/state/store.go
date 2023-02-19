@@ -103,7 +103,7 @@ func pathPrefix() (string, error) {
 		return "", err
 	}
 
-	return u.Path[1:], nil
+	return u.Path[:], nil
 }
 
 func resolveEndpoint() string {

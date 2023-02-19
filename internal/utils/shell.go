@@ -9,19 +9,33 @@ import (
 	"syscall"
 )
 
-func RunCommand(cmdStr, user string) ([]byte, error) {
-	pgUID, pgGID, err := SystemUserIDs(user)
+func RunCommand(cmdStr, usr string) ([]byte, error) {
+	if os.Getenv("UNIT_TESTING") != "" {
+		u, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+
+		usr = u.Username
+	}
+
+	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {
 		return nil, err
 	}
 
 	cmd := exec.Command("sh", "-c", cmdStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(pgUID), Gid: uint32(pgGID)}
+	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+
 	return cmd.Output()
 }
 
 func SetFileOwnership(pathToFile, owner string) error {
+	if os.Getenv("UNIT_TESTING") != "" {
+		return nil
+	}
+
 	uid, gid, err := SystemUserIDs(owner)
 	if err != nil {
 		return fmt.Errorf("failed to resolve system user ids: %s", err)
