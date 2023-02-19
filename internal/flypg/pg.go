@@ -249,7 +249,7 @@ func (c *PGConfig) initialize() error {
 }
 
 func (c *PGConfig) writePGConfigEntries(entries []string) error {
-	file, err := os.Create(c.configFilePath)
+	file, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}

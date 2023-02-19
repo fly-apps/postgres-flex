@@ -124,7 +124,7 @@ func (r *RepMgr) initialize() error {
 		return fmt.Errorf("failed to set repmgr.conf ownership: %s", err)
 	}
 
-	return file.Sync()
+	return nil
 }
 
 func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
@@ -236,7 +236,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 
 func (r *RepMgr) writePasswdConf() error {
 	path := "/data/.pgpass"
-	file, err := os.Create(path)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open repmgr password file: %s", err)
 	}
