@@ -16,7 +16,7 @@ func handleListDatabases(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	dbs, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -41,7 +41,7 @@ func handleGetDatabase(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	db, err := admin.FindDatabase(ctx, conn, name)
 	if err != nil {
@@ -63,7 +63,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	var input createDatabaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -82,7 +82,7 @@ func handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	if err := admin.GrantCreateOnPublic(ctx, dbConn); err != nil {
 		renderErr(w, err)
@@ -103,7 +103,7 @@ func handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	err = admin.DeleteDatabase(ctx, conn, name)
 	if err != nil {

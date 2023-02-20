@@ -100,7 +100,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 			sample.totalInactive++
 			continue
 		}
-		defer mConn.Close(ctx)
+		defer func() { _ = mConn.Close(ctx) }()
 
 		// Verify the primary
 		primary, err := node.RepMgr.PrimaryMember(ctx, mConn)
@@ -110,6 +110,10 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 			continue
 		}
 
+		if err := mConn.Close(ctx); err != nil {
+			return nil, fmt.Errorf("failed to close connection: %s", err)
+		}
+
 		sample.totalActive++
 
 		// Record conflict when primary doesn't match.
@@ -117,6 +121,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 			sample.totalConflicts++
 			sample.conflictMap[primary.Hostname]++
 		}
+
 	}
 
 	return sample, nil
@@ -203,7 +208,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", ip.String(), err)
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 
 		primary, err := n.RepMgr.PrimaryMember(ctx, conn)
 		if err != nil {

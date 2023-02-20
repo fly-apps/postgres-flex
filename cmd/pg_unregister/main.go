@@ -37,7 +37,7 @@ func processUnregistration(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to local db: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
 	if err != nil {

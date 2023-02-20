@@ -25,7 +25,7 @@ func clusterStateMonitorTick(ctx context.Context, node *flypg.Node) error {
 	if err != nil {
 		return fmt.Errorf("failed to open local connection: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	member, err := node.RepMgr.Member(ctx, conn)
 	if err != nil {
@@ -58,6 +58,10 @@ func clusterStateMonitorTick(ctx context.Context, node *flypg.Node) error {
 		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
 			log.Printf("errors while disabling readonly: %s", err)
 		}
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil

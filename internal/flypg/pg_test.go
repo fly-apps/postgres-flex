@@ -122,5 +122,7 @@ func setup(t *testing.T) error {
 }
 
 func cleanup() {
-	os.RemoveAll(pgTestDirectory)
+	if err := os.RemoveAll(pgTestDirectory); err != nil {
+		fmt.Printf("failed to remove testing dir: %s\n", err)
+	}
 }

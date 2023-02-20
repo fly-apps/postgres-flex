@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -26,7 +27,7 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 	if err != nil {
 		log.Printf("failed to open local connection: %s\n", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	member, err := node.RepMgr.Member(ctx, conn)
 	if err != nil {
@@ -80,6 +81,10 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 		} else {
 			inactiveSlotStatus[int(slot.MemberID)] = time.Now()
 		}
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil

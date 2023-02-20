@@ -56,7 +56,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to establish connection: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	members, err := n.RepMgr.Members(ctx, conn)
 	if err != nil {
@@ -76,7 +76,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 				fmt.Printf("failed to broadcast readonly state change to member %s: %s", member.Hostname, err)
 				continue
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode > 299 {
 				fmt.Printf("failed to broadcast readonly state change to member %s: %d\n", member.Hostname, resp.StatusCode)
@@ -91,11 +91,15 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 			fmt.Printf("failed restart haproxy on member %s: %s", member.Hostname, err)
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode > 299 {
 			fmt.Printf("failed to restart haproxy on member %s: %d\n", member.Hostname, resp.StatusCode)
 		}
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil
@@ -140,7 +144,7 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to establish connection: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	member, err := n.RepMgr.Member(ctx, conn)
 	if err != nil {
@@ -165,6 +169,10 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 				return fmt.Errorf("failed to alter readonly state on db %s: %s", db.Name, err)
 			}
 		}
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil

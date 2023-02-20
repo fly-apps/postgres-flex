@@ -17,7 +17,7 @@ func handleListUsers(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	users, err := admin.ListUsers(ctx, conn)
 	if err != nil {
@@ -43,7 +43,7 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	user, err := admin.FindUser(ctx, conn, name)
 	if err != nil {
@@ -64,7 +64,7 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	var input createUserRequest
 	err = json.NewDecoder(r.Body).Decode(&input)
@@ -112,7 +112,7 @@ func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -126,7 +126,7 @@ func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 			renderErr(w, err)
 			return
 		}
-		defer dbConn.Close(r.Context())
+		defer func() { _ = dbConn.Close(r.Context()) }()
 
 		if err := admin.ReassignOwnership(ctx, dbConn, name, "postgres"); err != nil {
 			renderErr(w, fmt.Errorf("failed to reassign ownership: %s", err))

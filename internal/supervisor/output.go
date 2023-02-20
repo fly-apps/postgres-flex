@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 
@@ -88,7 +89,10 @@ func (m *multiOutput) WriteLine(proc *process, p []byte) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	buf.WriteTo(os.Stdout)
+	_, err := buf.WriteTo(os.Stdout)
+	if err != nil {
+		log.Printf("failed to write to stdout: %s", err)
+	}
 }
 
 func (m *multiOutput) WriteErr(proc *process, err error) {

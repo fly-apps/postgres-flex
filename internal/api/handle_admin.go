@@ -89,7 +89,7 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	member, err := node.RepMgr.Member(r.Context(), conn)
 	if err != nil {
@@ -130,7 +130,7 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	consul, err := state.NewStore()
 	if err != nil {
@@ -210,7 +210,7 @@ func handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	consul, err := state.NewStore()
 	if err != nil {
@@ -241,7 +241,7 @@ func handleViewPostgresSettings(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer conn.Close(r.Context())
+	defer func() { _ = conn.Close(r.Context()) }()
 
 	var requestedSettings []string
 	if err := json.NewDecoder(r.Body).Decode(&requestedSettings); err != nil {

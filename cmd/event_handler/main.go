@@ -50,7 +50,7 @@ func processEvent(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to open local connection: %s", err)
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 
 		member, err := node.RepMgr.Member(ctx, conn)
 		if err != nil {
