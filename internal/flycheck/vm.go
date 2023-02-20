@@ -40,11 +40,14 @@ func checkPressure(name string) (string, error) {
 		return "", err
 	}
 
-	fmt.Sscanf(
+	_, err = fmt.Sscanf(
 		string(raw),
 		"some avg10=%f avg60=%f avg300=%f total=%f",
 		&avg10, &avg60, &avg300, &counter,
 	)
+	if err != nil {
+		return "", err
+	}
 
 	avg10Dur, err := pressureToDuration(avg10, 10.0)
 	if err != nil {

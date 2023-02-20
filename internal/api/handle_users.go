@@ -72,7 +72,7 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		renderErr(w, err)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	err = admin.CreateUser(ctx, conn, input.Username, input.Password)
 	if err != nil {

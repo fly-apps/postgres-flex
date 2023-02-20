@@ -237,7 +237,10 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		}
 
 		// Ensure the single instance created with the --force-rewind process is cleaned up properly.
-		utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
+		_, err = utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
+		if err != nil {
+			return fmt.Errorf("failed to stop postgres: %s", err)
+		}
 	} else {
 		// TODO - Provide link to documention on how to address this
 		fmt.Println("Zombie lock file does not contain a hostname.")

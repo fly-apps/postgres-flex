@@ -144,7 +144,9 @@ func writeInternalConfigFile(c Config) error {
 
 	for key, value := range internal {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
-		file.Write([]byte(entry))
+		if _, err := file.Write([]byte(entry)); err != nil {
+			return fmt.Errorf("failed to write to file: %s", err)
+		}
 	}
 
 	if err := file.Sync(); err != nil {
@@ -169,7 +171,9 @@ func writeUserConfigFile(c Config) error {
 
 	for key, value := range c.UserConfig() {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
-		file.Write([]byte(entry))
+		if _, err := file.Write([]byte(entry)); err != nil {
+			return fmt.Errorf("failed to write to file: %s", err)
+		}
 	}
 
 	if err := file.Sync(); err != nil {

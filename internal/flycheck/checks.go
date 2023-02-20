@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -96,10 +97,14 @@ func handleCheckResponse(w http.ResponseWriter, suite *check.CheckSuite, raw boo
 		handleError(w, errors.New(result))
 		return
 	}
-	io.WriteString(w, result)
+	if _, err := io.WriteString(w, result); err != nil {
+		log.Printf("failed to handle check response: %s", err)
+	}
 }
 
 func handleError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	io.WriteString(w, err.Error())
+	if _, err := io.WriteString(w, err.Error()); err != nil {
+		log.Printf("failed to handle check error: %s", err)
+	}
 }
