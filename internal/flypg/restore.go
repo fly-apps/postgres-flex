@@ -87,7 +87,11 @@ func Restore(ctx context.Context, node *Node) error {
 		return fmt.Errorf("failed to set restore lock: %s", err)
 	}
 
-	return conn.Close(ctx)
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
+	}
+
+	return nil
 }
 
 func isRestoreActive() (bool, error) {
