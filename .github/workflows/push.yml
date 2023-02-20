@@ -1,4 +1,4 @@
-me: "Push"
+name: "Push"
 on:
   push:
     branches:
