@@ -37,8 +37,8 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 
 	// Cleanup connections
 	checks.OnCompletion = func() {
-		localConn.Close(ctx)
-		repConn.Close(ctx)
+		_ = localConn.Close(ctx)
+		_ = repConn.Close(ctx)
 	}
 
 	checks.AddCheck("connections", func() (string, error) {

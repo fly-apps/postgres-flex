@@ -23,7 +23,7 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 
 	// Cleanup connections
 	checks.OnCompletion = func() {
-		conn.Close(ctx)
+		_ = conn.Close(ctx)
 	}
 
 	checks.AddCheck("role", func() (string, error) {

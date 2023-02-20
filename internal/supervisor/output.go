@@ -63,8 +63,8 @@ func (m *multiOutput) PipeOutput(proc *process) {
 
 func (m *multiOutput) ClosePipe(proc *process) {
 	if pipe := m.pipes[proc]; pipe != nil {
-		pipe.pty.Close()
-		pipe.tty.Close()
+		_ = pipe.pty.Close()
+		_ = pipe.tty.Close()
 	}
 }
 

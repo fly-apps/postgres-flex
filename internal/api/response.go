@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"log"
+
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 )
@@ -12,7 +14,9 @@ import (
 func renderJSON(w http.ResponseWriter, data interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("failed to write json response: %s", err)
+	}
 }
 
 func renderErr(w http.ResponseWriter, err error) {
