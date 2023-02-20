@@ -41,7 +41,7 @@ jobs:
           cache: true
 
       - name: Run unit tests
-        run: go test -v . ./internal/...
+        run: go test -v ./...
 
 
   staticcheck:
