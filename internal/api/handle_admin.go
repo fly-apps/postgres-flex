@@ -138,37 +138,35 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := flypg.ReadFromFile(node.PGConfig.UserConfigFile())
+	cfg, err := flypg.ReadFromFile(node.PGConfig.UserConfigFile())
 	if err != nil {
 		renderErr(w, err)
 		return
 	}
 
-	var in map[string]interface{}
-
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	var requestedChanges map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&requestedChanges); err != nil {
 		renderErr(w, err)
 		return
 	}
 
-	for k, v := range in {
+	for k, v := range requestedChanges {
 		exists, err := admin.SettingExists(r.Context(), conn, k)
 		if err != nil {
 			renderErr(w, err)
-			return
 		}
 		if !exists {
 			renderErr(w, fmt.Errorf("invalid config option: %s", k))
 			return
 		}
-		user[k] = v
+		cfg[k] = v
 	}
 
-	node.PGConfig.SetUserConfig(user)
+	node.PGConfig.SetUserConfig(cfg)
 
 	var requiresRestart []string
 
-	for k := range user {
+	for k := range cfg {
 		restart, err := admin.SettingRequiresRestart(r.Context(), conn, k)
 		if err != nil {
 			renderErr(w, err)

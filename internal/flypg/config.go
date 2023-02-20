@@ -61,8 +61,8 @@ func SyncUserConfig(c Config, consul *state.Store) error {
 	}
 	c.SetUserConfig(cfg)
 
-	if err := WriteConfigFiles(c); err != nil {
-		return fmt.Errorf("failed to write to pg config file: %s", err)
+	if err := writeUserConfigFile(c); err != nil {
+		return fmt.Errorf("failed to write user config: %s", err)
 	}
 
 	return nil
@@ -167,11 +167,8 @@ func writeUserConfigFile(c Config) error {
 	}
 	defer func() { _ = file.Close() }()
 
-	internal := c.InternalConfig()
-
 	for key, value := range c.UserConfig() {
 		entry := fmt.Sprintf("%s = %v\n", key, value)
-		delete(internal, key)
 		file.Write([]byte(entry))
 	}
 

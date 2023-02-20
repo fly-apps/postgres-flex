@@ -118,14 +118,14 @@ func (c *PGConfig) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-// SetDefaults WriteDefaults will resolve the default configuration settings and write them to the
+// SetDefaults will resolve the default configuration settings and write them to the
 // internal config file.
 func (c *PGConfig) SetDefaults() error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
 	// Calculate total allocated disk in bytes
-	diskSizeBytes, err := diskSizeInBytes()
+	diskSizeBytes, err := diskSizeInBytes(c.dataDir)
 	if err != nil {
 		return fmt.Errorf("failed to fetch disk size: %s", err)
 	}
@@ -166,7 +166,7 @@ func (c *PGConfig) SetDefaults() error {
 		sharedPreloadLibraries = append(sharedPreloadLibraries, "timescaledb")
 	}
 
-	conf := ConfigMap{
+	c.internalConfig = ConfigMap{
 		"random_page_cost":         "1.1",
 		"port":                     c.port,
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
@@ -183,9 +183,35 @@ func (c *PGConfig) SetDefaults() error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
-	c.internalConfig = conf
+	if err := writeInternalConfigFile(c); err != nil {
+		return fmt.Errorf("failed to write internal config file: %s", err)
+	}
 
 	return nil
+}
+
+func memTotalInBytes() (int64, error) {
+	memoryStr := os.Getenv("FLY_VM_MEMORY_MB")
+	if memoryStr == "" {
+		return 0, fmt.Errorf("FLY_VM_MEMORY_MB envvar has not been set")
+	}
+
+	parsed, err := strconv.ParseInt(memoryStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	memoryBytes := parsed * (1024 * 1024)
+
+	return memoryBytes, nil
+}
+
+func diskSizeInBytes(dir string) (uint64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(dir, &stat); err != nil {
+		return 0, err
+	}
+	return stat.Blocks * uint64(stat.Bsize), nil
 }
 
 func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
@@ -201,24 +227,20 @@ func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
 // initialize will ensure the required configuration files are stubbed and the parent
 // postgresql.conf file includes them.
 func (c *PGConfig) initialize() error {
-	if _, err := os.Stat(c.internalConfigFilePath); err != nil {
-		if os.IsNotExist(err) {
-			if _, err := utils.RunCommand(fmt.Sprintf("touch %s", c.internalConfigFilePath), "postgres"); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
+	if err := stubConfigurationFile(c.internalConfigFilePath); err != nil {
+		return err
 	}
 
-	if _, err := os.Stat(c.userConfigFilePath); err != nil {
-		if os.IsNotExist(err) {
-			if _, err := utils.RunCommand(fmt.Sprintf("touch %s", c.userConfigFilePath), "postgres"); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
+	if err := utils.SetFileOwnership(c.internalConfigFilePath, "postgres"); err != nil {
+		return err
+	}
+
+	if err := stubConfigurationFile(c.userConfigFilePath); err != nil {
+		return err
+	}
+
+	if err := utils.SetFileOwnership(c.userConfigFilePath, "postgres"); err != nil {
+		return err
 	}
 
 	b, err := os.ReadFile(c.configFilePath)
@@ -264,26 +286,19 @@ func (c *PGConfig) writePGConfigEntries(entries []string) error {
 	return file.Sync()
 }
 
-func memTotalInBytes() (int64, error) {
-	memoryStr := os.Getenv("FLY_VM_MEMORY_MB")
-	if memoryStr == "" {
-		return 0, fmt.Errorf("FLY_VM_MEMORY_MB envvar has not been set")
+func stubConfigurationFile(path string) error {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		file, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = file.Close() }()
+
+		return file.Sync()
+	} else if err != nil {
+		return nil
 	}
 
-	parsed, err := strconv.ParseInt(memoryStr, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	memoryBytes := parsed * (1024 * 1024)
-
-	return memoryBytes, nil
-}
-
-func diskSizeInBytes() (uint64, error) {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs("/data", &stat); err != nil {
-		return 0, err
-	}
-	return stat.Blocks * uint64(stat.Bsize), nil
+	return nil
 }
