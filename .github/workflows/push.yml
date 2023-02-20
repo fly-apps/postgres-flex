@@ -30,8 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        journal_mode: [delete, persist, truncate, wal]
+
     steps:
       - uses: actions/checkout@v3
 
