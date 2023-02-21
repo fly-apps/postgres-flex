@@ -41,6 +41,13 @@ fly image update --app <app-name>
 
 ```
 
+## TimescaleDB support
+We currently maintain a separate TimescaleDB-enabled image that you can specify at provision time.
+
+```
+fly pg create  --image-ref flyio/postgres-flex-timescaledb:15
+```
+
 ## Having trouble?
 Create an issue or ask a question here: https://community.fly.io/
 
