@@ -1,0 +1,76 @@
+name: "Push"
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  build:
+    name: "Build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build binaries
+        run: go install ./cmd/...
+
+  unit:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Run unit tests
+        run: go test -v ./...
+
+
+  staticcheck:
+    name: "Staticcheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+          go-version-file: 'go.mod'
+          cache: true
+
+      - uses: dominikh/staticcheck-action@v1.2.0
+        with:
+          install-go: false
+
+  errcheck:
+    name: "Errcheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+          go-version-file: 'go.mod'
+          cache: true
+
+      - run: go install github.com/kisielk/errcheck@latest
+      - run: errcheck -ignore 'AddCheck' ./...

@@ -56,7 +56,7 @@ func deadMemberMonitorTick(ctx context.Context, node *flypg.Node, seenAt map[int
 	if err != nil {
 		return fmt.Errorf("failed to open local connection: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	member, err := node.RepMgr.MemberByID(ctx, conn, int(node.RepMgr.ID))
 	if err != nil {
@@ -87,8 +87,15 @@ func deadMemberMonitorTick(ctx context.Context, node *flypg.Node, seenAt map[int
 
 			continue
 		}
-		defer sConn.Close(ctx)
 		seenAt[standby.ID] = time.Now()
+
+		if err := sConn.Close(ctx); err != nil {
+			return fmt.Errorf("failed to close connection: %s", err)
+		}
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil

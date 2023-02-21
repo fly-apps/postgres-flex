@@ -213,13 +213,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("unrecoverable zombie")
 	}
 
-	// Ensure local PG is up before establishing connection with consul.
-	pgConn, err := n.NewLocalConnection(ctx, "postgres")
-	if err != nil {
-		return fmt.Errorf("failed to establish connection to local node: %s", err)
-	}
-	defer pgConn.Close(ctx)
-
 	store, err := state.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed initialize cluster state store. %v", err)
@@ -239,13 +232,19 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'", n.PrimaryRegion, repmgr.Region)
 		}
 
+		conn, err := n.NewLocalConnection(ctx, "postgres")
+		if err != nil {
+			return fmt.Errorf("failed to establish connection to local node: %s", err)
+		}
+		defer func() { _ = conn.Close(ctx) }()
+
 		// Create required users
-		if err := n.createRequiredUsers(ctx, pgConn); err != nil {
+		if err := n.createRequiredUsers(ctx, conn); err != nil {
 			return fmt.Errorf("failed to create required users: %s", err)
 		}
 
 		// Setup repmgr database and extension
-		if err := repmgr.setup(ctx, pgConn); err != nil {
+		if err := repmgr.setup(ctx, conn); err != nil {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
@@ -260,12 +259,17 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to register cluster with consul")
 		}
 
+		// Ensure connection is closed.
+		if err := conn.Close(ctx); err != nil {
+			return fmt.Errorf("failed to close connection: %s", err)
+		}
+
 	} else {
 		conn, err := repmgr.NewLocalConnection(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 
 		member, err := repmgr.Member(ctx, conn)
 		if err != nil {
@@ -322,6 +326,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 			if err := repmgr.registerStandby(); err != nil {
 				fmt.Printf("failed to register standby: %s\n", err)
 			}
+		}
+
+		if err := conn.Close(ctx); err != nil {
+			return fmt.Errorf("failed to close connection: %s", err)
 		}
 	}
 

@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -38,7 +39,7 @@ func Restore(ctx context.Context, node *Node) error {
 
 	// Clear the standby.signal if it exists.
 	if _, err := os.Stat("/data/postgresql/standby.signal"); err == nil {
-		fmt.Println("Restoring from a hot standby.")
+		log.Println("Restoring from a hot standby.")
 		// Clear the signal so we can boot.
 		if err = os.Remove("/data/postgresql/standby.signal"); err != nil {
 			return fmt.Errorf("failed to remove standby signal: %s", err)
@@ -49,13 +50,17 @@ func Restore(ctx context.Context, node *Node) error {
 	svisor := supervisor.New("flypg", 5*time.Minute)
 	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D /data/postgresql -p 5433 -h %s", node.PrivateIP))
 
-	go svisor.Run()
+	go func() {
+		if err := svisor.Run(); err != nil {
+			log.Printf("failed to boot postgres in the background: %s", err)
+		}
+	}()
 
 	conn, err := openConn(ctx, node)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	// Drop repmgr database to clear any metadata that belonged to the old cluster.
 	sql := "DROP DATABASE repmgr;"
@@ -80,6 +85,10 @@ func Restore(ctx context.Context, node *Node) error {
 	// the restore process.
 	if err := setRestoreLock(); err != nil {
 		return fmt.Errorf("failed to set restore lock: %s", err)
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil

@@ -6,7 +6,6 @@ import (
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/jackc/pgx/v5"
-	"github.com/pkg/errors"
 	"github.com/superfly/fly-checks/check"
 )
 
@@ -17,12 +16,12 @@ const diskCapacityPercentageThreshold = 90.0
 func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
 	node, err := flypg.NewNode()
 	if err != nil {
-		return checks, errors.Wrap(err, "failed to initialize node")
+		return checks, fmt.Errorf("failed to initialize node: %s", err)
 	}
 
 	localConn, err := node.NewLocalConnection(ctx, "postgres")
 	if err != nil {
-		return checks, errors.Wrap(err, "failed to connect with local node")
+		return checks, fmt.Errorf("failed to connect with local node: %s", err)
 	}
 
 	repConn, err := node.RepMgr.NewLocalConnection(ctx)
@@ -98,9 +97,8 @@ func connectionCount(ctx context.Context, local *pgx.Conn) (string, error) {
 	var used, reserved, max int
 
 	err := local.QueryRow(ctx, sql).Scan(&used, &reserved, &max)
-
 	if err != nil {
-		return "", fmt.Errorf("%v", err)
+		return "", fmt.Errorf("failed to query connection count: %s", err)
 	}
 
 	return fmt.Sprintf("%d used, %d reserved, %d max", used, reserved, max), nil
