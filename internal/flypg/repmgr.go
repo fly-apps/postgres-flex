@@ -145,28 +145,9 @@ func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
 }
 
 func (r *RepMgr) setDefaults() error {
-	var nodeID string
-	if utils.FileExists(r.InternalConfigFile()) {
-		// Pull existing id from configuraiton file
-		config, err := r.CurrentConfig()
-		if err != nil {
-			return fmt.Errorf("failed to resolve current repmgr config: %s", err)
-		}
-
-		if val, ok := config["node_id"]; ok {
-			nodeID = fmt.Sprint(val)
-		}
-
-		if nodeID == "" {
-			return fmt.Errorf("failed to resolve existing node_id: %s", err)
-		}
-	} else {
-		// Generate a new random id
-		id, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32))
-		if err != nil {
-			return fmt.Errorf("failed to generate node id: %s", err)
-		}
-		nodeID = id.String()
+	nodeID, err := r.resolveNodeID()
+	if err != nil {
+		return err
 	}
 
 	conf := ConfigMap{
@@ -194,6 +175,34 @@ func (r *RepMgr) setDefaults() error {
 	r.internalConfig = conf
 
 	return nil
+}
+
+func (r *RepMgr) resolveNodeID() (string, error) {
+	var nodeID string
+	if utils.FileExists(r.InternalConfigFile()) {
+		// Pull existing id from configuraiton file
+		config, err := r.CurrentConfig()
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve current repmgr config: %s", err)
+		}
+
+		if val, ok := config["node_id"]; ok {
+			nodeID = fmt.Sprint(val)
+		}
+
+		if nodeID == "" {
+			return "", fmt.Errorf("failed to resolve existing node_id: %s", err)
+		}
+	} else {
+		// Generate a new random id
+		id, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate node id: %s", err)
+		}
+		nodeID = id.String()
+	}
+
+	return nodeID, nil
 }
 
 func (r *RepMgr) registerPrimary() error {
