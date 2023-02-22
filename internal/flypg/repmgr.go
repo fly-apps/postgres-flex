@@ -371,7 +371,7 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 
 		conn, err := r.NewRemoteConnection(ctx, ip.String())
 		if err != nil {
-			fmt.Printf("failed to connect to %s", ip.String())
+			fmt.Printf("failed to resolve %s\n", ip.String())
 			continue
 		}
 		defer func() { _ = conn.Close(ctx) }()
@@ -386,7 +386,7 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 			return nil, fmt.Errorf("failed to close connection: %s", err)
 		}
 
-		if member.Role == PrimaryRoleName || member.Role == StandbyRoleName {
+		if member.Role == PrimaryRoleName && member.Active {
 			target = member
 			break
 		}
