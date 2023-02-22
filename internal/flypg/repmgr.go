@@ -156,6 +156,10 @@ func (r *RepMgr) setDefaults() error {
 		if val, ok := config["node_id"]; ok {
 			nodeID = fmt.Sprint(val)
 		}
+
+		if nodeID == "" {
+			return fmt.Errorf("failed to resolve existing node_id: %s", err)
+		}
 	} else {
 		// Generate a new random id
 		id, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32))
