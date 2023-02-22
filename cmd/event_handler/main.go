@@ -12,15 +12,27 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// TODO - Move this into the admin process.
 const eventLogFile = "/data/event.log"
 
 func main() {
 	ctx := context.Background()
 
-	if err := processEvent(ctx); err != nil {
-		log.Println(err)
-		os.Exit(1)
+	logFile, err := os.OpenFile(eventLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		log.Fatalf("failed to open event log: %s", err)
 	}
+	defer func() { _ = logFile.Close() }()
+
+	log.SetOutput(logFile)
+
+	err = processEvent(ctx)
+	if err != nil {
+		_ = logFile.Close()
+		log.Fatal(err)
+	}
+
+	_ = logFile.Sync()
 }
 
 func processEvent(ctx context.Context) error {
@@ -30,13 +42,6 @@ func processEvent(ctx context.Context) error {
 	details := flag.String("details", "", "details")
 	flag.Parse()
 
-	logFile, err := os.OpenFile(eventLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open event log: %s", err)
-	}
-	defer func() { _ = logFile.Close() }()
-
-	log.SetOutput(logFile)
 	log.Printf("event: %s, node: %d, success: %s, details: %s\n", *event, *nodeID, *success, *details)
 
 	node, err := flypg.NewNode()
@@ -59,7 +64,6 @@ func processEvent(ctx context.Context) error {
 
 		if member.Role != flypg.PrimaryRoleName {
 			// We should never get here.
-			log.Println("skipping since we are not the primary")
 			return nil
 		}
 
@@ -68,7 +72,7 @@ func processEvent(ctx context.Context) error {
 		}
 	}
 
-	return logFile.Sync()
+	return nil
 }
 
 func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {
