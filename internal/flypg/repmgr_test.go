@@ -67,21 +67,18 @@ func TestRepmgrNodeIDGeneration(t *testing.T) {
 		t.Error(err)
 	}
 
-	if conf.internalConfig["node_id"] == "" {
-		t.Fatalf("expected node_id to not be empty, got %q", conf.internalConfig["node_id"])
-	}
-
-	nodeID := conf.internalConfig["node_id"]
-
 	if err := writeInternalConfigFile(conf); err != nil {
 		t.Error(err)
 	}
 
-	if err := conf.setDefaults(); err != nil {
+	nodeID := conf.internalConfig["node_id"]
+
+	resolvedNodeID, err := conf.resolveNodeID()
+	if err != nil {
 		t.Error(err)
 	}
 
-	if nodeID != conf.internalConfig["node_id"] {
-		t.Fatalf("expected node_id to be %s, got %q", nodeID, conf.internalConfig["node_id"])
+	if nodeID != resolvedNodeID {
+		t.Fatalf("expected node_id to be %s, got %q", nodeID, resolvedNodeID)
 	}
 }
