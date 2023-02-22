@@ -2,7 +2,10 @@ package flypg
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"strconv"
@@ -95,7 +98,9 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 }
 
 func (r *RepMgr) initialize() error {
-	r.setDefaults()
+	if err := r.setDefaults(); err != nil {
+		return fmt.Errorf("failed to set repmgr defaults: %s", err)
+	}
 
 	file, err := os.Create(r.ConfigPath)
 	if err != nil {
@@ -139,9 +144,14 @@ func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-func (r *RepMgr) setDefaults() {
+func (r *RepMgr) setDefaults() error {
+	nodeID, err := r.resolveNodeID()
+	if err != nil {
+		return err
+	}
+
 	conf := ConfigMap{
-		"node_id":                      fmt.Sprint(r.ID),
+		"node_id":                      nodeID,
 		"node_name":                    fmt.Sprintf("'%s'", r.PrivateIP),
 		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":               fmt.Sprintf("'%s'", r.DataDir),
@@ -163,6 +173,36 @@ func (r *RepMgr) setDefaults() {
 	}
 
 	r.internalConfig = conf
+
+	return nil
+}
+
+func (r *RepMgr) resolveNodeID() (string, error) {
+	var nodeID string
+	if utils.FileExists(r.InternalConfigFile()) {
+		// Pull existing id from configuraiton file
+		config, err := r.CurrentConfig()
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve current repmgr config: %s", err)
+		}
+
+		if val, ok := config["node_id"]; ok {
+			nodeID = fmt.Sprint(val)
+		}
+
+		if nodeID == "" {
+			return "", fmt.Errorf("failed to resolve existing node_id: %s", err)
+		}
+	} else {
+		// Generate a new random id
+		id, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate node id: %s", err)
+		}
+		nodeID = id.String()
+	}
+
+	return nodeID, nil
 }
 
 func (r *RepMgr) registerPrimary() error {

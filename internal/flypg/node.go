@@ -2,10 +2,8 @@ package flypg
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -86,13 +84,7 @@ func NewNode() (*Node, error) {
 		Password: os.Getenv("REPL_PASSWORD"),
 	}
 
-	// Generate a random, reconstructable signed int32
-	machineID := os.Getenv("FLY_ALLOC_ID")
-	seed := binary.LittleEndian.Uint64([]byte(machineID))
-	rand.Seed(int64(seed))
-
 	node.RepMgr = RepMgr{
-		ID:                 rand.Int31(), // skipcq: GSC-G404
 		AppName:            node.AppName,
 		PrimaryRegion:      node.PrimaryRegion,
 		Region:             os.Getenv("FLY_REGION"),
