@@ -2,7 +2,10 @@ package flypg
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"strconv"
@@ -97,6 +100,24 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 func (r *RepMgr) initialize() error {
 	r.setDefaults()
 
+	// Use existing Node id if present, otherwise generate a new one.
+	if utils.FileExists(r.InternalConfigFile()) {
+		config, err := r.CurrentConfig()
+		if err != nil {
+			return fmt.Errorf("failed to resolve current repmgr config: %s", err)
+		}
+
+		if val, ok := config["node_id"]; ok {
+			r.internalConfig["node_id"] = val
+		}
+	} else {
+		nodeID, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32))
+		if err != nil {
+			return fmt.Errorf("failed to generate node id: %s", err)
+		}
+		r.internalConfig["node_id"] = nodeID
+	}
+
 	file, err := os.Create(r.ConfigPath)
 	if err != nil {
 		return nil
@@ -141,7 +162,6 @@ func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
 
 func (r *RepMgr) setDefaults() {
 	conf := ConfigMap{
-		"node_id":                      fmt.Sprint(r.ID),
 		"node_name":                    fmt.Sprintf("'%s'", r.PrivateIP),
 		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":               fmt.Sprintf("'%s'", r.DataDir),

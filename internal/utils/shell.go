@@ -39,6 +39,14 @@ func SetFileOwnership(pathToFile, owner string) error {
 	return nil
 }
 
+func FileExists(path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		return false
+	}
+
+	return true
+}
+
 func SystemUserIDs(usr string) (int, int, error) {
 	pgUser, err := user.Lookup(usr)
 	if err != nil {
