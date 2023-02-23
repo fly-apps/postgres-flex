@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const rCertPath = "/data/.registration"
+
 func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 	// Short-circuit if we are holding a certificate
 	if hasRegistrationCertificate() {
@@ -48,6 +50,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 		return false, fmt.Errorf("failed to resolve member role: %s", err)
 	}
 
+	// Does it matter if it's active or not?
 	if member.Active {
 		if err := issueRegistrationCertificate(); err != nil {
 			fmt.Println("failed to issue registration certificate.")
@@ -59,11 +62,11 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 }
 
 func issueRegistrationCertificate() error {
-	return os.WriteFile("/data/.registrationCert", []byte(""), 0600)
+	return os.WriteFile(rCertPath, []byte(""), 0600)
 }
 
 func hasRegistrationCertificate() bool {
-	if _, err := os.Stat("/data/.registrationCert"); err != nil {
+	if _, err := os.Stat(rCertPath); err != nil {
 		if os.IsNotExist(err) {
 			return false
 		}
