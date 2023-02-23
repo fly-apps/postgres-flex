@@ -149,14 +149,6 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	if err := n.FlyConfig.initialize(store); err != nil {
-		return fmt.Errorf("failed to initialize fly config: %s", err)
-	}
-
-	if err := n.RepMgr.initialize(store); err != nil {
-		return fmt.Errorf("failed to initialize repmgr: %s", err)
-	}
-
 	if !n.PGConfig.isInitialized() {
 		// Check to see if cluster has already been initialized.
 		clusterInitialized, err := store.IsInitializationFlagSet()
@@ -166,7 +158,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 		if !clusterInitialized {
 			fmt.Println("Provisioning primary")
-
 			// TODO - This should probably run on boot in case the password changes.
 			if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
 				return fmt.Errorf("failed to write pg password file: %s", err)
@@ -175,7 +166,6 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := n.PGConfig.initdb(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
-
 		} else {
 			fmt.Println("Provisioning standby")
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
@@ -194,6 +184,14 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
+	if err := n.FlyConfig.initialize(store); err != nil {
+		return fmt.Errorf("failed to initialize fly config: %s", err)
+	}
+
+	if err := n.RepMgr.initialize(store); err != nil {
+		return fmt.Errorf("failed to initialize repmgr: %s", err)
+	}
+
 	if err := n.PGConfig.initialize(store); err != nil {
 		return fmt.Errorf("failed to initialize pg config: %s", err)
 	}
@@ -205,13 +203,12 @@ func (n *Node) Init(ctx context.Context) error {
 	return nil
 }
 
-// PostInit are operations that should be executed against a running Postgres on boot.
+// PostInit are operations that need to be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	if ZombieLockExists() {
 		fmt.Println("Manual intervention required. Delete the zombie.lock file and restart the machine to force a retry.")
 		fmt.Println("Sleeping for 5 minutes.")
 		time.Sleep(5 * time.Minute)
-
 		return fmt.Errorf("unrecoverable zombie")
 	}
 
@@ -225,13 +222,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("failed to verify cluster state: %s", err)
 	}
 
-	// If the cluster has not yet been initialized we should initialize ourself as the primary
+	// If the cluster has not yet been initialized, configure ourself as the primary
 	if !clusterInitialized {
+		// Verify we reside within the clusters primary region
 		if !n.RepMgr.eligiblePrimary() {
-			return fmt.Errorf("no primary to follow and can't configure self as primary because primary region is '%s' and we are in '%s'",
-				n.PrimaryRegion,
-				n.RepMgr.Region,
-			)
+			return fmt.Errorf("unable to configure myself as primary since I do not reside within the primary region %q", n.PrimaryRegion)
 		}
 
 		conn, err := n.NewLocalConnection(ctx, "postgres")
@@ -250,7 +245,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
-		// Register ourselves as the primary
+		// Register ourself as the primary
 		if err := n.RepMgr.registerPrimary(); err != nil {
 			return fmt.Errorf("failed to register repmgr primary: %s", err)
 		}
@@ -287,6 +282,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		switch role {
 		case PrimaryRoleName:
+			// Verify cluster state to ensure we are the actual primary and not a zombie.
 			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
@@ -310,7 +306,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen", primary, n.PrivateIP)
 			}
 
-			// Readonly lock is set by healthchecks when disk capacity is dangerously high.
+			// Readonly lock is set when disk capacity is dangerously high.
 			if !ReadOnlyLockExists() {
 				if err := BroadcastReadonlyChange(ctx, n, false); err != nil {
 					return fmt.Errorf("failed to unset read-only: %s", err)
@@ -323,6 +319,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				fmt.Println("Registering a new standby")
 			}
 
+			// Register ourself as a standby
 			if err := n.RepMgr.registerStandby(); err != nil {
 				fmt.Printf("failed to register standby: %s\n", err)
 			}
@@ -348,7 +345,7 @@ func (n *Node) setupCredentials(ctx context.Context, conn *pgx.Conn) error {
 		n.SUCredentials,
 	}
 
-	return admin.CreateOrUpdateUsers(ctx, conn, requiredCredentials)
+	return admin.ManageDefaultUsers(ctx, conn, requiredCredentials)
 }
 
 func openConnection(parentCtx context.Context, host string, database string, creds admin.Credential) (*pgx.Conn, error) {

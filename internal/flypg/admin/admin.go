@@ -33,7 +33,7 @@ func CreateUser(ctx context.Context, pg *pgx.Conn, username string, password str
 	return err
 }
 
-func CreateOrUpdateUsers(ctx context.Context, conn *pgx.Conn, creds []Credential) error {
+func ManageDefaultUsers(ctx context.Context, conn *pgx.Conn, creds []Credential) error {
 	curUsers, err := ListUsers(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to list existing users: %s", err)
