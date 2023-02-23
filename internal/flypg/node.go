@@ -224,11 +224,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("failed to verify member registration: %s", err)
 	}
 
-	store, err := state.NewStore()
-	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store. %v", err)
-	}
-
 	if registered {
 		repConn, err := n.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
@@ -280,16 +275,31 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("member has unknown role: %q", member.Role)
 		}
 	} else {
-		// We are a new member coming up.
+		// Check with consul to see if the cluster has already been initialized
+		store, err := state.NewStore()
+		if err != nil {
+			return fmt.Errorf("failed initialize cluster state store. %v", err)
+		}
+
 		clusterInitialized, err := store.IsInitializationFlagSet()
 		if err != nil {
 			return fmt.Errorf("failed to verify cluster state: %s", err)
 		}
 
-		// Configure ourself as the primary
-		if !clusterInitialized {
-			fmt.Println("Initializing ourselve as primary")
+		if clusterInitialized {
+			// Configure standby
+			fmt.Println("Registring standby")
+			if err := n.RepMgr.registerStandby(); err != nil {
+				fmt.Printf("failed to register standby: %s\n", err)
+			}
 
+			// On disk representation we have finished registration.
+			if err := issueRegistrationCertificate(); err != nil {
+				return fmt.Errorf("failed to issue registration certificate: %s", err)
+			}
+
+		} else {
+			// Configure primary
 			// Verify we reside within the clusters primary region
 			if !n.RepMgr.eligiblePrimary() {
 				return fmt.Errorf("unable to configure myself as primary since I do not reside within the primary region %q", n.PrimaryRegion)
@@ -324,17 +334,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			// Ensure connection is closed.
 			if err := conn.Close(ctx); err != nil {
 				return fmt.Errorf("failed to close connection: %s", err)
-			}
-		} else {
-			// Configure standby
-			fmt.Println("Registring standby")
-			if err := n.RepMgr.registerStandby(); err != nil {
-				fmt.Printf("failed to register standby: %s\n", err)
-			}
-
-			// On disk representation we have finished registration.
-			if err := issueRegistrationCertificate(); err != nil {
-				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		}
 	}
