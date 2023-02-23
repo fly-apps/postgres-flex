@@ -26,7 +26,9 @@ func TestFlyConfigInitialization(t *testing.T) {
 	}
 
 	store, _ := state.NewStore()
-	cfg.initialize(store)
+	if err := cfg.initialize(store); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("configFiles", func(t *testing.T) {
 		if !utils.FileExists(cfg.internalConfigFilePath) {

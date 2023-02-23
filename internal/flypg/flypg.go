@@ -70,9 +70,8 @@ func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 func (c *FlyPGConfig) initialize(store *state.Store) error {
 	c.SetDefaults()
 
-	if err := SyncUserConfig(c, store); err != nil {
-		return fmt.Errorf("failed to sync internal config from consul: %s", err)
-	}
+	// Note - Sync from consul has been disabled for this component.
+	// It will be re-enabled once we offer user-defined configuration.
 
 	if err := WriteConfigFiles(c); err != nil {
 		return fmt.Errorf("failed to write internal config files: %s", err)

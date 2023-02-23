@@ -149,6 +149,10 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
+	if err := n.RepMgr.initialize(store); err != nil {
+		return fmt.Errorf("failed to initialize repmgr: %s", err)
+	}
+
 	if !n.PGConfig.isInitialized() {
 		// Check to see if cluster has already been initialized.
 		clusterInitialized, err := store.IsInitializationFlagSet()
@@ -186,10 +190,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 	if err := n.FlyConfig.initialize(store); err != nil {
 		return fmt.Errorf("failed to initialize fly config: %s", err)
-	}
-
-	if err := n.RepMgr.initialize(store); err != nil {
-		return fmt.Errorf("failed to initialize repmgr: %s", err)
 	}
 
 	if err := n.PGConfig.initialize(store); err != nil {

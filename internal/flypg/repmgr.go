@@ -104,11 +104,11 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 
 func (r *RepMgr) initialize(store *state.Store) error {
 	entries := []string{
-		"include 'repmgr.internal.conf'",
-		"include 'repmgr.user.conf'",
+		"include 'repmgr.internal.conf'\n",
+		"include 'repmgr.user.conf'\n",
 	}
 
-	entriesStr := strings.Join(entries, "\n")
+	entriesStr := strings.Join(entries, "")
 	if err := os.WriteFile(r.ConfigPath, []byte(entriesStr), 0600); err != nil {
 		return fmt.Errorf("failed to create %s: %s", r.ConfigPath, err)
 	}
@@ -129,6 +129,9 @@ func (r *RepMgr) initialize(store *state.Store) error {
 	if err := r.setDefaults(); err != nil {
 		return fmt.Errorf("failed to set defaults: %s", err)
 	}
+
+	// Note - Sync from consul has been disabled for this component.
+	// It will be re-enabled once we offer user-defined configuration.
 
 	if err := WriteConfigFiles(r); err != nil {
 		return fmt.Errorf("failed to write config files for repmgr: %s", err)
