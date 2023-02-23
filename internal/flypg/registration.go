@@ -11,12 +11,12 @@ import (
 )
 
 func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
-	// Short-circuit if we are holding a the registration certificate
+	// Short-circuit if we are holding a certificate
 	if hasRegistrationCertificate() {
 		return true, nil
 	}
 
-	// This is for backwards compatibility.
+	// Below is for backwards compatibility
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
 		return false, err
@@ -59,18 +59,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 }
 
 func issueRegistrationCertificate() error {
-	if err := os.WriteFile("/data/.registrationCert", []byte(""), 0600); err != nil {
-		return err
-	}
-	return nil
-}
-
-func removeRegistrationCertificate() error {
-	if err := os.Remove("/data/.registrationCert"); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile("/data/.registrationCert", []byte(""), 0600)
 }
 
 func hasRegistrationCertificate() bool {
