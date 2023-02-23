@@ -52,6 +52,10 @@ func PushUserConfig(c Config, consul *state.Store) error {
 }
 
 func SyncUserConfig(c Config, consul *state.Store) error {
+	if os.Getenv("UNIT_TESTING") != "" {
+		return nil
+	}
+
 	cfg, err := pullFromConsul(c, consul)
 	if err != nil {
 		return fmt.Errorf("failed to pull config from consul: %s", err)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 	"github.com/fly-apps/postgres-flex/internal/utils"
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -135,12 +134,7 @@ func removeReadOnlyLock() error {
 }
 
 func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
-	var (
-		err  error
-		conn *pgx.Conn
-	)
-
-	conn, err = n.RepMgr.NewLocalConnection(ctx)
+	conn, err := n.RepMgr.NewLocalConnection(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection: %s", err)
 	}

@@ -189,7 +189,7 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		}}
 	}
 
-	err = flypg.PushUserConfig(node.PGConfig, consul)
+	err = flypg.PushUserConfig(&node.PGConfig, consul)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -218,7 +218,7 @@ func handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = flypg.SyncUserConfig(node.PGConfig, consul)
+	err = flypg.SyncUserConfig(&node.PGConfig, consul)
 	if err != nil {
 		renderErr(w, err)
 		return

@@ -2,7 +2,6 @@ package flypg
 
 import (
 	"fmt"
-	"os"
 	"time"
 )
 
@@ -12,25 +11,8 @@ type FlyPGConfig struct {
 
 	internalConfig ConfigMap
 	userConfig     ConfigMap
-
-	configPath string
 }
 
-func (c *FlyPGConfig) SetDefaults() {
-	c.internalConfig = ConfigMap{
-		"deadMemberRemovalThreshold": time.Hour * 24,
-	}
-}
-
-func NewInternalConfig(configPath string) *FlyPGConfig {
-	return &FlyPGConfig{
-		internalConfigFilePath: fmt.Sprintf("%s/flypg.internal.conf", configPath),
-		userConfigFilePath:     fmt.Sprintf("%s/flypg.user.conf", configPath),
-		configPath:             configPath,
-		internalConfig:         ConfigMap{},
-		userConfig:             ConfigMap{},
-	}
-}
 func (c *FlyPGConfig) InternalConfig() ConfigMap {
 	return c.internalConfig
 }
@@ -53,6 +35,12 @@ func (c *FlyPGConfig) InternalConfigFile() string {
 
 func (c *FlyPGConfig) UserConfigFile() string {
 	return c.userConfigFilePath
+}
+
+func (c *FlyPGConfig) SetDefaults() {
+	c.internalConfig = ConfigMap{
+		"deadMemberRemovalThreshold": time.Hour * 24,
+	}
 }
 
 func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
@@ -80,28 +68,11 @@ func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 func (c *FlyPGConfig) initialize() error {
 	c.SetDefaults()
 
-	file, err := os.Create(c.internalConfigFilePath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
+	// Note - Sync from consul has been disabled for this component.
+	// It will be re-enabled once we offer user-defined configuration.
 
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file: %s", err)
-	} else if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %s", err)
-	}
-
-	file, err = os.Create(c.userConfigFilePath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file: %s", err)
-	} else if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %s", err)
+	if err := WriteConfigFiles(c); err != nil {
+		return fmt.Errorf("failed to write internal config files: %s", err)
 	}
 
 	return nil

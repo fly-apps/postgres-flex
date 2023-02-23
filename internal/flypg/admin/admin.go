@@ -9,6 +9,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type Credential struct {
+	Username string
+	Password string
+}
+
 func GrantAccess(ctx context.Context, pg *pgx.Conn, username string) error {
 	sql := fmt.Sprintf("GRANT pg_read_all_data, pg_write_all_data TO %q", username)
 	_, err := pg.Exec(ctx, sql)
@@ -26,6 +31,38 @@ func CreateUser(ctx context.Context, pg *pgx.Conn, username string, password str
 	sql := fmt.Sprintf(`CREATE USER %s WITH LOGIN PASSWORD '%s'`, username, password)
 	_, err := pg.Exec(ctx, sql)
 	return err
+}
+
+func ManageDefaultUsers(ctx context.Context, conn *pgx.Conn, creds []Credential) error {
+	curUsers, err := ListUsers(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to list existing users: %s", err)
+	}
+
+	for _, c := range creds {
+		exists := false
+		for _, curUser := range curUsers {
+			if c.Username == curUser.Username {
+				exists = true
+			}
+		}
+
+		if exists {
+			if err := ChangePassword(ctx, conn, c.Username, c.Password); err != nil {
+				return fmt.Errorf("failed to update credentials for user %s: %s", c.Username, err)
+			}
+		} else {
+			if err := CreateUser(ctx, conn, c.Username, c.Password); err != nil {
+				return fmt.Errorf("failed to create require user %s: %s", c.Username, err)
+			}
+
+			if err := GrantSuperuser(ctx, conn, c.Username); err != nil {
+				return fmt.Errorf("failed to grant superuser privileges to user %s: %s", c.Username, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string) error {

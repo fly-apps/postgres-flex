@@ -3,7 +3,6 @@ package flypg
 import (
 	"fmt"
 	"os"
-	"os/exec"
 )
 
 const (
@@ -25,10 +24,12 @@ func writeSSHKey() error {
 		return fmt.Errorf("failed to write cert: %s", err)
 	}
 
-	cmdStr := fmt.Sprintf("chmod 600 %s %s", privateKeyFile, publicKeyFile)
-	cmd := exec.Command("sh", "-c", cmdStr)
-	if _, err := cmd.Output(); err != nil {
-		return err
+	if err := os.Chmod(privateKeyFile, 0600); err != nil {
+		return fmt.Errorf("failed to chmod private key file: %s", err)
+	}
+
+	if err := os.Chmod(publicKeyFile, 0600); err != nil {
+		return fmt.Errorf("failed to chmod private key file: %s", err)
 	}
 
 	return nil

@@ -11,17 +11,21 @@ import (
 	"syscall"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
+	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
 )
 
 type PGConfig struct {
-	configFilePath string
+	ConfigFilePath         string
+	InternalConfigFilePath string
+	UserConfigFilePath     string
+	Port                   int
+	DataDir                string
 
-	internalConfigFilePath string
-	userConfigFilePath     string
-	port                   int
-	dataDir                string
+	passwordFilePath string
+	repmgrUsername   string
+	repmgrDatabase   string
 
 	internalConfig ConfigMap
 	userConfig     ConfigMap
@@ -47,11 +51,11 @@ func (c *PGConfig) SetUserConfig(newConfig ConfigMap) {
 }
 
 func (c *PGConfig) InternalConfigFile() string {
-	return c.internalConfigFilePath
+	return c.InternalConfigFilePath
 }
 
 func (c *PGConfig) UserConfigFile() string {
-	return c.userConfigFilePath
+	return c.UserConfigFilePath
 }
 
 func (c *PGConfig) CurrentConfig() (ConfigMap, error) {
@@ -76,28 +80,14 @@ func (c *PGConfig) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func NewConfig(dataDir string, port int) *PGConfig {
-	return &PGConfig{
-		dataDir:        dataDir,
-		port:           port,
-		configFilePath: fmt.Sprintf("%s/postgresql.conf", dataDir),
-
-		internalConfigFilePath: fmt.Sprintf("%s/postgresql.internal.conf", dataDir),
-		userConfigFilePath:     fmt.Sprintf("%s/postgresql.user.conf", dataDir),
-
-		internalConfig: ConfigMap{},
-		userConfig:     ConfigMap{},
-	}
-}
-
 // Print outputs the internal/user config to stdout.
 func (c *PGConfig) Print(w io.Writer) error {
-	internalCfg, err := ReadFromFile(c.internalConfigFilePath)
+	internalCfg, err := ReadFromFile(c.InternalConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read internal config: %s", err)
 	}
 
-	userCfg, err := ReadFromFile(c.userConfigFilePath)
+	userCfg, err := ReadFromFile(c.UserConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read internal config: %s", err)
 	}
@@ -118,14 +108,12 @@ func (c *PGConfig) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-// SetDefaults will resolve the default configuration settings and write them to the
-// internal config file.
 func (c *PGConfig) SetDefaults() error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
 	// Calculate total allocated disk in bytes
-	diskSizeBytes, err := diskSizeInBytes(c.dataDir)
+	diskSizeBytes, err := diskSizeInBytes(c.DataDir)
 	if err != nil {
 		return fmt.Errorf("failed to fetch disk size: %s", err)
 	}
@@ -168,7 +156,7 @@ func (c *PGConfig) SetDefaults() error {
 
 	c.internalConfig = ConfigMap{
 		"random_page_cost":         "1.1",
-		"port":                     c.port,
+		"port":                     c.Port,
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
 		"max_connections":          300,
 		"max_replication_slots":    10,
@@ -183,11 +171,183 @@ func (c *PGConfig) SetDefaults() error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
-	if err := writeInternalConfigFile(c); err != nil {
-		return fmt.Errorf("failed to write internal config file: %s", err)
+	return nil
+}
+
+func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
+	for key, value := range c.userConfig {
+		if err := admin.SetConfigurationSetting(ctx, conn, key, value); err != nil {
+			fmt.Printf("failed to set configuration setting %s -> %s: %s", key, value, err)
+		}
 	}
 
 	return nil
+}
+
+func (c *PGConfig) initdb() error {
+	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=%s", c.DataDir, c.passwordFilePath)
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to init postgres: %s", err)
+	}
+
+	return nil
+}
+
+func (c *PGConfig) isInitialized() bool {
+	_, err := os.Stat(c.DataDir)
+	return !os.IsNotExist(err)
+}
+
+// initialize will ensure the required configuration files are stubbed and the parent
+// postgresql.conf file includes them.
+func (c *PGConfig) initialize(store *state.Store) error {
+	if err := c.setDefaultHBA(); err != nil {
+		return fmt.Errorf("failed updating pg_hba.conf: %s", err)
+	}
+
+	contents, err := os.ReadFile(c.ConfigFilePath)
+	if err != nil {
+		return err
+	}
+
+	var entries []string
+	if !strings.Contains(string(contents), "postgresql.internal.conf") {
+		entries = append(entries, "include 'postgresql.internal.conf'\n")
+	}
+
+	if !strings.Contains(string(contents), "postgresql.user.conf") {
+		entries = append(entries, "include 'postgresql.user.conf'\n")
+	}
+
+	if len(entries) > 0 {
+		if err := c.writePGConfigEntries(entries); err != nil {
+			return fmt.Errorf("failed to write pg entries: %s", err)
+		}
+	}
+
+	if err := c.SetDefaults(); err != nil {
+		return fmt.Errorf("failed to set pg defaults: %s", err)
+	}
+
+	if err := SyncUserConfig(c, store); err != nil {
+		return fmt.Errorf("failed to sync user config from consul for postgres: %s", err.Error())
+	}
+
+	if err := WriteConfigFiles(c); err != nil {
+		return fmt.Errorf("failed to write pg config files: %s", err)
+	}
+
+	return nil
+}
+
+func (c *PGConfig) writePGConfigEntries(entries []string) error {
+	file, err := os.OpenFile(c.ConfigFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+
+	for _, entry := range entries {
+		if _, err := file.WriteString(entry); err != nil {
+			return fmt.Errorf("failed append configuration entry: %s", err)
+		}
+	}
+
+	return file.Sync()
+}
+
+func (c *PGConfig) writePasswordFile(pwd string) error {
+	if err := os.WriteFile(c.passwordFilePath, []byte(pwd), 0600); err != nil {
+		return fmt.Errorf("failed to write default password to %s: %s", c.passwordFilePath, err)
+	}
+
+	if err := utils.SetFileOwnership(c.passwordFilePath, "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
+	}
+
+	return nil
+}
+
+type HBAEntry struct {
+	Type     string
+	Database string
+	User     string
+	Address  string
+	Method   string
+}
+
+func (c *PGConfig) setDefaultHBA() error {
+	entries := []HBAEntry{
+		{
+			Type:     "local",
+			Database: "all",
+			User:     "postgres",
+			Method:   "trust",
+		},
+		{
+			Type:     "local",
+			Database: "all",
+			User:     "flypgadmin",
+			Method:   "trust",
+		},
+		{
+			Type:     "local",
+			Database: c.repmgrDatabase,
+			User:     c.repmgrUsername,
+			Method:   "trust",
+		},
+		{
+			Type:     "local",
+			Database: "replication",
+			User:     c.repmgrUsername,
+			Method:   "trust",
+		},
+		{
+			Type:     "host",
+			Database: "replication",
+			User:     c.repmgrUsername,
+			Address:  "::0/0",
+			Method:   "trust",
+		},
+		{
+			Type:     "host",
+			Database: c.repmgrDatabase,
+			User:     c.repmgrUsername,
+			Address:  "::0/0",
+			Method:   "trust",
+		},
+		{
+			Type:     "host",
+			Database: "all",
+			User:     "all",
+			Address:  "0.0.0.0/0",
+			Method:   "md5",
+		},
+		{
+			Type:     "host",
+			Database: "all",
+			User:     "all",
+			Address:  "::0/0",
+			Method:   "md5",
+		},
+	}
+
+	path := fmt.Sprintf("%s/pg_hba.conf", c.DataDir)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create pg_hba.conf file: %s", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	for _, entry := range entries {
+		str := fmt.Sprintf("%s %s %s %s %s\n", entry.Type, entry.Database, entry.User, entry.Address, entry.Method)
+		_, err := file.Write([]byte(str))
+		if err != nil {
+			return err
+		}
+	}
+
+	return file.Sync()
 }
 
 func memTotalInBytes() (int64, error) {
@@ -212,93 +372,4 @@ func diskSizeInBytes(dir string) (uint64, error) {
 		return 0, err
 	}
 	return stat.Blocks * uint64(stat.Bsize), nil
-}
-
-func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
-	for key, value := range c.userConfig {
-		if err := admin.SetConfigurationSetting(ctx, conn, key, value); err != nil {
-			fmt.Printf("failed to set configuration setting %s -> %s: %s", key, value, err)
-		}
-	}
-
-	return nil
-}
-
-// initialize will ensure the required configuration files are stubbed and the parent
-// postgresql.conf file includes them.
-func (c *PGConfig) initialize() error {
-	if err := stubConfigurationFile(c.internalConfigFilePath); err != nil {
-		return err
-	}
-
-	if err := utils.SetFileOwnership(c.internalConfigFilePath, "postgres"); err != nil {
-		return err
-	}
-
-	if err := stubConfigurationFile(c.userConfigFilePath); err != nil {
-		return err
-	}
-
-	if err := utils.SetFileOwnership(c.userConfigFilePath, "postgres"); err != nil {
-		return err
-	}
-
-	b, err := os.ReadFile(c.configFilePath)
-	if err != nil {
-		return err
-	}
-
-	var entries []string
-	if !strings.Contains(string(b), "postgresql.internal.conf") {
-		entries = append(entries, "include 'postgresql.internal.conf'\n")
-	}
-
-	if !strings.Contains(string(b), "postgresql.user.conf") {
-		entries = append(entries, "include 'postgresql.user.conf'\n")
-	}
-
-	if len(entries) > 0 {
-		if err := c.writePGConfigEntries(entries); err != nil {
-			return fmt.Errorf("failed to write pg entries: %s", err)
-		}
-	}
-
-	if err := c.SetDefaults(); err != nil {
-		return fmt.Errorf("failed to set pg defaults: %s", err)
-	}
-
-	return nil
-}
-
-func (c *PGConfig) writePGConfigEntries(entries []string) error {
-	file, err := os.OpenFile(c.configFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	for _, entry := range entries {
-		if _, err := file.WriteString(entry); err != nil {
-			return fmt.Errorf("failed append configuration entry: %s", err)
-		}
-	}
-
-	return file.Sync()
-}
-
-func stubConfigurationFile(path string) error {
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		file, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = file.Close() }()
-
-		return file.Sync()
-	} else if err != nil {
-		return nil
-	}
-
-	return nil
 }
