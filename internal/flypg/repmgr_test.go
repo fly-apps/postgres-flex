@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
@@ -34,7 +35,7 @@ func TestRepmgrInitialization(t *testing.T) {
 		PasswordConfigPath: repgmrPasswordConfigFilePath,
 		DataDir:            repmgrTestDirectory,
 		PrivateIP:          "127.0.0.1",
-		Credentials: Credentials{
+		Credentials: admin.Credential{
 			Username: "user",
 			Password: "password",
 		},
@@ -125,7 +126,7 @@ func TestRepmgrNodeIDGeneration(t *testing.T) {
 		PrivateIP:    "127.0.0.1",
 		Port:         5433,
 		DatabaseName: "repmgr",
-		Credentials: Credentials{
+		Credentials: admin.Credential{
 			Username: "user",
 			Password: "password",
 		},

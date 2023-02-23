@@ -88,6 +88,31 @@ func TestPGConfigInitialization(t *testing.T) {
 		if cfg["hot_standby"] != "true" {
 			t.Fatalf("expected hot_standby to be true, got %v", cfg["hot_standby"])
 		}
+
+		if cfg["shared_preload_libraries"] != "'repmgr'" {
+			t.Fatalf("expected 'repmgr', got %s", cfg["shared_preload_libraries"])
+		}
+	})
+
+	t.Run("timescaledb", func(t *testing.T) {
+		t.Setenv("TIMESCALEDB_ENABLED", "true")
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := "'repmgr,timescaledb'"
+
+		if cfg["shared_preload_libraries"] != expected {
+			t.Fatalf("expected %s, got %s", expected, cfg["shared_preload_libraries"])
+		}
+
 	})
 }
 

@@ -193,14 +193,6 @@ func (c *PGConfig) initdb() error {
 	return nil
 }
 
-func (c *PGConfig) postInit() error {
-	if err := c.setDefaultHBA(); err != nil {
-		return fmt.Errorf("failed updating pg_hba.conf: %s", err)
-	}
-
-	return nil
-}
-
 func (c *PGConfig) isInitialized() bool {
 	_, err := os.Stat(c.DataDir)
 	return !os.IsNotExist(err)
@@ -209,6 +201,10 @@ func (c *PGConfig) isInitialized() bool {
 // initialize will ensure the required configuration files are stubbed and the parent
 // postgresql.conf file includes them.
 func (c *PGConfig) initialize(store *state.Store) error {
+	if err := c.setDefaultHBA(); err != nil {
+		return fmt.Errorf("failed updating pg_hba.conf: %s", err)
+	}
+
 	contents, err := os.ReadFile(c.ConfigFilePath)
 	if err != nil {
 		return err
@@ -337,7 +333,6 @@ func (c *PGConfig) setDefaultHBA() error {
 	}
 
 	path := fmt.Sprintf("%s/pg_hba.conf", c.DataDir)
-	fmt.Println(path)
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create pg_hba.conf file: %s", err)

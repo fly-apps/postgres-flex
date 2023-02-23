@@ -35,7 +35,7 @@ type RepMgr struct {
 	PrivateIP          string
 	DataDir            string
 	DatabaseName       string
-	Credentials        Credentials
+	Credentials        admin.Credential
 	ConfigPath         string
 	UserConfigPath     string
 	PasswordConfigPath string
@@ -103,8 +103,6 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 }
 
 func (r *RepMgr) initialize(store *state.Store) error {
-	// Include separate configuration files so we can isolate user-defined configuration
-	// from our defaults.
 	entries := []string{
 		"include 'repmgr.internal.conf'",
 		"include 'repmgr.user.conf'",

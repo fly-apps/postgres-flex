@@ -70,7 +70,7 @@ func Restore(ctx context.Context, node *Node) error {
 	}
 
 	// Create required users and ensure auth is configured to match the environment.
-	if err = node.createRequiredUsers(ctx, conn); err != nil {
+	if err := node.setupCredentials(ctx, conn); err != nil {
 		return fmt.Errorf("failed creating required users: %s", err)
 	}
 

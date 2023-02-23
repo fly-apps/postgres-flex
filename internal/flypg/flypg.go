@@ -7,7 +7,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 )
 
-type FlyConfig struct {
+type FlyPGConfig struct {
 	internalConfigFilePath string
 	userConfigFilePath     string
 
@@ -15,37 +15,37 @@ type FlyConfig struct {
 	userConfig     ConfigMap
 }
 
-func (c *FlyConfig) InternalConfig() ConfigMap {
+func (c *FlyPGConfig) InternalConfig() ConfigMap {
 	return c.internalConfig
 }
 
-func (c *FlyConfig) UserConfig() ConfigMap {
+func (c *FlyPGConfig) UserConfig() ConfigMap {
 	return c.userConfig
 }
 
-func (*FlyConfig) ConsulKey() string {
+func (*FlyPGConfig) ConsulKey() string {
 	return "FlyPGConfig"
 }
 
-func (c *FlyConfig) SetUserConfig(newConfig ConfigMap) {
+func (c *FlyPGConfig) SetUserConfig(newConfig ConfigMap) {
 	c.userConfig = newConfig
 }
 
-func (c *FlyConfig) InternalConfigFile() string {
+func (c *FlyPGConfig) InternalConfigFile() string {
 	return c.internalConfigFilePath
 }
 
-func (c *FlyConfig) UserConfigFile() string {
+func (c *FlyPGConfig) UserConfigFile() string {
 	return c.userConfigFilePath
 }
 
-func (c *FlyConfig) SetDefaults() {
+func (c *FlyPGConfig) SetDefaults() {
 	c.internalConfig = ConfigMap{
 		"deadMemberRemovalThreshold": time.Hour * 24,
 	}
 }
 
-func (c *FlyConfig) CurrentConfig() (ConfigMap, error) {
+func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 	internal, err := ReadFromFile(c.InternalConfigFile())
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (c *FlyConfig) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func (c *FlyConfig) initialize(store *state.Store) error {
+func (c *FlyPGConfig) initialize(store *state.Store) error {
 	c.SetDefaults()
 
 	if err := SyncUserConfig(c, store); err != nil {

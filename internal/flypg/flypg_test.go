@@ -20,7 +20,7 @@ func TestFlyConfigInitialization(t *testing.T) {
 	}
 	defer cleanup()
 
-	cfg := FlyConfig{
+	cfg := FlyPGConfig{
 		internalConfigFilePath: flyInternalConfigFilePath,
 		userConfigFilePath:     flyInternalConfigFilePath,
 	}
