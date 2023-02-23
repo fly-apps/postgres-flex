@@ -9,11 +9,13 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/fly-apps/postgres-flex/internal/privnet"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
+	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -21,6 +23,8 @@ const (
 	PrimaryRoleName = "primary"
 	StandbyRoleName = "standby"
 	UnknownRoleName = ""
+
+	repmgrConsulKey = "repmgr"
 )
 
 type RepMgr struct {
@@ -34,11 +38,16 @@ type RepMgr struct {
 	Credentials        Credentials
 	ConfigPath         string
 	UserConfigPath     string
+	PasswordConfigPath string
 	InternalConfigPath string
 	Port               int
 
 	internalConfig ConfigMap
 	userConfig     ConfigMap
+}
+
+func (*RepMgr) ConsulKey() string {
+	return repmgrConsulKey
 }
 
 func (r *RepMgr) InternalConfigFile() string {
@@ -83,61 +92,59 @@ func (r *RepMgr) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func (*RepMgr) ConsulKey() string {
-	return "repmgr"
-}
-
 func (r *RepMgr) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	host := net.JoinHostPort(r.PrivateIP, strconv.Itoa(r.Port))
-	return openConnection(ctx, host, "repmgr", r.Credentials)
+	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
 
 func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(hostname, strconv.Itoa(r.Port))
-	return openConnection(ctx, host, "repmgr", r.Credentials)
+	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
 
-func (r *RepMgr) initialize() error {
-	if err := r.setDefaults(); err != nil {
-		return fmt.Errorf("failed to set repmgr defaults: %s", err)
+func (r *RepMgr) initialize(store *state.Store) error {
+	// Include separate configuration files so we can isolate user-defined configuration
+	// from our defaults.
+	entries := []string{
+		"include 'repmgr.internal.conf'",
+		"include 'repmgr.user.conf'",
 	}
 
-	file, err := os.Create(r.ConfigPath)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = file.Close() }()
-
-	entries := []string{"include 'repmgr.internal.conf'\n", "include 'repmgr.user.conf'\n"}
-	for _, entry := range entries {
-		if _, err := file.WriteString(entry); err != nil {
-			return fmt.Errorf("failed append configuration entry: %s", err)
-		}
-	}
-
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file: %s", err)
-	} else if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %s", err)
-	}
-
-	if err := r.writePasswdConf(); err != nil {
-		return fmt.Errorf("failed creating pgpass file: %s", err)
+	entriesStr := strings.Join(entries, "\n")
+	if err := os.WriteFile(r.ConfigPath, []byte(entriesStr), 0600); err != nil {
+		return fmt.Errorf("failed to create %s: %s", r.ConfigPath, err)
 	}
 
 	if err := utils.SetFileOwnership(r.ConfigPath, "postgres"); err != nil {
 		return fmt.Errorf("failed to set repmgr.conf ownership: %s", err)
 	}
 
+	// Create password file that repmgr will hook into for internal operations.
+	passStr := fmt.Sprintf("*:*:*:%s:%s", r.Credentials.Username, r.Credentials.Password)
+	if err := os.WriteFile(r.PasswordConfigPath, []byte(passStr), 0600); err != nil {
+		return fmt.Errorf("failed to write file %s: %s", r.PasswordConfigPath, err)
+	}
+	if err := utils.SetFileOwnership(r.PasswordConfigPath, "postgres"); err != nil {
+		return fmt.Errorf("failed to set file ownership: %s", err)
+	}
+
+	if err := r.setDefaults(); err != nil {
+		return fmt.Errorf("failed to set defaults: %s", err)
+	}
+
+	if err := WriteConfigFiles(r); err != nil {
+		return fmt.Errorf("failed to write config files for repmgr: %s", err)
+	}
+
 	return nil
 }
 
-func (r *RepMgr) setup(ctx context.Context, conn *pgx.Conn) error {
+func (r *RepMgr) enable(ctx context.Context, conn *pgx.Conn) error {
 	if err := admin.CreateDatabaseWithOwner(ctx, conn, r.DatabaseName, r.Credentials.Username); err != nil {
 		return fmt.Errorf("failed to create repmgr database: %s", err)
 	}
 
-	if err := admin.EnableExtension(ctx, conn, "repmgr"); err != nil {
+	if err := admin.EnableExtension(ctx, conn, r.DatabaseName); err != nil {
 		return fmt.Errorf("failed to enable repmgr extension: %s", err)
 	}
 
@@ -161,7 +168,7 @@ func (r *RepMgr) setDefaults() error {
 		"follow_command":               fmt.Sprintf("'repmgr standby follow -f %s --log-to-file --upstream-node-id=%%n'", r.ConfigPath),
 		"event_notification_command":   fmt.Sprintf("'/usr/local/bin/event_handler -node-id %%n -event %%e -success %%s -details \"%%d\"'"),
 		"event_notifications":          "'child_node_disconnect,child_node_reconnect,child_node_new_connect'",
-		"location":                     r.Region,
+		"location":                     fmt.Sprintf("'%s'", r.Region),
 		"primary_visibility_consensus": true,
 		"failover_validation_command":  fmt.Sprintf("'/usr/local/bin/failover_validation -visible-nodes %%v -total-nodes %%t'"),
 		"ssh_options":                  "'-o \"StrictHostKeyChecking=no\"'",
@@ -272,33 +279,6 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 	}
 
 	return nil
-}
-
-func (r *RepMgr) writePasswdConf() error {
-	path := "/data/.pgpass"
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open repmgr password file: %s", err)
-	}
-	defer func() { _ = file.Close() }()
-
-	if err := utils.SetFileOwnership(path, "postgres"); err != nil {
-		return fmt.Errorf("failed to set file ownership: %s", err)
-	}
-
-	entries := []string{
-		fmt.Sprintf("*:*:*:%s:%s", r.Credentials.Username, r.Credentials.Password),
-	}
-
-	for _, entry := range entries {
-		str := fmt.Sprintf("%s\n", entry)
-		_, err := file.Write([]byte(str))
-		if err != nil {
-			return err
-		}
-	}
-
-	return file.Sync()
 }
 
 type Member struct {

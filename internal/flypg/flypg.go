@@ -2,60 +2,50 @@ package flypg
 
 import (
 	"fmt"
-	"os"
 	"time"
+
+	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 )
 
-type FlyPGConfig struct {
+type FlyConfig struct {
 	internalConfigFilePath string
 	userConfigFilePath     string
 
 	internalConfig ConfigMap
 	userConfig     ConfigMap
-
-	configPath string
 }
 
-func (c *FlyPGConfig) SetDefaults() {
+func (c *FlyConfig) InternalConfig() ConfigMap {
+	return c.internalConfig
+}
+
+func (c *FlyConfig) UserConfig() ConfigMap {
+	return c.userConfig
+}
+
+func (*FlyConfig) ConsulKey() string {
+	return "FlyPGConfig"
+}
+
+func (c *FlyConfig) SetUserConfig(newConfig ConfigMap) {
+	c.userConfig = newConfig
+}
+
+func (c *FlyConfig) InternalConfigFile() string {
+	return c.internalConfigFilePath
+}
+
+func (c *FlyConfig) UserConfigFile() string {
+	return c.userConfigFilePath
+}
+
+func (c *FlyConfig) SetDefaults() {
 	c.internalConfig = ConfigMap{
 		"deadMemberRemovalThreshold": time.Hour * 24,
 	}
 }
 
-func NewInternalConfig(configPath string) *FlyPGConfig {
-	return &FlyPGConfig{
-		internalConfigFilePath: fmt.Sprintf("%s/flypg.internal.conf", configPath),
-		userConfigFilePath:     fmt.Sprintf("%s/flypg.user.conf", configPath),
-		configPath:             configPath,
-		internalConfig:         ConfigMap{},
-		userConfig:             ConfigMap{},
-	}
-}
-func (c *FlyPGConfig) InternalConfig() ConfigMap {
-	return c.internalConfig
-}
-
-func (c *FlyPGConfig) UserConfig() ConfigMap {
-	return c.userConfig
-}
-
-func (*FlyPGConfig) ConsulKey() string {
-	return "FlyPGConfig"
-}
-
-func (c *FlyPGConfig) SetUserConfig(newConfig ConfigMap) {
-	c.userConfig = newConfig
-}
-
-func (c *FlyPGConfig) InternalConfigFile() string {
-	return c.internalConfigFilePath
-}
-
-func (c *FlyPGConfig) UserConfigFile() string {
-	return c.userConfigFilePath
-}
-
-func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
+func (c *FlyConfig) CurrentConfig() (ConfigMap, error) {
 	internal, err := ReadFromFile(c.InternalConfigFile())
 	if err != nil {
 		return nil, err
@@ -77,31 +67,15 @@ func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func (c *FlyPGConfig) initialize() error {
+func (c *FlyConfig) initialize(store *state.Store) error {
 	c.SetDefaults()
 
-	file, err := os.Create(c.internalConfigFilePath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file: %s", err)
-	} else if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %s", err)
+	if err := SyncUserConfig(c, store); err != nil {
+		return fmt.Errorf("failed to sync internal config from consul: %s", err)
 	}
 
-	file, err = os.Create(c.userConfigFilePath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file: %s", err)
-	} else if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %s", err)
+	if err := WriteConfigFiles(c); err != nil {
+		return fmt.Errorf("failed to write internal config files: %s", err)
 	}
 
 	return nil

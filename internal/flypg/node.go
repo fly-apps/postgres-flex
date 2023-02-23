@@ -28,14 +28,14 @@ type Node struct {
 	PrimaryRegion string
 	DataDir       string
 	Port          int
-	PGConfig      *PGConfig
 
 	SUCredentials       Credentials
 	OperatorCredentials Credentials
 	ReplCredentials     Credentials
 
-	RepMgr         RepMgr
-	InternalConfig FlyPGConfig
+	PGConfig  PGConfig
+	RepMgr    RepMgr
+	FlyConfig FlyConfig
 }
 
 func NewNode() (*Node, error) {
@@ -64,9 +64,6 @@ func NewNode() (*Node, error) {
 		node.Port = port
 	}
 
-	// Stub configuration
-	node.PGConfig = NewConfig(node.DataDir, node.Port)
-
 	// Internal user
 	node.SUCredentials = Credentials{
 		Username: "flypgadmin",
@@ -91,6 +88,7 @@ func NewNode() (*Node, error) {
 		ConfigPath:         "/data/repmgr.conf",
 		InternalConfigPath: "/data/repmgr.internal.conf",
 		UserConfigPath:     "/data/repmgr.user.conf",
+		PasswordConfigPath: "/data/.pgpass",
 		DataDir:            node.DataDir,
 		PrivateIP:          node.PrivateIP,
 		Port:               5433,
@@ -98,7 +96,22 @@ func NewNode() (*Node, error) {
 		Credentials:        node.ReplCredentials,
 	}
 
-	node.InternalConfig = *NewInternalConfig("/data")
+	node.PGConfig = PGConfig{
+		DataDir:                node.DataDir,
+		Port:                   node.Port,
+		ConfigFilePath:         fmt.Sprintf("%s/postgresql.conf", node.DataDir),
+		InternalConfigFilePath: fmt.Sprintf("%s/postgresql.internal.conf", node.DataDir),
+		UserConfigFilePath:     fmt.Sprintf("%s/postgresql.user.conf", node.DataDir),
+
+		passwordFilePath: "/data/.default_password",
+		repmgrUsername:   node.RepMgr.Credentials.Username,
+		repmgrDatabase:   node.RepMgr.DatabaseName,
+	}
+
+	node.FlyConfig = FlyConfig{
+		internalConfigFilePath: "/data/flypg.internal.conf",
+		userConfigFilePath:     "/data/flypg.user.conf",
+	}
 
 	return node, nil
 }
@@ -141,15 +154,15 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	if err := n.configureInternal(store); err != nil {
-		return fmt.Errorf("failed to set internal config: %s", err)
+	if err := n.FlyConfig.initialize(store); err != nil {
+		return fmt.Errorf("failed to initialize fly config: %s", err)
 	}
 
-	if err := n.configureRepmgr(store); err != nil {
-		return fmt.Errorf("failed to configure repmgr config: %s", err)
+	if err := n.RepMgr.initialize(store); err != nil {
+		return fmt.Errorf("failed to initialize repmgr: %s", err)
 	}
 
-	if !n.isPGInitialized() {
+	if !n.PGConfig.isInitialized() {
 		// Check to see if cluster has already been initialized.
 		clusterInitialized, err := store.IsInitializationFlagSet()
 		if err != nil {
@@ -158,14 +171,19 @@ func (n *Node) Init(ctx context.Context) error {
 
 		if !clusterInitialized {
 			fmt.Println("Provisioning primary")
-			// Initialize ourselves as the primary.
-			if err := n.initializePG(); err != nil {
+
+			if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
+				return fmt.Errorf("failed to write pg password file: %s", err)
+			}
+
+			if err := n.PGConfig.initdb(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
 
-			if err := n.setDefaultHBA(); err != nil {
-				return fmt.Errorf("failed updating pg_hba.conf: %s", err)
+			if err := n.PGConfig.postInit(); err != nil {
+				return fmt.Errorf("failed to run postgres post-init: %s", err)
 			}
+
 		} else {
 			fmt.Println("Provisioning standby")
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
@@ -184,8 +202,8 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	if err := n.configurePostgres(store); err != nil {
-		return fmt.Errorf("failed to configure postgres: %s", err)
+	if err := n.PGConfig.initialize(store); err != nil {
+		return fmt.Errorf("failed to initialize pg config: %s", err)
 	}
 
 	if err := setDirOwnership(); err != nil {
@@ -236,7 +254,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		}
 
 		// Setup repmgr database and extension
-		if err := repmgr.setup(ctx, conn); err != nil {
+		if err := repmgr.enable(ctx, conn); err != nil {
 			fmt.Printf("failed to setup repmgr: %s\n", err)
 		}
 
@@ -289,14 +307,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
-				// Issue panic to force a process restart so we can attempt to rejoin
-				// the the cluster we've diverged from.
+				// Issue panic to force a process restart so we can attempt to rejoin the cluster we've diverged from.
 				panic(err)
 			} else if err != nil {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}
 
-			// This should never happen, but protect against it just in case.
+			// This should never happen
 			if primary != n.PrivateIP {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen", primary, n.PrivateIP)
 			}
@@ -333,84 +350,7 @@ func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Co
 	return openConnection(ctx, host, database, n.OperatorCredentials)
 }
 
-func (n *Node) initializePG() error {
-	if n.isPGInitialized() {
-		return nil
-	}
-
-	if err := writePasswordFile(n.OperatorCredentials.Password); err != nil {
-		return fmt.Errorf("failed to write pg password file: %s", err)
-	}
-
-	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=/data/.default_password", n.DataDir)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return fmt.Errorf("failed to run postgres initdb: %s", err)
-	}
-
-	return nil
-}
-
-func writePasswordFile(pwd string) error {
-	if err := os.WriteFile("/data/.default_password", []byte(pwd), 0600); err != nil {
-		return fmt.Errorf("failed to write default password: %s", err)
-	}
-
-	if err := utils.SetFileOwnership("/data/.default_password", "postgres"); err != nil {
-		return fmt.Errorf("failed to set file ownership: %s", err)
-	}
-
-	return nil
-}
-
-func (n *Node) isPGInitialized() bool {
-	_, err := os.Stat(n.DataDir)
-	return !os.IsNotExist(err)
-}
-
 func (n *Node) configureInternal(store *state.Store) error {
-	if err := n.InternalConfig.initialize(); err != nil {
-		return fmt.Errorf("failed to initialize internal config: %s", err)
-	}
-
-	if err := SyncUserConfig(&n.InternalConfig, store); err != nil {
-		return fmt.Errorf("failed to sync internal config from consul: %s", err)
-	}
-
-	if err := WriteConfigFiles(&n.InternalConfig); err != nil {
-		return fmt.Errorf("failed to write internal config files: %s", err)
-	}
-
-	return nil
-}
-
-func (n *Node) configureRepmgr(store *state.Store) error {
-	if err := n.RepMgr.initialize(); err != nil {
-		return fmt.Errorf("failed to initialize repmgr config: %s", err)
-	}
-
-	if err := SyncUserConfig(&n.RepMgr, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for repmgr: %s", err)
-	}
-
-	if err := WriteConfigFiles(&n.RepMgr); err != nil {
-		return fmt.Errorf("failed to write config files for repmgr: %s", err)
-	}
-
-	return nil
-}
-
-func (n *Node) configurePostgres(store *state.Store) error {
-	if err := n.PGConfig.initialize(); err != nil {
-		return fmt.Errorf("failed to initialize pg config: %s", err)
-	}
-
-	if err := SyncUserConfig(n.PGConfig, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for postgres: %s", err.Error())
-	}
-
-	if err := WriteConfigFiles(n.PGConfig); err != nil {
-		return fmt.Errorf("failed to write pg config files: %s", err)
-	}
 
 	return nil
 }
@@ -451,88 +391,6 @@ func (n *Node) createRequiredUsers(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	return nil
-}
-
-type HBAEntry struct {
-	Type     string
-	Database string
-	User     string
-	Address  string
-	Method   string
-}
-
-func (n *Node) setDefaultHBA() error {
-	entries := []HBAEntry{
-		{
-			Type:     "local",
-			Database: "all",
-			User:     "postgres",
-			Method:   "trust",
-		},
-		{
-			Type:     "local",
-			Database: "all",
-			User:     "flypgadmin",
-			Method:   "trust",
-		},
-		{
-			Type:     "local",
-			Database: n.RepMgr.DatabaseName,
-			User:     n.RepMgr.Credentials.Username,
-			Method:   "trust",
-		},
-		{
-			Type:     "local",
-			Database: "replication",
-			User:     n.RepMgr.Credentials.Username,
-			Method:   "trust",
-		},
-		{
-			Type:     "host",
-			Database: "replication",
-			User:     n.RepMgr.Credentials.Username,
-			Address:  "::0/0",
-			Method:   "trust",
-		},
-		{
-			Type:     "host",
-			Database: n.RepMgr.DatabaseName,
-			User:     n.RepMgr.Credentials.Username,
-			Address:  "::0/0",
-			Method:   "trust",
-		},
-		{
-			Type:     "host",
-			Database: "all",
-			User:     "all",
-			Address:  "0.0.0.0/0",
-			Method:   "md5",
-		},
-		{
-			Type:     "host",
-			Database: "all",
-			User:     "all",
-			Address:  "::0/0",
-			Method:   "md5",
-		},
-	}
-
-	path := fmt.Sprintf("%s/pg_hba.conf", n.DataDir)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	for _, entry := range entries {
-		str := fmt.Sprintf("%s %s %s %s %s\n", entry.Type, entry.Database, entry.User, entry.Address, entry.Method)
-		_, err := file.Write([]byte(str))
-		if err != nil {
-			return err
-		}
-	}
-
-	return file.Sync()
 }
 
 func openConnection(parentCtx context.Context, host string, database string, creds Credentials) (*pgx.Conn, error) {
