@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
-	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
@@ -42,8 +41,7 @@ func TestRepmgrInitialization(t *testing.T) {
 	}
 
 	t.Run("initializate", func(t *testing.T) {
-		store, _ := state.NewStore()
-		if err := conf.initialize(store); err != nil {
+		if err := conf.initialize(); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -132,8 +130,7 @@ func TestRepmgrNodeIDGeneration(t *testing.T) {
 		},
 	}
 
-	store, _ := state.NewStore()
-	if err := conf.initialize(store); err != nil {
+	if err := conf.initialize(); err != nil {
 		t.Fatal(err)
 	}
 

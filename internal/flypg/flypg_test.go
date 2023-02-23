@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
@@ -25,8 +24,7 @@ func TestFlyConfigInitialization(t *testing.T) {
 		userConfigFilePath:     flyInternalConfigFilePath,
 	}
 
-	store, _ := state.NewStore()
-	if err := cfg.initialize(store); err != nil {
+	if err := cfg.initialize(); err != nil {
 		t.Fatal(err)
 	}
 

@@ -15,7 +15,6 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/utils"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
-	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -102,7 +101,7 @@ func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
 
-func (r *RepMgr) initialize(store *state.Store) error {
+func (r *RepMgr) initialize() error {
 	entries := []string{
 		"include 'repmgr.internal.conf'\n",
 		"include 'repmgr.user.conf'\n",

@@ -3,8 +3,6 @@ package flypg
 import (
 	"fmt"
 	"time"
-
-	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 )
 
 type FlyPGConfig struct {
@@ -67,7 +65,7 @@ func (c *FlyPGConfig) CurrentConfig() (ConfigMap, error) {
 	return all, nil
 }
 
-func (c *FlyPGConfig) initialize(store *state.Store) error {
+func (c *FlyPGConfig) initialize() error {
 	c.SetDefaults()
 
 	// Note - Sync from consul has been disabled for this component.
