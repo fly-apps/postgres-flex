@@ -212,90 +212,48 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("unrecoverable zombie")
 	}
 
-	store, err := state.NewStore()
+	conn, err := n.NewLocalConnection(ctx, "postgres")
 	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store. %v", err)
+		return fmt.Errorf("failed to establish connection to member: %s", err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	// Check to see if we have already been registered with repmgr.
+	registered, err := isRegistered(ctx, conn, n)
+	if err != nil {
+		return fmt.Errorf("failed to verify member registration: %s", err)
 	}
 
-	clusterInitialized, err := store.IsInitializationFlagSet()
-	if err != nil {
-		return fmt.Errorf("failed to verify cluster state: %s", err)
-	}
-
-	// If the cluster has not yet been initialized, configure ourself as the primary
-	if !clusterInitialized {
-		// Verify we reside within the clusters primary region
-		if !n.RepMgr.eligiblePrimary() {
-			return fmt.Errorf("unable to configure myself as primary since I do not reside within the primary region %q", n.PrimaryRegion)
-		}
-
-		conn, err := n.NewLocalConnection(ctx, "postgres")
-		if err != nil {
-			return fmt.Errorf("failed to establish connection to local node: %s", err)
-		}
-		defer func() { _ = conn.Close(ctx) }()
-
-		// Create required users
-		if err := n.setupCredentials(ctx, conn); err != nil {
-			return fmt.Errorf("failed to create required users: %s", err)
-		}
-
-		// Setup repmgr database and extension
-		if err := n.RepMgr.enable(ctx, conn); err != nil {
-			fmt.Printf("failed to setup repmgr: %s\n", err)
-		}
-
-		// Register ourself as the primary
-		if err := n.RepMgr.registerPrimary(); err != nil {
-			return fmt.Errorf("failed to register repmgr primary: %s", err)
-		}
-
-		// Set initialization flag within consul so future members know they are joining
-		// an existing cluster.
-		if err := store.SetInitializationFlag(); err != nil {
-			return fmt.Errorf("failed to register cluster with consul")
-		}
-
-		// Ensure connection is closed.
-		if err := conn.Close(ctx); err != nil {
-			return fmt.Errorf("failed to close connection: %s", err)
-		}
-
-	} else {
-		conn, err := n.RepMgr.NewLocalConnection(ctx)
+	if registered {
+		// Existing member
+		repConn, err := n.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
 		}
-		defer func() { _ = conn.Close(ctx) }()
+		defer func() { _ = repConn.Close(ctx) }()
 
-		member, err := n.RepMgr.Member(ctx, conn)
+		member, err := n.RepMgr.Member(ctx, repConn)
 		if err != nil {
-			if !errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("failed to resolve member role: %s", err)
-			}
+			return fmt.Errorf("failed to resolve member role: %s", err)
 		}
 
-		role := ""
-		if member != nil {
-			role = member.Role
-		}
-
-		switch role {
+		switch member.Role {
 		case PrimaryRoleName:
 			// Verify cluster state to ensure we are the actual primary and not a zombie.
 			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				fmt.Println("Unable to confirm that we are the true primary!")
+				// Turn member read-only
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 			} else if errors.Is(err, ErrZombieDiscovered) {
 				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
+				// Turn member read-only
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 
-				// Issue panic to force a process restart so we can attempt to rejoin the cluster we've diverged from.
 				panic(err)
 			} else if err != nil {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
@@ -303,7 +261,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 			// This should never happen
 			if primary != n.PrivateIP {
-				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen", primary, n.PrivateIP)
+				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen",
+					primary,
+					n.PrivateIP,
+				)
 			}
 
 			// Readonly lock is set when disk capacity is dangerously high.
@@ -312,21 +273,82 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to unset read-only: %s", err)
 				}
 			}
-		default:
-			if role != "" {
-				fmt.Println("Updating existing standby")
-			} else {
-				fmt.Println("Registering a new standby")
-			}
-
-			// Register ourself as a standby
+		case StandbyRoleName:
+			// Register existing standby to take-on any configuration changes.
 			if err := n.RepMgr.registerStandby(); err != nil {
 				fmt.Printf("failed to register standby: %s\n", err)
 			}
+		default:
+			return fmt.Errorf("member has unknown role: %q", member.Role)
+		}
+	} else {
+		// New member
+
+		// Check with consul to see if the cluster has already been initialized
+		store, err := state.NewStore()
+		if err != nil {
+			return fmt.Errorf("failed initialize cluster state store. %v", err)
 		}
 
-		if err := conn.Close(ctx); err != nil {
-			return fmt.Errorf("failed to close connection: %s", err)
+		// The initialization flag is set after the primary is registered.
+		clusterInitialized, err := store.IsInitializationFlagSet()
+		if err != nil {
+			return fmt.Errorf("failed to verify cluster state: %s", err)
+		}
+
+		if !clusterInitialized {
+			// Configure as primary
+			fmt.Println("Registering primary")
+
+			// Verify we reside within the clusters primary region
+			if !n.RepMgr.eligiblePrimary() {
+				return fmt.Errorf("unable to configure as the primary. expected region: %q, got: %q",
+					n.PrimaryRegion,
+					n.RepMgr.Region,
+				)
+			}
+
+			// Create required users
+			if err := n.setupCredentials(ctx, conn); err != nil {
+				return fmt.Errorf("failed to create required users: %s", err)
+			}
+
+			// Setup repmgr database and extension
+			if err := n.RepMgr.enable(ctx, conn); err != nil {
+				fmt.Printf("failed to setup repmgr: %s\n", err)
+			}
+
+			// Register ourself as the primary
+			if err := n.RepMgr.registerPrimary(); err != nil {
+				return fmt.Errorf("failed to register repmgr primary: %s", err)
+			}
+
+			// Set initialization flag within consul so future members know they are joining
+			// an existing cluster.
+			if err := store.SetInitializationFlag(); err != nil {
+				return fmt.Errorf("failed to register cluster with consul")
+			}
+
+			// Let the boot process know that we've already been configured.
+			if err := issueRegistrationCertificate(); err != nil {
+				return fmt.Errorf("failed to issue registration certificate: %s", err)
+			}
+
+			// Ensure connection is closed.
+			if err := conn.Close(ctx); err != nil {
+				return fmt.Errorf("failed to close connection: %s", err)
+			}
+		} else {
+			// Configure as standby
+			fmt.Println("Registering standby")
+			if err := n.RepMgr.registerStandby(); err != nil {
+				fmt.Printf("failed to register standby: %s\n", err)
+			}
+
+			// Let the boot process know that we've already been configured.
+			if err := issueRegistrationCertificate(); err != nil {
+				return fmt.Errorf("failed to issue registration certificate: %s", err)
+			}
 		}
 	}
 
