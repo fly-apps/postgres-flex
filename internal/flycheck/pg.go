@@ -19,7 +19,7 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		return checks, fmt.Errorf("failed to initialize node: %s", err)
 	}
 
-	localConn, err := node.NewLocalConnection(ctx, "postgres")
+	localConn, err := node.NewLocalConnection(ctx, "postgres", node.SUCredentials)
 	if err != nil {
 		return checks, fmt.Errorf("failed to connect with local node: %s", err)
 	}
