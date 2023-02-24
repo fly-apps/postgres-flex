@@ -21,7 +21,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 	// Below is for backwards compatibility
 	databases, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to list databases: %s", err)
 	}
 
 	repmgrExists := false
@@ -38,11 +38,11 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 
 	repConn, err := n.RepMgr.NewLocalConnection(ctx)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to connect to local repmgr: %s", err)
 	}
 	defer func() { _ = repConn.Close(ctx) }()
 
-	member, err := n.RepMgr.Member(ctx, conn)
+	member, err := n.RepMgr.Member(ctx, repConn)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
