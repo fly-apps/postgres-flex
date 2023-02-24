@@ -330,7 +330,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Let the boot process know that we've already been configured.
-			if err := issueRegistrationCertificate(); err != nil {
+			if err := issueRegistrationCert(); err != nil {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 
@@ -346,7 +346,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Let the boot process know that we've already been configured.
-			if err := issueRegistrationCertificate(); err != nil {
+			if err := issueRegistrationCert(); err != nil {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		}

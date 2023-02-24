@@ -222,5 +222,11 @@ func clearLocks() error {
 		}
 	}
 
+	if err := removeRegistrationCert(); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove registration certificate: %s", err)
+		}
+	}
+
 	return nil
 }
