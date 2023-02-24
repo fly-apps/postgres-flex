@@ -230,11 +230,15 @@ func (c *PGConfig) initialize(store *state.Store) error {
 	}
 
 	if err := SyncUserConfig(c, store); err != nil {
-		return fmt.Errorf("failed to sync user config from consul for postgres: %s", err.Error())
-	}
-
-	if err := WriteConfigFiles(c); err != nil {
-		return fmt.Errorf("failed to write pg config files: %s", err)
+		fmt.Printf("WARNING: Failed to sync user config from consul for postgres: %s\n", err.Error())
+		fmt.Println("       This may cause this node to behave unexpectedly")
+		if err := writeInternalConfigFile(c); err != nil {
+			return fmt.Errorf("failed to write pg config files: %s", err)
+		}
+	} else {
+		if err := WriteConfigFiles(c); err != nil {
+			return fmt.Errorf("failed to write pg config files: %s", err)
+		}
 	}
 
 	return nil
