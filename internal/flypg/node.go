@@ -276,7 +276,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		case StandbyRoleName:
 			// Register existing standby to take-on any configuration changes.
 			if err := n.RepMgr.registerStandby(); err != nil {
-				fmt.Printf("failed to register standby: %s\n", err)
+				fmt.Printf("failed to register existing standby: %s\n", err)
 			}
 		default:
 			return fmt.Errorf("member has unknown role: %q", member.Role)
@@ -342,7 +342,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			// Configure as standby
 			fmt.Println("Registering standby")
 			if err := n.RepMgr.registerStandby(); err != nil {
-				fmt.Printf("failed to register standby: %s\n", err)
+				fmt.Printf("failed to register new standby: %s\n", err)
 			}
 
 			// Let the boot process know that we've already been configured.
