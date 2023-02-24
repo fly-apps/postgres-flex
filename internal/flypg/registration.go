@@ -50,7 +50,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 		return false, fmt.Errorf("failed to resolve member role: %s", err)
 	}
 
-	// Does it matter if it's active or not?
+	// If we are active, issue registration certificate
 	if member.Active {
 		if err := issueRegistrationCertificate(); err != nil {
 			fmt.Println("failed to issue registration certificate.")

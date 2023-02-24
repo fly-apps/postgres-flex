@@ -225,7 +225,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 
 	if registered {
-		// Existing members
+		// Existing member
 		repConn, err := n.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
