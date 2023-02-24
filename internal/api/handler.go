@@ -67,7 +67,7 @@ func localConnection(ctx context.Context, database string) (*pgx.Conn, error) {
 		return nil, err
 	}
 
-	pg, err := node.NewLocalConnection(ctx, database)
+	pg, err := node.NewLocalConnection(ctx, database, node.OperatorCredentials)
 	if err != nil {
 		return nil, err
 	}

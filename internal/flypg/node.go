@@ -65,12 +65,13 @@ func NewNode() (*Node, error) {
 		Password: os.Getenv("SU_PASSWORD"),
 	}
 
-	// Superuser
+	// Postgres user
 	node.OperatorCredentials = admin.Credential{
 		Username: "postgres",
 		Password: os.Getenv("OPERATOR_PASSWORD"),
 	}
 
+	// Repmgr user
 	node.ReplCredentials = admin.Credential{
 		Username: "repmgr",
 		Password: os.Getenv("REPL_PASSWORD"),
@@ -212,7 +213,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 		return fmt.Errorf("unrecoverable zombie")
 	}
 
-	conn, err := n.NewLocalConnection(ctx, "postgres")
+	// Use the Postgres user on boot, since our internal user may not have been created yet.
+	conn, err := n.NewLocalConnection(ctx, "postgres", n.OperatorCredentials)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to member: %s", err)
 	}
@@ -355,11 +357,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) NewLocalConnection(ctx context.Context, database string) (*pgx.Conn, error) {
-	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
-	return openConnection(ctx, host, database, n.OperatorCredentials)
-}
-
 func (n *Node) setupCredentials(ctx context.Context, conn *pgx.Conn) error {
 	requiredCredentials := []admin.Credential{
 		n.OperatorCredentials,
@@ -368,6 +365,12 @@ func (n *Node) setupCredentials(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	return admin.ManageDefaultUsers(ctx, conn, requiredCredentials)
+}
+
+// NewLocalConnection opens up a new connection using the flypgadmin user.
+func (n *Node) NewLocalConnection(ctx context.Context, database string, creds admin.Credential) (*pgx.Conn, error) {
+	host := net.JoinHostPort(n.PrivateIP, strconv.Itoa(n.Port))
+	return openConnection(ctx, host, database, creds)
 }
 
 func openConnection(parentCtx context.Context, host string, database string, creds admin.Credential) (*pgx.Conn, error) {
