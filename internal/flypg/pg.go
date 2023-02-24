@@ -310,14 +310,14 @@ func (c *PGConfig) setDefaultHBA() error {
 			Type:     "host",
 			Database: "replication",
 			User:     c.repmgrUsername,
-			Address:  "::0/0",
+			Address:  "fdaa::/16",
 			Method:   "trust",
 		},
 		{
 			Type:     "host",
 			Database: c.repmgrDatabase,
 			User:     c.repmgrUsername,
-			Address:  "::0/0",
+			Address:  "fdaa::/16",
 			Method:   "trust",
 		},
 		{
