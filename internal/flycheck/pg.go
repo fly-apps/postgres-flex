@@ -3,8 +3,8 @@ package flycheck
 import (
 	"context"
 	"fmt"
-
 	"github.com/fly-apps/postgres-flex/internal/flypg"
+	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/superfly/fly-checks/check"
 )
@@ -44,6 +44,10 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		return connectionCount(ctx, localConn)
 	})
 
+	checks.AddCheck("repmgr", func() (string, error) {
+		return repmgrCheck()
+	})
+
 	if member.Role == flypg.PrimaryRoleName && member.Active {
 		// Check that provides additional insight into disk capacity and
 		// how close we are to hitting the readonly threshold.
@@ -53,6 +57,14 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 	}
 
 	return checks, nil
+}
+
+func repmgrCheck() (string, error) {
+	cmd, err := utils.RunCommand("repmgr node check --config-file /data/repmgr.conf", "postgres")
+	if err != nil {
+		return string(cmd), err
+	}
+	return string(cmd), nil
 }
 
 func diskCapacityCheck(ctx context.Context, node *flypg.Node) (string, error) {
