@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
@@ -216,7 +217,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 	// Use the Postgres user on boot, since our internal user may not have been created yet.
 	conn, err := n.NewLocalConnection(ctx, "postgres", n.OperatorCredentials)
 	if err != nil {
-		return fmt.Errorf("failed to establish connection to member: %s", err)
+		// Check to see if this is an authentication error.
+		if strings.Contains(err.Error(), "28P01") {
+			fmt.Println("WARNING: `postgres` user password does not match the `OPERATOR_PASSWORD` secret")
+			fmt.Printf("HINT: Use `fly secrets set OPERATOR_PASSWORD=<password> --app %s` to resolve the issue\n", n.AppName)
+		}
+
+		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
@@ -283,6 +290,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 		default:
 			return fmt.Errorf("member has unknown role: %q", member.Role)
 		}
+
+		// Ensure connection is closed.
+		if err := repConn.Close(ctx); err != nil {
+			return fmt.Errorf("failed to close connection: %s", err)
+		}
 	} else {
 		// New member
 
@@ -335,11 +347,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			if err := issueRegistrationCert(); err != nil {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
-
-			// Ensure connection is closed.
-			if err := conn.Close(ctx); err != nil {
-				return fmt.Errorf("failed to close connection: %s", err)
-			}
 		} else {
 			// Configure as standby
 			fmt.Println("Registering standby")
@@ -352,6 +359,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		}
+	}
+
+	// Ensure connection is closed.
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
 	return nil
