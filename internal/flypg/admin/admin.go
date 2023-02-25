@@ -198,7 +198,7 @@ func ListDatabases(ctx context.Context, pg *pgx.Conn) ([]DbInfo, error) {
 	}
 	defer rows.Close()
 
-	values := []DbInfo{}
+	var values []DbInfo
 
 	for rows.Next() {
 		di := DbInfo{}
@@ -257,7 +257,7 @@ func ListUsers(ctx context.Context, pg *pgx.Conn) ([]UserInfo, error) {
 	}
 	defer rows.Close()
 
-	values := []UserInfo{}
+	var values []UserInfo
 
 	for rows.Next() {
 		ui := UserInfo{}
