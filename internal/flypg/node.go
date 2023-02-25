@@ -329,7 +329,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 			// Setup repmgr database and extension
 			if err := n.RepMgr.enable(ctx, conn); err != nil {
-				fmt.Printf("failed to setup repmgr: %s\n", err)
+				return fmt.Errorf("failed to enable repmgr: %s", err)
 			}
 
 			// Register ourself as the primary
