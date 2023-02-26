@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
@@ -53,7 +54,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 	// If we are active, issue registration certificate
 	if member.Active {
 		if err := issueRegistrationCert(); err != nil {
-			fmt.Println("failed to issue registration certificate.")
+			log.Println("[WARN] Failed to issue registration certificate.")
 			return true, nil
 		}
 	}

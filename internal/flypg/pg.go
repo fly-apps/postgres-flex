@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -177,7 +178,7 @@ func (c *PGConfig) SetDefaults() error {
 func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
 	for key, value := range c.userConfig {
 		if err := admin.SetConfigurationSetting(ctx, conn, key, value); err != nil {
-			fmt.Printf("failed to set configuration setting %s -> %s: %s", key, value, err)
+			log.Printf("[WARN] Failed to set configuration setting %s -> %s: %s", key, value, err)
 		}
 	}
 
@@ -230,8 +231,8 @@ func (c *PGConfig) initialize(store *state.Store) error {
 	}
 
 	if err := SyncUserConfig(c, store); err != nil {
-		fmt.Printf("WARNING: Failed to sync user config from consul for postgres: %s\n", err.Error())
-		fmt.Println("       This may cause this node to behave unexpectedly")
+		log.Printf("[WARN] Failed to sync user config from consul for postgres: %s\n", err.Error())
+		log.Println("[WARN] This may cause this node to behave unexpectedly")
 		if err := writeInternalConfigFile(c); err != nil {
 			return fmt.Errorf("failed to write pg config files: %s", err)
 		}

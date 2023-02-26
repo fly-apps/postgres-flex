@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -163,7 +164,7 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if !clusterInitialized {
-			fmt.Println("Provisioning primary")
+			log.Println("[INFO] Provisioning primary")
 			// TODO - This should probably run on boot in case the password changes.
 			if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
 				return fmt.Errorf("failed to write pg password file: %s", err)
@@ -173,7 +174,7 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
 		} else {
-			fmt.Println("Provisioning standby")
+			log.Println("[INFO] Provisioning standby")
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to resolve member over dns: %s", err)
@@ -182,7 +183,7 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
 				// Clean-up the directory so it can be retried.
 				if rErr := os.Remove(n.DataDir); rErr != nil {
-					fmt.Printf("failed to cleanup postgresql dir after clone error: %s\n", rErr)
+					log.Printf("[ERROR] failed to cleanup postgresql dir after clone error: %s\n", rErr)
 				}
 
 				return fmt.Errorf("failed to clone primary: %s", err)
@@ -208,8 +209,8 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that need to be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	if ZombieLockExists() {
-		fmt.Println("Manual intervention required. Delete the zombie.lock file and restart the machine to force a retry.")
-		fmt.Println("Sleeping for 5 minutes.")
+		log.Println("[ERROR] Manual intervention required. Delete the zombie.lock file and restart the machine to force a retry.")
+		log.Println("[ERROR] Sleeping for 5 minutes.")
 		time.Sleep(5 * time.Minute)
 		return fmt.Errorf("unrecoverable zombie")
 	}
@@ -219,8 +220,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 	if err != nil {
 		// Check to see if this is an authentication error.
 		if strings.Contains(err.Error(), "28P01") {
-			fmt.Println("WARNING: `postgres` user password does not match the `OPERATOR_PASSWORD` secret")
-			fmt.Printf("HINT: Use `fly secrets set OPERATOR_PASSWORD=<password> --app %s` to resolve the issue\n", n.AppName)
+			log.Println("[WARN] `postgres` user password does not match the `OPERATOR_PASSWORD` secret")
+			log.Printf("[WARN] Use `fly secrets set OPERATOR_PASSWORD=<password> --app %s` to resolve the issue\n", n.AppName)
 		}
 
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
@@ -251,13 +252,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 			// Verify cluster state to ensure we are the actual primary and not a zombie.
 			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
-				fmt.Println("Unable to confirm that we are the true primary!")
+				log.Println("[WARN] Unable to confirm that we are the true primary!")
 				// Turn member read-only
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 			} else if errors.Is(err, ErrZombieDiscovered) {
-				fmt.Printf("The majority of registered members agree that '%s' is the real primary.\n", primary)
+				log.Printf("[WARN] The majority of registered members agree that '%s' is the real primary.\n", primary)
 				// Turn member read-only
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
@@ -285,7 +286,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		case StandbyRoleName:
 			// Register existing standby to take-on any configuration changes.
 			if err := n.RepMgr.registerStandby(); err != nil {
-				fmt.Printf("failed to register existing standby: %s\n", err)
+				return fmt.Errorf("failed to register existing standby: %s", err)
 			}
 		default:
 			return fmt.Errorf("member has unknown role: %q", member.Role)
@@ -312,7 +313,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		if !clusterInitialized {
 			// Configure as primary
-			fmt.Println("Registering primary")
+			log.Println("[INFO] Registering primary")
 
 			// Verify we reside within the clusters primary region
 			if !n.RepMgr.eligiblePrimary() {
@@ -349,9 +350,9 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 		} else {
 			// Configure as standby
-			fmt.Println("Registering standby")
+			log.Println("[INFO] Registering standby")
 			if err := n.RepMgr.registerStandby(); err != nil {
-				fmt.Printf("failed to register new standby: %s\n", err)
+				return fmt.Errorf("failed to register new standby: %s", err)
 			}
 
 			// Let the boot process know that we've already been configured.
