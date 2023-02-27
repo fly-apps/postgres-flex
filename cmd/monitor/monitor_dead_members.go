@@ -58,9 +58,9 @@ func deadMemberMonitorTick(ctx context.Context, node *flypg.Node, seenAt map[int
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
-	member, err := node.RepMgr.MemberByID(ctx, conn, int(node.RepMgr.ID))
+	member, err := node.RepMgr.Member(ctx, conn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve member: %s", err)
 	}
 
 	if member.Role != flypg.PrimaryRoleName {
