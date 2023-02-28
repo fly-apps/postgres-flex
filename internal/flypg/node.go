@@ -252,13 +252,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 			// Verify cluster state to ensure we are the actual primary and not a zombie.
 			primary, err := PerformScreening(ctx, conn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
-				log.Println("[WARN] Unable to confirm that we are the true primary!")
+				log.Println("[ERROR] Unable to confirm that we are the true primary!")
 				// Turn member read-only
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
 			} else if errors.Is(err, ErrZombieDiscovered) {
-				log.Printf("[WARN] The majority of registered members agree that '%s' is the real primary.\n", primary)
+				log.Printf("[ERROR] The majority of registered members agree that '%s' is the real primary.\n", primary)
 				// Turn member read-only
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
