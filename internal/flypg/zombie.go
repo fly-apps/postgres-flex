@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 
@@ -68,7 +69,7 @@ func PerformScreening(ctx context.Context, conn *pgx.Conn, n *Node) (string, err
 		return "", fmt.Errorf("failed to evaluate cluster data: %s", err)
 	}
 
-	fmt.Println(DNASampleString(sample))
+	log.Println(DNASampleString(sample))
 
 	return ZombieDiagnosis(sample)
 }
@@ -96,7 +97,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		// Check for connectivity
 		mConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
 		if err != nil {
-			fmt.Printf("failed to connect to %s\n", standby.Hostname)
+			log.Printf("[WARN] Failed to connect to %s\n", standby.Hostname)
 			sample.totalInactive++
 			continue
 		}
@@ -105,7 +106,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		// Verify the primary
 		primary, err := node.RepMgr.PrimaryMember(ctx, mConn)
 		if err != nil {
-			fmt.Printf("failed to resolve primary from standby %s\n", standby.Hostname)
+			log.Printf("[WARN] Failed to resolve primary from standby %s\n", standby.Hostname)
 			sample.totalInactive++
 			continue
 		}
@@ -190,7 +191,7 @@ func DNASampleString(s *DNASample) string {
 }
 
 func handleZombieLock(ctx context.Context, n *Node) error {
-	fmt.Println("Zombie lock detected!")
+	log.Println("[WARN] Zombie lock detected!")
 	primaryStr, err := ReadZombieLock()
 	if err != nil {
 		return fmt.Errorf("failed to read zombie lock: %s", primaryStr)
@@ -227,7 +228,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 
 		// If the primary does not reside within our primary region, we cannot rejoin until it is.
 		if primary.Region != n.PrimaryRegion {
-			fmt.Printf("Primary region mismatch detected. The primary lives in '%s', while PRIMARY_REGION is set to '%s'\n", primary.Region, n.PrimaryRegion)
+			log.Printf("[WARN] Primary region mismatch detected. The primary lives in '%s', while PRIMARY_REGION is set to '%s'\n", primary.Region, n.PrimaryRegion)
 			return ErrZombieLockRegionMismatch
 		}
 
@@ -248,8 +249,8 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		}
 	} else {
 		// TODO - Provide link to documention on how to address this
-		fmt.Println("Zombie lock file does not contain a hostname.")
-		fmt.Println("This likely means that we were unable to determine who the real primary is.")
+		log.Println("[WARN] Zombie lock file does not contain a hostname.")
+		log.Println("[WARN] This likely means that we were unable to determine who the real primary is.")
 	}
 
 	return nil

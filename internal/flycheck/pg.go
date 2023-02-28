@@ -3,6 +3,7 @@ package flycheck
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/jackc/pgx/v5"
@@ -69,9 +70,9 @@ func diskCapacityCheck(ctx context.Context, node *flypg.Node) (string, error) {
 		// If the read-only lock has already been set, we can assume that we've already
 		// broadcasted.
 		if !flypg.ReadOnlyLockExists() {
-			fmt.Println("Broadcasting readonly change to registered standbys")
+			log.Println("[WARN] Broadcasting readonly change to registered standbys")
 			if err := flypg.BroadcastReadonlyChange(ctx, node, true); err != nil {
-				fmt.Printf("errors with enable readonly broadcast: %s\n", err)
+				log.Printf("[ERROR] Failed to enable readonly: %s\n", err)
 			}
 		}
 
@@ -81,7 +82,7 @@ func diskCapacityCheck(ctx context.Context, node *flypg.Node) (string, error) {
 	// Don't attempt to disable readonly if there's a zombie.lock
 	if !flypg.ZombieLockExists() && flypg.ReadOnlyLockExists() {
 		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
-			fmt.Printf("errors with disable readonly broadcast: %s\n", err)
+			log.Printf("[ERROR] Failed to disable readonly: %s\n", err)
 		}
 	}
 

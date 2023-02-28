@@ -3,6 +3,7 @@ package supervisor
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -112,7 +113,7 @@ func (h *Supervisor) waitForTimeoutOrInterrupt() {
 func (h *Supervisor) waitForExit(ctx context.Context) {
 	<-ctx.Done()
 
-	fmt.Println("supervisor stopping")
+	log.Println("Supervisor stopping")
 
 	for _, proc := range h.procs {
 		go proc.Interrupt()
@@ -159,7 +160,7 @@ func (h *Supervisor) StopOnSignal(sigs ...os.Signal) {
 
 	go func() {
 		for sig := range sigch {
-			fmt.Printf("Got %s, stopping\n", sig)
+			log.Printf("Got %s, stopping\n", sig)
 			h.Stop()
 		}
 	}()

@@ -35,7 +35,6 @@ func status(err error) int {
 	var pgErr *pgconn.PgError
 
 	if errors.As(err, &pgErr) {
-		// fmt.Printf("%s: %s\n", pgErr.Code, pgErr.Message)
 		switch pgErr.Code {
 		case "42710": // unique violation
 			return http.StatusConflict

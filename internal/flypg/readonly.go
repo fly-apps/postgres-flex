@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -72,13 +73,13 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 			endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, target)
 			resp, err := http.Get(endpoint)
 			if err != nil {
-				fmt.Printf("failed to broadcast readonly state change to member %s: %s", member.Hostname, err)
+				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %s", member.Hostname, err)
 				continue
 			}
 			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode > 299 {
-				fmt.Printf("failed to broadcast readonly state change to member %s: %d\n", member.Hostname, resp.StatusCode)
+				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %d\n", member.Hostname, resp.StatusCode)
 			}
 		}
 	}
@@ -87,13 +88,13 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 		endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, RestartHaproxyEndpoint)
 		resp, err := http.Get(endpoint)
 		if err != nil {
-			fmt.Printf("failed restart haproxy on member %s: %s", member.Hostname, err)
+			log.Printf("[WARN] Failed restart haproxy on member %s: %s", member.Hostname, err)
 			continue
 		}
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode > 299 {
-			fmt.Printf("failed to restart haproxy on member %s: %d\n", member.Hostname, resp.StatusCode)
+			log.Printf("[WARN] Failed to restart haproxy on member %s: %d\n", member.Hostname, resp.StatusCode)
 		}
 	}
 
@@ -115,7 +116,7 @@ func writeReadOnlyLock() error {
 	}
 
 	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0600); err != nil {
-		return err
+		return fmt.Errorf("failed to create readonly.lock: %s", err)
 	}
 
 	if err := utils.SetFileOwnership(readOnlyLockFile, "postgres"); err != nil {

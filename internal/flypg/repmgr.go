@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"math"
 	"math/big"
 	"net"
@@ -235,7 +236,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 		r.DatabaseName,
 	)
 
-	fmt.Println(cmdStr)
+	log.Println(cmdStr)
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
@@ -245,7 +246,7 @@ func (r *RepMgr) registerStandby() error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		fmt.Printf("failed to register standby: %s", err)
+		return err
 	}
 
 	return nil
@@ -254,7 +255,7 @@ func (r *RepMgr) registerStandby() error {
 func (r *RepMgr) unregisterStandby(id int) error {
 	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		fmt.Printf("failed to unregister standby: %s", err)
+		return err
 	}
 
 	return nil
@@ -273,7 +274,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.Credentials.Username,
 		r.ConfigPath)
 
-	fmt.Println(cmdStr)
+	log.Println(cmdStr)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to clone primary: %s", err)
 	}
@@ -397,7 +398,6 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 
 		member, err := r.MemberByHostname(ctx, conn, ip.String())
 		if err != nil {
-			fmt.Printf("failed to resolve role from %s", ip.String())
 			continue
 		}
 
