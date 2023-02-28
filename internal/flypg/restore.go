@@ -52,7 +52,7 @@ func Restore(ctx context.Context, node *Node) error {
 
 	go func() {
 		if err := svisor.Run(); err != nil {
-			log.Printf("failed to boot postgres in the background: %s", err)
+			log.Printf("[ERROR] failed to boot postgres in the background: %s", err)
 		}
 	}()
 

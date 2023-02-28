@@ -164,7 +164,7 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if !clusterInitialized {
-			log.Println("[INFO] Provisioning primary")
+			log.Println("Provisioning primary")
 			// TODO - This should probably run on boot in case the password changes.
 			if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
 				return fmt.Errorf("failed to write pg password file: %s", err)
@@ -174,7 +174,7 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
 		} else {
-			log.Println("[INFO] Provisioning standby")
+			log.Println("Provisioning standby")
 			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to resolve member over dns: %s", err)

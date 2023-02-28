@@ -236,7 +236,7 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 		r.DatabaseName,
 	)
 
-	log.Println("[INFO] " + cmdStr)
+	log.Println(cmdStr)
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
@@ -274,7 +274,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		r.Credentials.Username,
 		r.ConfigPath)
 
-	log.Println("[INFO] " + cmdStr)
+	log.Println(cmdStr)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to clone primary: %s", err)
 	}
