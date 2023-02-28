@@ -313,7 +313,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		if !clusterInitialized {
 			// Configure as primary
-			log.Println("[INFO] Registering primary")
+			log.Println("Registering primary")
 
 			// Verify we reside within the clusters primary region
 			if !n.RepMgr.eligiblePrimary() {
@@ -350,7 +350,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 		} else {
 			// Configure as standby
-			log.Println("[INFO] Registering standby")
+			log.Println("Registering standby")
 			if err := n.RepMgr.registerStandby(); err != nil {
 				return fmt.Errorf("failed to register new standby: %s", err)
 			}
