@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 const Port = 5500
 
 func StartHttpServer() error {
+	log.SetFlags(0)
+
 	r := chi.NewMux()
 	r.Mount("/flycheck", flycheck.Handler())
 	r.Mount("/commands", Handler())
@@ -30,6 +33,9 @@ func StartHttpServer() error {
 
 func Handler() http.Handler {
 	r := chi.NewRouter()
+	r.Route("/events", func(r chi.Router) {
+		r.Post("/process", handleEvent)
+	})
 
 	r.Route("/users", func(r chi.Router) {
 		r.Get("/{name}", handleGetUser)
