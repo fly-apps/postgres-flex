@@ -21,6 +21,8 @@ var (
 func main() {
 	ctx := context.Background()
 
+	log.SetFlags(0)
+
 	node, err := flypg.NewNode()
 	if err != nil {
 		panic(fmt.Sprintf("failed to reference node: %s\n", err))
