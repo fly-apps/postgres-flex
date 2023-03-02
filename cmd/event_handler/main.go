@@ -31,12 +31,12 @@ func main() {
 		Details: *details,
 	}
 
-	node, err := flypg.NewNode()
+	reqBytes, err := json.Marshal(req)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	reqBytes, err := json.Marshal(req)
+	node, err := flypg.NewNode()
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -19,6 +19,12 @@ type EventRequest struct {
 	Details string `json:"details"`
 }
 
+const (
+	childNodeDisconnect = "child_node_disconnect"
+	childNodeReconnect  = "child_node_reconnect"
+	childNodeNewConnect = "child_node_new_connect"
+)
+
 func handleEvent(w http.ResponseWriter, r *http.Request) {
 	var event EventRequest
 	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
@@ -29,29 +35,28 @@ func handleEvent(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = r.Body.Close() }()
 
 	if !event.Success {
-		errMsg := fmt.Sprintf("[ERROR] event %s was non-successful: %s", event.Name, event.Details)
+		errMsg := fmt.Sprintf("[ERROR] Event %q failed: %s", event.Name, event.Details)
 		log.Println(errMsg)
 		renderErr(w, errors.New(errMsg))
 		return
 	}
 
 	if err := processEvent(r.Context(), event); err != nil {
-		log.Printf("[ERROR] failed to process event: %s\n", err)
+		log.Printf("[ERROR] Failed to process event: %s\n", err)
 		renderErr(w, err)
 		return
 	}
 }
 
 func processEvent(ctx context.Context, event EventRequest) error {
-	log.Printf("Processing event: %s\n", event.Name)
-
+	log.Printf("Processing event: %q \n", event.Name)
 	node, err := flypg.NewNode()
 	if err != nil {
 		return fmt.Errorf("failed to initialize node: %s", err)
 	}
 
 	switch event.Name {
-	case "child_node_disconnect", "child_node_reconnect", "child_node_new_connect":
+	case childNodeDisconnect, childNodeReconnect, childNodeNewConnect:
 		conn, err := node.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to open local connection: %s", err)
@@ -64,7 +69,6 @@ func processEvent(ctx context.Context, event EventRequest) error {
 		}
 
 		if member.Role != flypg.PrimaryRoleName {
-			// We should never get here.
 			return nil
 		}
 
