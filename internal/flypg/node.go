@@ -250,7 +250,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		switch member.Role {
 		case PrimaryRoleName:
 			// Verify cluster state to ensure we are the actual primary and not a zombie.
-			primary, err := PerformScreening(ctx, conn, n)
+			primary, err := PerformScreening(ctx, repConn, n)
 			if errors.Is(err, ErrZombieDiagnosisUndecided) {
 				log.Println("[ERROR] Unable to confirm that we are the true primary!")
 				// Turn member read-only
