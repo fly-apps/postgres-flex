@@ -11,7 +11,7 @@ pg_database:
         description: "Disk space used by the database"
 
 pg_replication:
-  query: "SELECT slot_name, active, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS lag FROM pg_replication_slots;"
+  query: "SELECT slot_name, CAST(active AS TEXT), pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS lag FROM pg_replication_slots"
   master: true
   cache_seconds: 30
   metrics:
@@ -22,5 +22,5 @@ pg_replication:
       usage: "LABEL"
       description: "Whether the replication slot is active"
     - lag:
-        usage: "GAUGE"
-        description: "Replication lag in bytes"
+      usage: "GAUGE"
+      description: "Replication lag in bytes"
