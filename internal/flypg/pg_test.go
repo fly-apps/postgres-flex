@@ -278,8 +278,9 @@ func TestValidateCompatibility(t *testing.T) {
 	}
 
 	store, _ := state.NewStore()
-	pgConf.initialize(store)
-
+	if err := pgConf.initialize(store); err != nil {
+		t.Fatal(err)
+	}
 	t.Run("SharedPreloadLibraries", func(t *testing.T) {
 		valid := ConfigMap{
 			"shared_preload_libraries": "repmgr",

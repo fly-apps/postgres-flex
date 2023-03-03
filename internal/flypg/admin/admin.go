@@ -392,8 +392,7 @@ func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[strin
 
 		// Verify specified extensions are installed
 		if k == "shared_preload_libraries" {
-			extensions := v.(string)
-			extensions = strings.Trim(v.(string), "'")
+			extensions := strings.Trim(v.(string), "'")
 			extSlice := strings.Split(extensions, ",")
 			for _, e := range extSlice {
 				available, err := ExtensionAvailable(ctx, conn, e)
