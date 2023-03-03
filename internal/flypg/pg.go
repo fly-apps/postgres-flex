@@ -274,7 +274,11 @@ func (c *PGConfig) writePasswordFile(pwd string) error {
 	return nil
 }
 
-func (c *PGConfig) Validate(requested ConfigMap) (ConfigMap, error) {
+func (c *PGConfig) Validate(ctx context.Context, conn *pgx.Conn, requested ConfigMap) (ConfigMap, error) {
+	if err := admin.ValidatePGSettings(ctx, conn, requested); err != nil {
+		return requested, err
+	}
+
 	current, err := c.CurrentConfig()
 	if err != nil {
 		return requested, fmt.Errorf("failed to resolve current config: %s", err)
@@ -283,16 +287,16 @@ func (c *PGConfig) Validate(requested ConfigMap) (ConfigMap, error) {
 	// Shared preload libraries
 	if v, ok := requested["shared_preload_libraries"]; ok {
 		val := v.(string)
-		// Strip off any single quotes that my have been added
+
+		// Remove any formatting that may be applied
 		val = strings.Trim(val, "'")
 		val = strings.TrimSpace(val)
-
 		if val == "" {
 			return requested, errors.New("`shared_preload_libraries` must contain the `repmgr` extension")
 		}
 
+		// Confirm repmgr is specified
 		repmgrPresent := false
-
 		entries := strings.Split(val, ",")
 		for _, entry := range entries {
 			if entry == "repmgr" {
@@ -305,6 +309,7 @@ func (c *PGConfig) Validate(requested ConfigMap) (ConfigMap, error) {
 			return requested, errors.New("`shared_preload_libraries` must contain the `repmgr` extension")
 		}
 
+		// Reconstruct value with proper formatting
 		requested["shared_preload_libraries"] = fmt.Sprintf("'%s'", val)
 	}
 
@@ -312,6 +317,7 @@ func (c *PGConfig) Validate(requested ConfigMap) (ConfigMap, error) {
 	if v, ok := requested["wal_level"]; ok {
 		value := v.(string)
 
+		// Postgres will not boot properly if minimal is set with archive_mode enabled.
 		if value == "minimal" {
 			valid := false
 			if val, ok := requested["archive_mode"]; ok {
