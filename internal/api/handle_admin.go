@@ -157,6 +157,10 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for k, v := range requestedChanges {
+		cfg[k] = v
+	}
+
 	node.PGConfig.SetUserConfig(cfg)
 
 	var requiresRestart []string

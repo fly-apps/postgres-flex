@@ -255,7 +255,7 @@ func setup(t *testing.T) error {
 	return nil
 }
 
-func TestValidateConfiguration(t *testing.T) {
+func TestValidateCompatibility(t *testing.T) {
 	if err := setup(t); err != nil {
 		t.Fatal(err)
 	}
@@ -280,16 +280,14 @@ func TestValidateConfiguration(t *testing.T) {
 	store, _ := state.NewStore()
 	pgConf.initialize(store)
 
-	t.Run("validSharedPreloadLibraries", func(t *testing.T) {
+	t.Run("SharedPreloadLibraries", func(t *testing.T) {
 		valid := ConfigMap{
 			"shared_preload_libraries": "repmgr",
 		}
-
-		conf, err := pgConf.Validate(valid)
+		conf, err := pgConf.validateCompatibility(valid)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		if conf["shared_preload_libraries"].(string) != "'repmgr'" {
 			t.Fatal("expected preload library string to be wrapped in single quotes")
 		}
@@ -297,12 +295,10 @@ func TestValidateConfiguration(t *testing.T) {
 		valid = ConfigMap{
 			"shared_preload_libraries": "'repmgr'",
 		}
-
-		conf, err = pgConf.Validate(valid)
+		conf, err = pgConf.validateCompatibility(valid)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		if conf["shared_preload_libraries"].(string) != "'repmgr'" {
 			t.Fatal("expected preload library string to be wrapped in single quotes")
 		}
@@ -310,54 +306,42 @@ func TestValidateConfiguration(t *testing.T) {
 		valid = ConfigMap{
 			"shared_preload_libraries": "repmgr,timescaledb",
 		}
-
-		conf, err = pgConf.Validate(valid)
+		conf, err = pgConf.validateCompatibility(valid)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		pgConf.SetUserConfig(conf)
-
-		fmt.Printf("%+v\n", pgConf.userConfig)
-
 		if conf["shared_preload_libraries"].(string) != "'repmgr,timescaledb'" {
 			t.Fatal("expected preload library string to be wrapped in single quotes")
 		}
 
-	})
-
-	t.Run("invalidSharedPreloadLibraries", func(t *testing.T) {
-		valid := ConfigMap{
+		valid = ConfigMap{
 			"shared_preload_libraries": "",
 		}
-
-		if _, err := pgConf.Validate(valid); err == nil {
+		if _, err := pgConf.validateCompatibility(valid); err == nil {
 			t.Fatal("expected validation to fail when empty")
 		}
 
 		valid = ConfigMap{
 			"shared_preload_libraries": "timescaledb",
 		}
-
-		if _, err := pgConf.Validate(valid); err == nil {
+		if _, err := pgConf.validateCompatibility(valid); err == nil {
 			t.Fatal("expected validation to fail when repmgr is missing")
 		}
+
 	})
 
-	t.Run("validWalLevel", func(t *testing.T) {
+	t.Run("WalLevel", func(t *testing.T) {
 		valid := ConfigMap{
 			"wal_level": "replica",
 		}
-
-		if _, err := pgConf.Validate(valid); err != nil {
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
 			t.Fatal(err)
 		}
 
 		valid = ConfigMap{
 			"wal_level": "logical",
 		}
-
-		if _, err := pgConf.Validate(valid); err != nil {
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
 			t.Fatal(err)
 		}
 
@@ -365,30 +349,25 @@ func TestValidateConfiguration(t *testing.T) {
 			"wal_level":    "minimal",
 			"archive_mode": "off",
 		}
-
-		if _, err := pgConf.Validate(valid); err != nil {
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
 			t.Fatal(err)
 		}
-	})
 
-	t.Run("invalidWalLevel", func(t *testing.T) {
-		valid := ConfigMap{
+		invalid := ConfigMap{
 			"wal_level": "minimal",
 		}
 
-		if _, err := pgConf.Validate(valid); err == nil {
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
 			t.Fatal("expected wal_level minimal to fail with archiving enabled")
 		}
 
-		valid = ConfigMap{
+		invalid = ConfigMap{
 			"wal_level": "logical",
 		}
-
-		if _, err := pgConf.Validate(valid); err != nil {
+		if _, err := pgConf.validateCompatibility(invalid); err != nil {
 			t.Fatal(err)
 		}
 	})
-
 }
 
 func stubPGConfigFile() error {

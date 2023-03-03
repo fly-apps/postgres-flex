@@ -279,6 +279,10 @@ func (c *PGConfig) Validate(ctx context.Context, conn *pgx.Conn, requested Confi
 		return requested, err
 	}
 
+	return c.validateCompatibility(requested)
+}
+
+func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error) {
 	current, err := c.CurrentConfig()
 	if err != nil {
 		return requested, fmt.Errorf("failed to resolve current config: %s", err)
