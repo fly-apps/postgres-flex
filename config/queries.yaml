@@ -13,6 +13,7 @@ pg_database:
 pg_replication:
   query: "SELECT slot_name, active, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS lag FROM pg_replication_slots;"
   master: true
+  cache_seconds: 30
   metrics:
     - slot_name:
       usage: "LABEL"
