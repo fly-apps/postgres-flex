@@ -163,7 +163,7 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		cfg[k] = v
 	}
 
-	requestedChanges, err = node.PGConfig.ValidateConfig(requestedChanges)
+	requestedChanges, err = node.PGConfig.Validate(cfg)
 	if err != nil {
 		renderErr(w, err)
 		return

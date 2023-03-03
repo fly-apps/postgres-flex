@@ -285,7 +285,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"shared_preload_libraries": "repmgr",
 		}
 
-		conf, err := pgConf.ValidateConfig(valid)
+		conf, err := pgConf.Validate(valid)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -298,7 +298,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"shared_preload_libraries": "'repmgr'",
 		}
 
-		conf, err = pgConf.ValidateConfig(valid)
+		conf, err = pgConf.Validate(valid)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -311,10 +311,14 @@ func TestValidateConfiguration(t *testing.T) {
 			"shared_preload_libraries": "repmgr,timescaledb",
 		}
 
-		conf, err = pgConf.ValidateConfig(valid)
+		conf, err = pgConf.Validate(valid)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		pgConf.SetUserConfig(conf)
+
+		fmt.Printf("%+v\n", pgConf.userConfig)
 
 		if conf["shared_preload_libraries"].(string) != "'repmgr,timescaledb'" {
 			t.Fatal("expected preload library string to be wrapped in single quotes")
@@ -327,7 +331,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"shared_preload_libraries": "",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err == nil {
+		if _, err := pgConf.Validate(valid); err == nil {
 			t.Fatal("expected validation to fail when empty")
 		}
 
@@ -335,7 +339,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"shared_preload_libraries": "timescaledb",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err == nil {
+		if _, err := pgConf.Validate(valid); err == nil {
 			t.Fatal("expected validation to fail when repmgr is missing")
 		}
 	})
@@ -345,7 +349,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"wal_level": "replica",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err != nil {
+		if _, err := pgConf.Validate(valid); err != nil {
 			t.Fatal(err)
 		}
 
@@ -353,7 +357,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"wal_level": "logical",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err != nil {
+		if _, err := pgConf.Validate(valid); err != nil {
 			t.Fatal(err)
 		}
 
@@ -362,7 +366,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"archive_mode": "off",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err != nil {
+		if _, err := pgConf.Validate(valid); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -372,7 +376,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"wal_level": "minimal",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err == nil {
+		if _, err := pgConf.Validate(valid); err == nil {
 			t.Fatal("expected wal_level minimal to fail with archiving enabled")
 		}
 
@@ -380,7 +384,7 @@ func TestValidateConfiguration(t *testing.T) {
 			"wal_level": "logical",
 		}
 
-		if _, err := pgConf.ValidateConfig(valid); err != nil {
+		if _, err := pgConf.Validate(valid); err != nil {
 			t.Fatal(err)
 		}
 	})

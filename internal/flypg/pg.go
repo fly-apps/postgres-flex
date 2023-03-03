@@ -274,7 +274,7 @@ func (c *PGConfig) writePasswordFile(pwd string) error {
 	return nil
 }
 
-func (c *PGConfig) ValidateConfig(requested ConfigMap) (ConfigMap, error) {
+func (c *PGConfig) Validate(requested ConfigMap) (ConfigMap, error) {
 	current, err := c.CurrentConfig()
 	if err != nil {
 		return requested, fmt.Errorf("failed to resolve current config: %s", err)
@@ -288,7 +288,7 @@ func (c *PGConfig) ValidateConfig(requested ConfigMap) (ConfigMap, error) {
 		val = strings.TrimSpace(val)
 
 		if val == "" {
-			return requested, errors.New("`shared_preload_libraries` must contain the repmgr extension")
+			return requested, errors.New("`shared_preload_libraries` must contain the `repmgr` extension")
 		}
 
 		repmgrPresent := false
@@ -302,7 +302,7 @@ func (c *PGConfig) ValidateConfig(requested ConfigMap) (ConfigMap, error) {
 		}
 
 		if !repmgrPresent {
-			return requested, errors.New("`shared_preload_libraries` must contain the repmgr extension")
+			return requested, errors.New("`shared_preload_libraries` must contain the `repmgr` extension")
 		}
 
 		requested["shared_preload_libraries"] = fmt.Sprintf("'%s'", val)
