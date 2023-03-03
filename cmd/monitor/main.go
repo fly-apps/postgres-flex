@@ -12,7 +12,7 @@ import (
 var (
 	deadMemberMonitorFrequency       = time.Hour * 1
 	replicationStateMonitorFrequency = time.Hour * 1
-	clusterStateMonitorFrequency     = time.Minute * 15
+	clusterStateMonitorFrequency     = time.Minute * 10
 
 	defaultDeadMemberRemovalThreshold   = time.Hour * 12
 	defaultInactiveSlotRemovalThreshold = time.Hour * 12

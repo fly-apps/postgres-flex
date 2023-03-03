@@ -267,7 +267,7 @@ func (r *RepMgr) clonePrimary(ipStr string) error {
 		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
-	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -F",
+	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -c -F",
 		ipStr,
 		r.Port,
 		r.DatabaseName,
