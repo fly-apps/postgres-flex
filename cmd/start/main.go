@@ -74,6 +74,7 @@ func main() {
 		"DATA_SOURCE_PASS":                    node.SUCredentials.Password,
 		"PG_EXPORTER_EXCLUDE_DATABASE":        "template0,template1",
 		"PG_EXPORTER_AUTO_DISCOVER_DATABASES": "true",
+		"PG_EXPORTER_EXTEND_QUERY_PATH":       "/fly/queries.yaml",
 	}
 	svisor.AddProcess("exporter", "postgres_exporter --log.level=warn ",
 		supervisor.WithEnv(exporterEnv),
