@@ -3,6 +3,7 @@ package flypg
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -167,7 +168,7 @@ func (c *PGConfig) SetDefaults() error {
 		"wal_level":                "replica",
 		"wal_log_hints":            true,
 		"hot_standby":              true,
-		"archive_mode":             true,
+		"archive_mode":             "on",
 		"archive_command":          "'/bin/true'",
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
@@ -271,6 +272,75 @@ func (c *PGConfig) writePasswordFile(pwd string) error {
 	}
 
 	return nil
+}
+
+func (c *PGConfig) Validate(ctx context.Context, conn *pgx.Conn, requested ConfigMap) (ConfigMap, error) {
+	if err := admin.ValidatePGSettings(ctx, conn, requested); err != nil {
+		return requested, err
+	}
+
+	return c.validateCompatibility(requested)
+}
+
+func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error) {
+	current, err := c.CurrentConfig()
+	if err != nil {
+		return requested, fmt.Errorf("failed to resolve current config: %s", err)
+	}
+
+	// Shared preload libraries
+	if v, ok := requested["shared_preload_libraries"]; ok {
+		val := v.(string)
+
+		// Remove any formatting that may be applied
+		val = strings.Trim(val, "'")
+		val = strings.TrimSpace(val)
+		if val == "" {
+			return requested, errors.New("`shared_preload_libraries` must contain the `repmgr` extension")
+		}
+
+		// Confirm repmgr is specified
+		repmgrPresent := false
+		entries := strings.Split(val, ",")
+		for _, entry := range entries {
+			if entry == "repmgr" {
+				repmgrPresent = true
+				break
+			}
+		}
+
+		if !repmgrPresent {
+			return requested, errors.New("`shared_preload_libraries` must contain the `repmgr` extension")
+		}
+
+		// Reconstruct value with proper formatting
+		requested["shared_preload_libraries"] = fmt.Sprintf("'%s'", val)
+	}
+
+	// Wal-level
+	if v, ok := requested["wal_level"]; ok {
+		value := v.(string)
+
+		// Postgres will not boot properly if minimal is set with archive_mode enabled.
+		if value == "minimal" {
+			valid := false
+			if val, ok := requested["archive_mode"]; ok {
+				if val == "off" {
+					valid = true
+				}
+			}
+
+			if !valid && current["archive_mode"] == "off" {
+				valid = true
+			}
+
+			if !valid {
+				return requested, errors.New("archive_mode must be set to `off` before wal_level can be set to `minimal`")
+			}
+		}
+	}
+
+	return requested, nil
 }
 
 type HBAEntry struct {

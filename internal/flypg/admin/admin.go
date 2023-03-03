@@ -337,6 +337,15 @@ func SettingExists(ctx context.Context, pg *pgx.Conn, setting string) (bool, err
 	return out, nil
 }
 
+func ExtensionAvailable(ctx context.Context, pg *pgx.Conn, extension string) (bool, error) {
+	sql := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_available_extensions WHERE name='%s')", extension)
+	var out bool
+	if err := pg.QueryRow(ctx, sql).Scan(&out); err != nil {
+		return false, err
+	}
+	return out, nil
+}
+
 func SettingRequiresRestart(ctx context.Context, pg *pgx.Conn, setting string) (bool, error) {
 	sql := fmt.Sprintf("SELECT pending_restart FROM pg_settings WHERE name='%s'", setting)
 	row := pg.QueryRow(ctx, sql)
@@ -369,4 +378,34 @@ func GetSetting(ctx context.Context, pg *pgx.Conn, setting string) (*PGSetting, 
 		return nil, err
 	}
 	return &out, nil
+}
+
+func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[string]interface{}) error {
+	for k, v := range requested {
+		exists, err := SettingExists(ctx, conn, k)
+		if err != nil {
+			return fmt.Errorf("failed to verify setting: %s", err)
+		}
+		if !exists {
+			return fmt.Errorf("setting %v is not a valid config option", k)
+		}
+
+		// Verify specified extensions are installed
+		if k == "shared_preload_libraries" {
+			extensions := strings.Trim(v.(string), "'")
+			extSlice := strings.Split(extensions, ",")
+			for _, e := range extSlice {
+				available, err := ExtensionAvailable(ctx, conn, e)
+				if err != nil {
+					return fmt.Errorf("failed to verify pg extension %s: %s", e, err)
+				}
+
+				if !available {
+					return fmt.Errorf("extension %s has not been installed within this image", e)
+				}
+			}
+		}
+	}
+
+	return nil
 }
