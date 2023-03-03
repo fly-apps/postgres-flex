@@ -255,6 +255,138 @@ func setup(t *testing.T) error {
 	return nil
 }
 
+func TestValidateConfiguration(t *testing.T) {
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	pgConf := &PGConfig{
+		DataDir:                pgTestDirectory,
+		Port:                   5433,
+		ConfigFilePath:         pgConfigFilePath,
+		InternalConfigFilePath: pgInternalConfigFilePath,
+		UserConfigFilePath:     pgUserConfigFilePath,
+
+		passwordFilePath: pgPasswordFilePath,
+		repmgrUsername:   "repmgr",
+		repmgrDatabase:   "repgmr",
+	}
+
+	if err := stubPGConfigFile(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, _ := state.NewStore()
+	pgConf.initialize(store)
+
+	t.Run("validSharedPreloadLibraries", func(t *testing.T) {
+		valid := ConfigMap{
+			"shared_preload_libraries": "repmgr",
+		}
+
+		conf, err := pgConf.ValidateConfig(valid)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if conf["shared_preload_libraries"].(string) != "'repmgr'" {
+			t.Fatal("expected preload library string to be wrapped in single quotes")
+		}
+
+		valid = ConfigMap{
+			"shared_preload_libraries": "'repmgr'",
+		}
+
+		conf, err = pgConf.ValidateConfig(valid)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if conf["shared_preload_libraries"].(string) != "'repmgr'" {
+			t.Fatal("expected preload library string to be wrapped in single quotes")
+		}
+
+		valid = ConfigMap{
+			"shared_preload_libraries": "repmgr,timescaledb",
+		}
+
+		conf, err = pgConf.ValidateConfig(valid)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if conf["shared_preload_libraries"].(string) != "'repmgr,timescaledb'" {
+			t.Fatal("expected preload library string to be wrapped in single quotes")
+		}
+
+	})
+
+	t.Run("invalidSharedPreloadLibraries", func(t *testing.T) {
+		valid := ConfigMap{
+			"shared_preload_libraries": "",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err == nil {
+			t.Fatal("expected validation to fail when empty")
+		}
+
+		valid = ConfigMap{
+			"shared_preload_libraries": "timescaledb",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err == nil {
+			t.Fatal("expected validation to fail when repmgr is missing")
+		}
+	})
+
+	t.Run("validWalLevel", func(t *testing.T) {
+		valid := ConfigMap{
+			"wal_level": "replica",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err != nil {
+			t.Fatal(err)
+		}
+
+		valid = ConfigMap{
+			"wal_level": "logical",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err != nil {
+			t.Fatal(err)
+		}
+
+		valid = ConfigMap{
+			"wal_level":    "minimal",
+			"archive_mode": "off",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("invalidWalLevel", func(t *testing.T) {
+		valid := ConfigMap{
+			"wal_level": "minimal",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err == nil {
+			t.Fatal("expected wal_level minimal to fail with archiving enabled")
+		}
+
+		valid = ConfigMap{
+			"wal_level": "logical",
+		}
+
+		if _, err := pgConf.ValidateConfig(valid); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+}
+
 func stubPGConfigFile() error {
 	file, err := os.Create(pgConfigFilePath)
 	if err != nil {

@@ -154,12 +154,19 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		exists, err := admin.SettingExists(r.Context(), conn, k)
 		if err != nil {
 			renderErr(w, err)
+			return
 		}
 		if !exists {
 			renderErr(w, fmt.Errorf("invalid config option: %s", k))
 			return
 		}
 		cfg[k] = v
+	}
+
+	requestedChanges, err = node.PGConfig.ValidateConfig(requestedChanges)
+	if err != nil {
+		renderErr(w, err)
+		return
 	}
 
 	node.PGConfig.SetUserConfig(cfg)
