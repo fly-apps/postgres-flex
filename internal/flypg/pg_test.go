@@ -345,30 +345,44 @@ func TestValidateCompatibility(t *testing.T) {
 		if _, err := pgConf.validateCompatibility(valid); err != nil {
 			t.Fatal(err)
 		}
+	})
 
-		valid = ConfigMap{
-			"wal_level":    "minimal",
-			"archive_mode": "off",
+	t.Run("WalLevelMinimal", func(t *testing.T) {
+		valid := ConfigMap{
+			"wal_level":       "minimal",
+			"archive_mode":    "off",
+			"max_wal_senders": "0",
 		}
 		if _, err := pgConf.validateCompatibility(valid); err != nil {
 			t.Fatal(err)
 		}
 
 		invalid := ConfigMap{
-			"wal_level": "minimal",
+			"wal_level":       "minimal",
+			"archive_mode":    "on",
+			"max_wal_senders": "0",
 		}
-
 		if _, err := pgConf.validateCompatibility(invalid); err == nil {
-			t.Fatal("expected wal_level minimal to fail with archiving enabled")
+			t.Fatal(err)
 		}
 
 		invalid = ConfigMap{
-			"wal_level": "logical",
+			"wal_level":       "minimal",
+			"archive_mode":    "off",
+			"max_wal_senders": "10",
 		}
-		if _, err := pgConf.validateCompatibility(invalid); err != nil {
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+
+		invalid = ConfigMap{
+			"wal_level": "minimal",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
 			t.Fatal(err)
 		}
 	})
+
 }
 
 func stubPGConfigFile() error {

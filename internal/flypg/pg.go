@@ -319,20 +319,40 @@ func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error)
 	if v, ok := requested["wal_level"]; ok {
 		value := v.(string)
 
-		// Postgres will not boot properly if minimal is set with archive_mode enabled.
+		// Wal-level minimal cannot be set unless `max_wal_senders` is 0 and `archive_mode` is off.
 		if value == "minimal" {
-			valid := false
-			if val, ok := requested["archive_mode"]; ok {
-				if val == "off" {
-					valid = true
-				}
+
+			// flyctl passes in `max_wal_senders` in as a string for backwards compatibility with older PG implementations.
+			maxWalSendersInterface := requested["max_wal_senders"]
+			if maxWalSendersInterface == nil {
+				maxWalSendersInterface = current["max_wal_senders"]
 			}
 
-			if !valid && current["archive_mode"] == "off" {
-				valid = true
+			if maxWalSendersInterface == nil {
+				maxWalSendersInterface = "10"
 			}
 
-			if !valid {
+			var maxWalSenders int64
+
+			// Convert string to int
+			maxWalSenders, err = strconv.ParseInt(maxWalSendersInterface.(string), 10, 64)
+			if err != nil {
+				return requested, fmt.Errorf("failed to parse max-wal-senders: %s", err)
+			}
+
+			if maxWalSenders > 0 {
+				return requested, fmt.Errorf("max_wal_senders must be set to `0` before wal-level can be set to `minimal`")
+			}
+
+			archiveMode := requested["archive_mode"]
+			if archiveMode == nil {
+				archiveMode = current["archive_mode"]
+			}
+			if archiveMode == nil {
+				archiveMode = "off"
+			}
+
+			if archiveMode.(string) != "off" {
 				return requested, errors.New("archive_mode must be set to `off` before wal_level can be set to `minimal`")
 			}
 		}
