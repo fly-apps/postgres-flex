@@ -168,8 +168,6 @@ func (c *PGConfig) SetDefaults() error {
 		"wal_level":                "replica",
 		"wal_log_hints":            true,
 		"hot_standby":              true,
-		"archive_mode":             "on",
-		"archive_command":          "'/bin/true'",
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
@@ -416,7 +414,7 @@ func (c *PGConfig) setDefaultHBA() error {
 
 	for _, entry := range entries {
 		str := fmt.Sprintf("%s %s %s %s %s\n", entry.Type, entry.Database, entry.User, entry.Address, entry.Method)
-		_, err := file.Write([]byte(str))
+		_, err := file.WriteString(str)
 		if err != nil {
 			return err
 		}
