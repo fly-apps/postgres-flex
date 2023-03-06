@@ -345,6 +345,23 @@ func TestValidateCompatibility(t *testing.T) {
 		if _, err := pgConf.validateCompatibility(valid); err != nil {
 			t.Fatal(err)
 		}
+
+		invalid := ConfigMap{
+			"wal_level":       "logical",
+			"max_wal_senders": "0",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+
+		invalid = ConfigMap{
+			"wal_level":       "replica",
+			"max_wal_senders": "0",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+
 	})
 
 	t.Run("WalLevelMinimal", func(t *testing.T) {
@@ -377,6 +394,33 @@ func TestValidateCompatibility(t *testing.T) {
 
 		invalid = ConfigMap{
 			"wal_level": "minimal",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("maxWalSenders", func(t *testing.T) {
+		valid := ConfigMap{
+			"wal_level":       "minimal",
+			"archive_mode":    "off",
+			"max_wal_senders": "0",
+		}
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
+			t.Fatal(err)
+		}
+
+		invalid := ConfigMap{
+			"wal_level":       "replica",
+			"max_wal_senders": "0",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+
+		invalid = ConfigMap{
+			"wal_level":       "logical",
+			"max_wal_senders": "0",
 		}
 		if _, err := pgConf.validateCompatibility(invalid); err == nil {
 			t.Fatal(err)

@@ -318,21 +318,12 @@ func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error)
 	// Wal-level
 	if v, ok := requested["wal_level"]; ok {
 		value := v.(string)
-
-		// Wal-level minimal cannot be set unless `max_wal_senders` is 0 and `archive_mode` is off.
-		if value == "minimal" {
-
-			// flyctl passes in `max_wal_senders` in as a string for backwards compatibility with older PG implementations.
-			maxWalSendersInterface := requested["max_wal_senders"]
-			if maxWalSendersInterface == nil {
-				maxWalSendersInterface = current["max_wal_senders"]
-			}
-
-			if maxWalSendersInterface == nil {
-				maxWalSendersInterface = "10"
-			}
-
+		switch value {
+		case "minimal":
 			var maxWalSenders int64
+
+			// flyctl passes in `max_wal_senders` in as a string.
+			maxWalSendersInterface := resolveConfigValue(requested, current, "max_wal_senders", "10")
 
 			// Convert string to int
 			maxWalSenders, err = strconv.ParseInt(maxWalSendersInterface.(string), 10, 64)
@@ -344,21 +335,63 @@ func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error)
 				return requested, fmt.Errorf("max_wal_senders must be set to `0` before wal-level can be set to `minimal`")
 			}
 
-			archiveMode := requested["archive_mode"]
-			if archiveMode == nil {
-				archiveMode = current["archive_mode"]
-			}
-			if archiveMode == nil {
-				archiveMode = "off"
-			}
-
+			archiveMode := resolveConfigValue(requested, current, "archive_mode", "off")
 			if archiveMode.(string) != "off" {
 				return requested, errors.New("archive_mode must be set to `off` before wal_level can be set to `minimal`")
+			}
+
+		case "replica", "logical":
+			var maxWalSenders int64
+			maxWalSendersInterface := resolveConfigValue(requested, current, "max_wal_senders", "10")
+
+			// Convert string to int
+			maxWalSenders, err = strconv.ParseInt(maxWalSendersInterface.(string), 10, 64)
+			if err != nil {
+				return requested, fmt.Errorf("failed to parse max-wal-senders: %s", err)
+			}
+
+			if maxWalSenders == 0 {
+				return requested, fmt.Errorf("max_wal_senders must be greater than `0`")
 			}
 		}
 	}
 
+	// Max-wal-senders
+	if v, ok := requested["max_wal_senders"]; ok {
+		val := v.(string)
+
+		// Convert string to int
+		maxWalSenders, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return requested, fmt.Errorf("failed to parse max-wal-senders: %s", err)
+		}
+
+		walLevel := resolveConfigValue(requested, current, "wal_level", "replica")
+
+		if maxWalSenders > 0 && walLevel == "minimal" {
+			return requested, fmt.Errorf("max_wal_senders must be set to `0` when wal_level is `minimal`")
+		}
+
+		if maxWalSenders == 0 && walLevel != "minimal" {
+			return requested, fmt.Errorf("max_wal_senders must be greater than `0` when wal_level is set to `%s`", walLevel.(string))
+		}
+
+	}
+
 	return requested, nil
+}
+
+func resolveConfigValue(requested ConfigMap, current ConfigMap, key string, defaultVal interface{}) interface{} {
+	val := requested[key]
+	if val == nil {
+		val = current[key]
+	}
+
+	if val == nil {
+		val = defaultVal
+	}
+
+	return val
 }
 
 type HBAEntry struct {
