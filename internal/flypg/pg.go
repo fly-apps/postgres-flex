@@ -414,7 +414,7 @@ func (c *PGConfig) setDefaultHBA() error {
 
 	for _, entry := range entries {
 		str := fmt.Sprintf("%s %s %s %s %s\n", entry.Type, entry.Database, entry.User, entry.Address, entry.Method)
-		_, err := file.Write([]byte(str))
+		_, err := file.WriteString(str)
 		if err != nil {
 			return err
 		}
