@@ -35,9 +35,9 @@ Tests can be found here: https://github.com/fly-apps/postgres-flex/pull/49/files
 In both of these instances the primary member will be fenced.
 
 **If the real primary is resolvable**
-The cluster will be made read-only.  The real primary's ip is written to a `zombie.lock` file and the member role is set to "zombie", this will ensure no new connections will be routed to this node.  Once this has completed, the member will be restarted and the boot process will read the ip address from the `zombie.lock` file and use that to attempt to rejoin the cluster we diverged from.  If we are successful, the `zombie.lock` is cleared and we will boot as a standby.
+The cluster will be made read-only.  The real primary's ip is written to a `zombie.lock` file and the member role will be set to "zombie".  Once this has completed, the member will be restarted and the boot process will read the ip address from the `zombie.lock` file and attempt to rejoin the cluster we diverged from. If we are successful, the `zombie.lock` is cleared and we will boot as a standby.
 
 **Note: We will not attempt to rejoin a cluster if the resolved primary resides in a region that differs from the `PRIMARY_REGION` environment variable set on self.  The `PRIMARY_REGION` will need to be updated before a rejoin will be attempted.**
 
 **If the real primary is NOT resolvable**
-The cluster will be made read-only and the `zombie.lock` file will be created without a value.  When the member reboots, we will read the `zombie.lock` file and see that it's empty.  This indicates that we've entered a failure mode that can't be recovered automatically.  This could be an issue where previously deleted members were not properly unregistered, or the primary's state has diverged to a point where its registered members have been cycled out.
+The cluster will be made read-only and the `zombie.lock` file will be created without a value.  When the member reboots, we will read the `zombie.lock` file and see that it's empty.  This indicates that we've entered a failure mode that can't be recovered automatically.  This could be an issue where previously deleted members were not properly unregistered or the primary's state has diverged to a point where its registered members have been completely cycled out.
