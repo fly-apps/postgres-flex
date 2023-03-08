@@ -161,7 +161,7 @@ func (r *RepMgr) setDefaults() error {
 	conf := ConfigMap{
 		"node_id":                      nodeID,
 		"node_name":                    fmt.Sprintf("'%s'", r.PrivateIP),
-		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=10'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
+		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=5'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":               fmt.Sprintf("'%s'", r.DataDir),
 		"failover":                     "'automatic'",
 		"use_replication_slots":        "yes",
@@ -174,6 +174,8 @@ func (r *RepMgr) setDefaults() error {
 		"failover_validation_command":  fmt.Sprintf("'/usr/local/bin/failover_validation -visible-nodes %%v -total-nodes %%t'"),
 		"ssh_options":                  "'-o \"StrictHostKeyChecking=no\"'",
 		"priority":                     100,
+		"node_rejoin_timeout":          30,
+		"standby_reconnect_timeout":    30,
 	}
 
 	if !r.eligiblePrimary() {
