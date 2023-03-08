@@ -209,7 +209,8 @@ func (n *Node) Init(ctx context.Context) error {
 // PostInit are operations that need to be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
 	if ZombieLockExists() {
-		log.Println("[ERROR] Manual intervention required. Delete the zombie.lock file and restart the machine to force a retry.")
+		log.Println("[ERROR] Manual intervention required.")
+		log.Println("[ERROR] If a new primary has been established, consider adding a new replica with `fly machines clone <primary-machine-id>` and then remove this member.")
 		log.Println("[ERROR] Sleeping for 5 minutes.")
 		time.Sleep(5 * time.Minute)
 		return fmt.Errorf("unrecoverable zombie")
