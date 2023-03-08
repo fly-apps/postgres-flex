@@ -5,16 +5,16 @@ We start out evaluating the cluster state by checking each registered standby fo
 
 The "clusters state" is represented across a few different dimensions:
 
-**Total members**
+### Total members
 Number of registered members, including the primary.
 
-**Total active members**
-Number of members that are responsive.  This includes the primary we are evaluating, so this will never be less than one.
+### Total active members
+Number of members that are responsive. This includes the primary we are evaluating, so this will never be less than one.
 
-**Total inactive members**
-Number of registered members that are non-responsive.
+### Total inactive members
+Number of registered members that are not responsive.
 
-**Conflict map**
+### Conflict map
 The conflict map is a `map[string]int` that tracks conflicting primary's queried from our standbys and the number of occurrences a given primary was referenced.
 
 As an example, say we have a 3 member cluster and both of the standby's indicate a conflicting primary ip.  This will be recorded as:
@@ -24,9 +24,9 @@ map[string]int{
 }
 ```
 
-The real primary is resolvable so long as the majority of members can agree on who it is.  Quorum being defined as `total_members / 2 + 1`.
+The real primary is resolvable so long as the majority of members can agree on who it is. Quorum being defined as `total_members / 2 + 1`.
 
-**There is one exception to note here. When the primary being evaluated meets quorum, it will still be fenced in the event a conflict is found.  This is to protect against a possible race condition where an old primary comes back up during an active failover.**
+**Note: When the primary being evaluated meets quorum, it will still be fenced in the event a conflict is found. This is to protect against a possible race condition where an old primary comes back up in the middle of an active failover.**
 
 Tests can be found here: https://github.com/fly-apps/postgres-flex/pull/49/files#diff-3d71960ff7855f775cb257a74643d67d2636b354c9d485d10c2ded2426a7f362
 
