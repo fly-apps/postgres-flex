@@ -45,16 +45,14 @@ The cluster will be made read-only and the `zombie.lock` file will be created wi
 
 ## Monitoring cluster state
 
-In order to mitigate possible split-brain scenarios, it's important that cluster state is properly monitored.  
+In order to mitigate possible split-brain scenarios, it's important that cluster state is evaluated regularly and when specific events/actions take place.  
 
-Here's a quick breakdown on when cluster state is evaluated: 
-
-1. On boot
-We evaluate cluster state on boot to ensure the booting primary is indeed the real primary.
+### On boot
+This is to ensure the booting primary is not a primary coming back from the dead.
   
-2. During standby connect/reconnect/disconnect events
-There are a myriad of reasons why a standby might disconnect, but we have to assume the possibility of a network partition.  In the event quorum is lost, the primary will be fenced. 
+### During standby connect/reconnect/disconnect events
+There are a myriad of reasons why a standby might disconnect, but we have to assume the possibility of a network partition.  In either case, if quorum is lost, the primary will be fenced.
 
-3. In the background
+### In the background
 Cluster state is monitored in the background at regular intervals. This acts as a fallback in the off-chance an event gets swallowed.
 
