@@ -56,3 +56,26 @@ There are a myriad of reasons why a standby might disconnect, but we have to ass
 ### In the background
 Cluster state is monitored in the background at regular intervals. This acts as a fallback in the off-chance an event gets swallowed.
 
+
+## Split-brain detection window
+**This pertains to v0.0.36+**
+
+When a network partition is initiated, the following steps are performed: 
+
+1. Repmgr will attempt to ping registered members with a 5s connect timeout.
+2. Repmgr will wait up to 30 seconds for the standby to reconnect before issuing a `child_node_disconnect` event.
+3. The cluster state is evaluated and the primary will be fenced in the event quorum can't be met. In the event the primary has been completely isolated, this process could take up to 5 seconds per standby.
+
+A rough split-brain detection window can be calculated using the following formula:
+
+```
+connect_timeout + standby_reconnect_timeout + (registered standbys * 5)
+```
+
+For a typical 3 node cluster:
+
+* Initial connect timeout: 5s
+* Standby reconnect timeout: 30s
+* Cluster evaluation: (2 * 5s) = 10s
+
+Estimated detection window: 45s
