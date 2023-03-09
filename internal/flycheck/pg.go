@@ -45,12 +45,28 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		return connectionCount(ctx, localConn)
 	})
 
-	if member.Role == flypg.PrimaryRoleName && member.Active {
-		// Check that provides additional insight into disk capacity and
-		// how close we are to hitting the readonly threshold.
-		checks.AddCheck("disk-capacity", func() (string, error) {
-			return diskCapacityCheck(ctx, node)
+	if member.Role == flypg.PrimaryRoleName {
+		// Check to see if any locks are present.
+		checks.AddCheck("cluster-locks", func() (string, error) {
+			if flypg.ZombieLockExists() {
+				return "", fmt.Errorf("`zombie.lock` detected")
+			}
+
+			if flypg.ReadOnlyLockExists() {
+				return "", fmt.Errorf("`readonly.lock` detected")
+			}
+
+			return "No active locks detected", nil
 		})
+
+		if member.Active {
+			// Check that provides additional insight into disk capacity and
+			// how close we are to hitting the readonly threshold.
+			checks.AddCheck("disk-capacity", func() (string, error) {
+				return diskCapacityCheck(ctx, node)
+			})
+		}
+
 	}
 
 	return checks, nil
