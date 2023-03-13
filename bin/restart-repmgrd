@@ -1,0 +1,3 @@
+#!/bin/bash
+
+kill `cat /tmp/repmgrd.pid`

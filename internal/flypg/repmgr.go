@@ -217,9 +217,15 @@ func (r *RepMgr) resolveNodeID() (string, error) {
 
 func (r *RepMgr) registerPrimary() error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return err
+	}
 
-	return err
+	if err := r.restartDaemon(); err != nil {
+		return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+	}
+
+	return nil
 }
 
 func (r *RepMgr) unregisterPrimary(id int) error {
@@ -251,6 +257,10 @@ func (r *RepMgr) registerStandby() error {
 		return err
 	}
 
+	if err := r.restartDaemon(); err != nil {
+		return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+	}
+
 	return nil
 }
 
@@ -261,6 +271,11 @@ func (r *RepMgr) unregisterStandby(id int) error {
 	}
 
 	return nil
+}
+
+func (r *RepMgr) restartDaemon() error {
+	_, err := utils.RunCommand("restart-repmgrd", "postgres")
+	return err
 }
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
