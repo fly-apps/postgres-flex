@@ -248,6 +248,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to resolve member role: %s", err)
 		}
 
+		// Restart repmgrd in the event the IP changes. This can happen when
+		// an app is moved across organizations.
+		daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
+
 		switch member.Role {
 		case PrimaryRoleName:
 			// Verify cluster state to ensure we are the actual primary and not a zombie.
@@ -279,7 +283,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Re-register primary to take-on any configuration changes.
-			if err := n.RepMgr.registerPrimary(); err != nil {
+			if err := n.RepMgr.registerPrimary(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to re-register existing primary: %s", err)
 			}
 
@@ -292,7 +296,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		case StandbyRoleName:
 			// Register existing standby to take-on any configuration changes.
-			if err := n.RepMgr.registerStandby(); err != nil {
+			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)
 			}
 		default:
@@ -341,7 +345,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Register ourself as the primary
-			if err := n.RepMgr.registerPrimary(); err != nil {
+			if err := n.RepMgr.registerPrimary(false); err != nil {
 				return fmt.Errorf("failed to register repmgr primary: %s", err)
 			}
 
@@ -358,7 +362,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 		} else {
 			// Configure as standby
 			log.Println("Registering standby")
-			if err := n.RepMgr.registerStandby(); err != nil {
+			if err := n.RepMgr.registerStandby(false); err != nil {
 				return fmt.Errorf("failed to register new standby: %s", err)
 			}
 

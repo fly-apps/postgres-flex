@@ -215,14 +215,16 @@ func (r *RepMgr) resolveNodeID() (string, error) {
 	return nodeID, nil
 }
 
-func (r *RepMgr) registerPrimary() error {
+func (r *RepMgr) registerPrimary(restartDaemon bool) error {
 	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
-	if err := r.restartDaemon(); err != nil {
-		return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+	if restartDaemon {
+		if err := r.restartDaemon(); err != nil {
+			return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+		}
 	}
 
 	return nil
@@ -250,15 +252,17 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 	return err
 }
 
-func (r *RepMgr) registerStandby() error {
+func (r *RepMgr) registerStandby(restartDaemon bool) error {
 	// Force re-registry to ensure the standby picks up any new configuration changes.
 	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return err
 	}
 
-	if err := r.restartDaemon(); err != nil {
-		return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+	if restartDaemon {
+		if err := r.restartDaemon(); err != nil {
+			return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+		}
 	}
 
 	return nil
@@ -276,6 +280,10 @@ func (r *RepMgr) unregisterStandby(id int) error {
 func (r *RepMgr) restartDaemon() error {
 	_, err := utils.RunCommand("restart-repmgrd", "postgres")
 	return err
+}
+
+func (r *RepMgr) daemonRestartRequired(m *Member) bool {
+	return m.Hostname == r.PrivateIP
 }
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
