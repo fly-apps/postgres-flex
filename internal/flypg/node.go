@@ -278,16 +278,16 @@ func (n *Node) PostInit(ctx context.Context) error {
 				)
 			}
 
+			// Re-register primary to take-on any configuration changes.
+			if err := n.RepMgr.registerPrimary(); err != nil {
+				return fmt.Errorf("failed to re-register existing primary: %s", err)
+			}
+
 			// Readonly lock is set when disk capacity is dangerously high.
 			if !ReadOnlyLockExists() {
 				if err := BroadcastReadonlyChange(ctx, n, false); err != nil {
 					return fmt.Errorf("failed to unset read-only: %s", err)
 				}
-			}
-
-			// Re-register primary to take-on any configuration changes.
-			if err := n.RepMgr.registerPrimary(); err != nil {
-				return fmt.Errorf("failed to re-register existing primary: %s", err)
 			}
 
 		case StandbyRoleName:
