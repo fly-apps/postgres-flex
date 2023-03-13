@@ -284,6 +284,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to unset read-only: %s", err)
 				}
 			}
+
+			// Re-register primary to take-on any configuration changes.
+			if err := n.RepMgr.registerPrimary(); err != nil {
+				return fmt.Errorf("failed to re-register existing primary: %s", err)
+			}
+
 		case StandbyRoleName:
 			// Register existing standby to take-on any configuration changes.
 			if err := n.RepMgr.registerStandby(); err != nil {

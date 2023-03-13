@@ -314,13 +314,18 @@ func (*RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 }
 
 func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
+	myID, err := r.resolveNodeID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve node id: %s", err)
+	}
+
 	members, err := r.Members(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, member := range members {
-		if member.Hostname == r.PrivateIP {
+		if fmt.Sprint(member.ID) == myID {
 			return &member, nil
 		}
 	}
