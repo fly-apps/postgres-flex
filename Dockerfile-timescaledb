@@ -2,7 +2,7 @@ ARG PG_VERSION=15.2
 ARG PG_MAJOR_VERSION=15
 ARG VERSION=custom
 
-FROM golang:1.20 as flyutil
+FROM golang:1.20
 
 WORKDIR /go/src/github.com/fly-examples/fly-postgres
 COPY . .
@@ -23,7 +23,7 @@ ENV PGDATA=/data/postgresql
 ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG POSTGIS_MAJOR=3
-
+ARG HAPROXY_VERSION=2.7
 
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
@@ -31,17 +31,30 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim haproxy socat procps ssh \
+    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim haproxy socat procps ssh gnupg \
     && apt autoremove -y
 
 RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(cat /etc/os-release | grep VERSION_CODENAME | cut -d'=' -f2) main" > /etc/apt/sources.list.d/timescaledb.list \
     && curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add -
 
+# TimescaleDB and PostGIS
 RUN apt-get update && apt-get install --no-install-recommends -y \
     postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR \
     postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR-scripts \
     timescaledb-2-postgresql-$PG_MAJOR_VERSION \
     timescaledb-toolkit-postgresql-$PG_MAJOR_VERSION \
+    && apt autoremove -y
+
+# Haproxy
+RUN curl https://haproxy.debian.net/bernat.debian.org.gpg \
+      | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
+
+RUN echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
+      http://haproxy.debian.net bullseye-backports-${HAPROXY_VERSION} main \
+      > /etc/apt/sources.list.d/haproxy.list
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    haproxy=$HAPROXY_VERSION.\* \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
