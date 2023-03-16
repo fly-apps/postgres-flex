@@ -43,7 +43,7 @@ RUN curl https://haproxy.debian.net/bernat.debian.org.gpg \
       | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
 
 RUN echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-      http://haproxy.debian.net bullseye-backports-2.7 main \
+      http://haproxy.debian.net bullseye-backports-${HAPROXY_VERSION} main \
       > /etc/apt/sources.list.d/haproxy.list
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
