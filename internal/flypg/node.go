@@ -25,7 +25,6 @@ type Node struct {
 	PrimaryRegion string
 	DataDir       string
 	Port          int
-	Witness       bool
 
 	SUCredentials       admin.Credential
 	OperatorCredentials admin.Credential
@@ -62,12 +61,6 @@ func NewNode() (*Node, error) {
 		node.Port = port
 	}
 
-	if os.Getenv("WITNESS") != "" {
-		node.Witness = true
-	} else {
-		node.Witness = false
-	}
-
 	// Internal user
 	node.SUCredentials = admin.Credential{
 		Username: "flypgadmin",
@@ -100,6 +93,8 @@ func NewNode() (*Node, error) {
 		DatabaseName:       "repmgr",
 		Credentials:        node.ReplCredentials,
 	}
+	_, present := os.LookupEnv("WITNESS")
+	node.RepMgr.Witness = present
 
 	node.PGConfig = PGConfig{
 		DataDir:                node.DataDir,
@@ -169,8 +164,8 @@ func (n *Node) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to verify cluster state %s", err)
 		}
 
-		if !clusterInitialized || n.Witness {
-			if n.Witness {
+		if !clusterInitialized || n.RepMgr.Witness {
+			if n.RepMgr.Witness {
 				log.Println("Provisioning witness")
 			} else {
 				log.Println("Provisioning primary")
@@ -370,7 +365,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		} else {
-			if n.Witness {
+			if n.RepMgr.Witness {
 				log.Println("Registering witness")
 
 				// Create required users

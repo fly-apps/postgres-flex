@@ -42,6 +42,7 @@ type RepMgr struct {
 	PasswordConfigPath string
 	InternalConfigPath string
 	Port               int
+	Witness            bool
 
 	internalConfig ConfigMap
 	userConfig     ConfigMap
