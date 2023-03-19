@@ -25,6 +25,7 @@ type Node struct {
 	PrimaryRegion string
 	DataDir       string
 	Port          int
+	Witness       bool
 
 	SUCredentials       admin.Credential
 	OperatorCredentials admin.Credential
@@ -59,6 +60,12 @@ func NewNode() (*Node, error) {
 
 	if port, err := strconv.Atoi(os.Getenv("PG_PORT")); err == nil {
 		node.Port = port
+	}
+
+	if os.Getenv("WITNESS") != "" {
+		node.Witness = true
+	} else {
+		node.Witness = false
 	}
 
 	// Internal user
@@ -122,7 +129,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Check to see if we were just restored
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
-		// Check to see if there's an active restore.
 		active, err := isRestoreActive()
 		if err != nil {
 			return fmt.Errorf("failed to verify active restore: %s", err)
@@ -163,9 +169,13 @@ func (n *Node) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to verify cluster state %s", err)
 		}
 
-		if !clusterInitialized {
-			log.Println("Provisioning primary")
-			// TODO - This should probably run on boot in case the password changes.
+		if !clusterInitialized || n.Witness {
+			if n.Witness {
+				log.Println("Provisioning witness")
+			} else {
+				log.Println("Provisioning primary")
+			}
+
 			if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
 				return fmt.Errorf("failed to write pg password file: %s", err)
 			}
@@ -236,13 +246,13 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 
 	if registered {
-		// Existing member
 		repConn, err := n.RepMgr.NewLocalConnection(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to establish connection to local repmgr: %s", err)
 		}
 		defer func() { _ = repConn.Close(ctx) }()
 
+		// Existing member
 		member, err := n.RepMgr.Member(ctx, repConn)
 		if err != nil {
 			return fmt.Errorf("failed to resolve member role: %s", err)
@@ -288,6 +298,16 @@ func (n *Node) PostInit(ctx context.Context) error {
 			// Register existing standby to take-on any configuration changes.
 			if err := n.RepMgr.registerStandby(); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)
+			}
+		case WitnessRoleName:
+			primary, err := n.RepMgr.PrimaryMember(ctx, repConn)
+			if err != nil {
+				return fmt.Errorf("failed to resolve primary member when updating witness: %s", err)
+			}
+
+			// Register existing witness to take-on any configuration changes.
+			if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
+				return fmt.Errorf("failed to register existing witness: %s", err)
 			}
 		default:
 			return fmt.Errorf("member has unknown role: %q", member.Role)
@@ -350,10 +370,32 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		} else {
-			// Configure as standby
-			log.Println("Registering standby")
-			if err := n.RepMgr.registerStandby(); err != nil {
-				return fmt.Errorf("failed to register new standby: %s", err)
+			if n.Witness {
+				log.Println("Registering witness")
+
+				// Create required users
+				if err := n.setupCredentials(ctx, conn); err != nil {
+					return fmt.Errorf("failed to create required users: %s", err)
+				}
+
+				// Setup repmgr database and extension
+				if err := n.RepMgr.enable(ctx, conn); err != nil {
+					return fmt.Errorf("failed to enable repmgr: %s", err)
+				}
+
+				primary, err := n.RepMgr.ResolveMemberOverDNS(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to resolve primary member: %s", err)
+				}
+
+				if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
+					return fmt.Errorf("failed to register witness: %s", err)
+				}
+			} else {
+				log.Println("Registering standby")
+				if err := n.RepMgr.registerStandby(); err != nil {
+					return fmt.Errorf("failed to register new standby: %s", err)
+				}
 			}
 
 			// Let the boot process know that we've already been configured.

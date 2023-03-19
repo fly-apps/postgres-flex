@@ -46,6 +46,8 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 
 		case flypg.StandbyRoleName:
 			return "replica", nil
+		case flypg.WitnessRoleName:
+			return "witness", nil
 		default:
 			return "unknown", nil
 		}

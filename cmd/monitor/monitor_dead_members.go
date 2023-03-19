@@ -67,27 +67,27 @@ func deadMemberMonitorTick(ctx context.Context, node *flypg.Node, seenAt map[int
 		return nil
 	}
 
-	standbys, err := node.RepMgr.StandbyMembers(ctx, conn)
+	votingMembers, err := node.RepMgr.VotingMembers(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to query standbys: %s", err)
 	}
 
-	for _, standby := range standbys {
-		sConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
+	for _, voter := range votingMembers {
+		sConn, err := node.RepMgr.NewRemoteConnection(ctx, voter.Hostname)
 		if err != nil {
 			// TODO - Verify the exception that's getting thrown.
-			if time.Since(seenAt[standby.ID]) >= deadMemberRemovalThreshold {
-				log.Printf("Removing dead member: %s\n", standby.Hostname)
-				if err := node.RepMgr.UnregisterMember(standby); err != nil {
-					log.Printf("failed to unregister member %s: %v", standby.Hostname, err)
+			if time.Since(seenAt[voter.ID]) >= deadMemberRemovalThreshold {
+				log.Printf("Removing dead member: %s\n", voter.Hostname)
+				if err := node.RepMgr.UnregisterMember(voter); err != nil {
+					log.Printf("failed to unregister member %s: %v", voter.Hostname, err)
 					continue
 				}
-				delete(seenAt, standby.ID)
+				delete(seenAt, voter.ID)
 			}
 
 			continue
 		}
-		seenAt[standby.ID] = time.Now()
+		seenAt[voter.ID] = time.Now()
 
 		if err := sConn.Close(ctx); err != nil {
 			return fmt.Errorf("failed to close connection: %s", err)

@@ -22,6 +22,7 @@ import (
 const (
 	PrimaryRoleName = "primary"
 	StandbyRoleName = "standby"
+	WitnessRoleName = "witness"
 	UnknownRoleName = ""
 
 	repmgrConsulKey = "repmgr"
@@ -216,7 +217,21 @@ func (r *RepMgr) resolveNodeID() (string, error) {
 }
 
 func (r *RepMgr) registerPrimary() error {
-	cmdStr := fmt.Sprintf("repmgr -f %s primary register -F -v", r.ConfigPath)
+	cmdStr := fmt.Sprintf("repmgr primary register -f %s -F", r.ConfigPath)
+	_, err := utils.RunCommand(cmdStr, "postgres")
+
+	return err
+}
+
+func (r *RepMgr) registerStandby() error {
+	cmdStr := fmt.Sprintf("repmgr standby register -f %s -F", r.ConfigPath)
+	_, err := utils.RunCommand(cmdStr, "postgres")
+
+	return err
+}
+
+func (r *RepMgr) registerWitness(primaryHostname string) error {
+	cmdStr := fmt.Sprintf("repmgr witness register -f %s -h %s -F", r.ConfigPath, primaryHostname)
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
@@ -224,6 +239,20 @@ func (r *RepMgr) registerPrimary() error {
 
 func (r *RepMgr) unregisterPrimary(id int) error {
 	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
+	_, err := utils.RunCommand(cmdStr, "postgres")
+
+	return err
+}
+
+func (r *RepMgr) unregisterStandby(id int) error {
+	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
+	_, err := utils.RunCommand(cmdStr, "postgres")
+
+	return err
+}
+
+func (r *RepMgr) unregisterWitness(id int) error {
+	cmdStr := fmt.Sprintf("repmgr witness unregister -f %s --node-id=%d", r.ConfigPath, id)
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
@@ -242,25 +271,6 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
-}
-
-func (r *RepMgr) registerStandby() error {
-	// Force re-registry to ensure the standby picks up any new configuration changes.
-	cmdStr := fmt.Sprintf("repmgr -f %s standby register -F", r.ConfigPath)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *RepMgr) unregisterStandby(id int) error {
-	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (r *RepMgr) clonePrimary(ipStr string) error {
@@ -339,20 +349,20 @@ func (*RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error)
 	return &member, nil
 }
 
-func (r *RepMgr) StandbyMembers(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
+func (r *RepMgr) VotingMembers(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
 	members, err := r.Members(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
 
-	var standbys []Member
+	var voters []Member
 	for _, member := range members {
-		if member.Role == StandbyRoleName {
-			standbys = append(standbys, member)
+		if member.Role == StandbyRoleName || member.Role == WitnessRoleName {
+			voters = append(voters, member)
 		}
 	}
 
-	return standbys, nil
+	return voters, nil
 }
 
 func (*RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, error) {
@@ -441,15 +451,19 @@ func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error
 }
 
 func (r *RepMgr) UnregisterMember(member Member) error {
-	if member.Role == PrimaryRoleName {
+	switch member.Role {
+	case PrimaryRoleName:
 		if err := r.unregisterPrimary(member.ID); err != nil {
 			return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)
 		}
-		return nil
-	}
-
-	if err := r.unregisterStandby(member.ID); err != nil {
-		return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)
+	case StandbyRoleName:
+		if err := r.unregisterStandby(member.ID); err != nil {
+			return fmt.Errorf("failed to unregister standby %d: %s", member.ID, err)
+		}
+	case WitnessRoleName:
+		if err := r.unregisterWitness(member.ID); err != nil {
+			return fmt.Errorf("failed to unregister witness %d: %s", member.ID, err)
+		}
 	}
 
 	return nil

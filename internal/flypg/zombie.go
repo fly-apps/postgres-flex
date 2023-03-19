@@ -57,14 +57,14 @@ func ReadZombieLock() (string, error) {
 }
 
 func PerformScreening(ctx context.Context, conn *pgx.Conn, n *Node) (string, error) {
-	standbys, err := n.RepMgr.StandbyMembers(ctx, conn)
+	members, err := n.RepMgr.VotingMembers(ctx, conn)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return "", fmt.Errorf("failed to query standbys")
 		}
 	}
 
-	sample, err := TakeDNASample(ctx, n, standbys)
+	sample, err := TakeDNASample(ctx, n, members)
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate cluster data: %s", err)
 	}
