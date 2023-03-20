@@ -48,6 +48,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
+
 		return false, fmt.Errorf("failed to resolve member role: %s", err)
 	}
 
