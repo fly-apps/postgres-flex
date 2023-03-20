@@ -93,6 +93,7 @@ func NewNode() (*Node, error) {
 		DatabaseName:       "repmgr",
 		Credentials:        node.ReplCredentials,
 	}
+
 	_, present := os.LookupEnv("WITNESS")
 	node.RepMgr.Witness = present
 
@@ -164,34 +165,40 @@ func (n *Node) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to verify cluster state %s", err)
 		}
 
-		if !clusterInitialized || n.RepMgr.Witness {
+		if clusterInitialized {
 			if n.RepMgr.Witness {
 				log.Println("Provisioning witness")
-			} else {
-				log.Println("Provisioning primary")
-			}
+				if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
+					return fmt.Errorf("failed to write pg password file: %s", err)
+				}
 
+				if err := n.PGConfig.initdb(); err != nil {
+					return fmt.Errorf("failed to initialize postgres %s", err)
+				}
+			} else {
+				log.Println("Provisioning standby")
+				cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to resolve member over dns: %s", err)
+				}
+
+				if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
+					// Clean-up the directory so it can be retried.
+					if rErr := os.Remove(n.DataDir); rErr != nil {
+						log.Printf("[ERROR] failed to cleanup postgresql dir after clone error: %s\n", rErr)
+					}
+
+					return fmt.Errorf("failed to clone primary: %s", err)
+				}
+			}
+		} else {
+			log.Println("Provisioning primary")
 			if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
 				return fmt.Errorf("failed to write pg password file: %s", err)
 			}
 
 			if err := n.PGConfig.initdb(); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
-			}
-		} else {
-			log.Println("Provisioning standby")
-			cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to resolve member over dns: %s", err)
-			}
-
-			if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
-				// Clean-up the directory so it can be retried.
-				if rErr := os.Remove(n.DataDir); rErr != nil {
-					log.Printf("[ERROR] failed to cleanup postgresql dir after clone error: %s\n", rErr)
-				}
-
-				return fmt.Errorf("failed to clone primary: %s", err)
 			}
 		}
 	}
