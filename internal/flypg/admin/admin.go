@@ -405,6 +405,25 @@ func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[strin
 				}
 			}
 		}
+
+		if k == "max_replication_slots" {
+			maxReplicationSlotsStr := v.(string)
+
+			// Convert string to int
+			maxReplicationSlots, err := strconv.ParseInt(maxReplicationSlotsStr, 10, 64)
+			if err != nil {
+				return fmt.Errorf("failed to parse max_replication_slots: %s", err)
+			}
+
+			slots, err := ListReplicationSlots(ctx, conn)
+			if err != nil {
+				return fmt.Errorf("failed to verify replication slots: %s", err)
+			}
+
+			if len(slots) > int(maxReplicationSlots) {
+				return fmt.Errorf("max_replication_slots must be greater than or equal to the number of active replication slots (%d)", len(slots))
+			}
+		}
 	}
 
 	return nil
