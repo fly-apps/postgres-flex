@@ -427,6 +427,32 @@ func TestValidateCompatibility(t *testing.T) {
 		}
 	})
 
+	t.Run("maxReplicationSlots", func(t *testing.T) {
+		valid := ConfigMap{
+			"wal_level":             "replica",
+			"max_replication_slots": "10",
+		}
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
+			t.Fatal(err)
+		}
+
+		valid = ConfigMap{
+			"wal_level":             "logical",
+			"max_replication_slots": "12",
+		}
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
+			t.Fatal(err)
+		}
+
+		invalid := ConfigMap{
+			"wal_level":             "minimal",
+			"max_replication_slots": "20",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+	})
+
 }
 
 func stubPGConfigFile() error {

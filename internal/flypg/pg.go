@@ -378,6 +378,25 @@ func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error)
 
 	}
 
+	// Max-replication-slots
+	if v, ok := requested["max_replication_slots"]; ok {
+		{
+			val := v.(string)
+
+			// Convert string to int
+			maxReplicationSlots, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return requested, fmt.Errorf("failed to parse max-replication-slots: %s", err)
+			}
+
+			walLevel := resolveConfigValue(requested, current, "wal_level", "replica")
+
+			if maxReplicationSlots > 0 && walLevel == "minimal" {
+				return requested, fmt.Errorf("wal_level must be set to replica or higher before replication slots can be used")
+			}
+		}
+	}
+
 	return requested, nil
 }
 
