@@ -49,6 +49,24 @@ func main() {
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
+	if timeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO"); exists {
+		duration, err := time.ParseDuration(timeout)
+		if err != nil {
+			fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
+		} else {
+			go func() {
+				timeout := time.After(duration)
+				for {
+					select {
+					case <-timeout:
+						svisor.Stop()
+						os.Exit(0)
+					}
+				}
+			}()
+		}
+	}
+
 	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.Port))
 
 	proxyEnv := map[string]string{
