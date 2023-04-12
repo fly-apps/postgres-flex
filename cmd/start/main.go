@@ -49,24 +49,6 @@ func main() {
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
-	if timeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO"); exists {
-		duration, err := time.ParseDuration(timeout)
-		if err != nil {
-			fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
-		} else {
-			go func() {
-				timeout := time.After(duration)
-				for {
-					select {
-					case <-timeout:
-						svisor.Stop()
-						os.Exit(0)
-					}
-				}
-			}()
-		}
-	}
-
 	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.Port))
 
 	proxyEnv := map[string]string{
@@ -104,6 +86,53 @@ func main() {
 	if err := svisor.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	if timeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO"); exists {
+		retries := 5
+		for retries > 0 {
+			var initial int
+			localConn, err := node.NewLocalConnection(ctx, "postgres", node.SUCredentials)
+			if err != nil {
+				fmt.Printf("failed to connect with local node: %s\n", err)
+				retries = retries - 1
+				time.Sleep(10 * time.Second)
+				return
+			}
+			if err := localConn.QueryRow(ctx, "select count(*) from pg_stat_activity;").Scan(&initial); err != nil {
+				fmt.Printf("failed to determine baseline connection count: %s\n", err)
+				retries = retries - 1
+				time.Sleep(10 * time.Second)
+				return
+			}
+			fmt.Printf("Initial connection count is %d", initial)
+			duration, err := time.ParseDuration(timeout)
+			if err != nil {
+				fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
+			} else {
+				go func() {
+					timeout := time.After(duration)
+					for {
+						select {
+						case <-timeout:
+							var current int
+							if err := localConn.QueryRow(ctx, "select count(*) from pg_stat_activity;").Scan(&current); err != nil {
+								fmt.Printf("failed to determine current connection count, shutting down: %s\n", err)
+								svisor.Stop()
+								os.Exit(0)
+							}
+							fmt.Printf("Initial connection count is %d, current is %d", initial, current)
+							if current > initial {
+								timeout = time.After(duration)
+								continue
+							}
+							svisor.Stop()
+							os.Exit(0)
+						}
+					}
+				}()
+			}
+		}
 	}
 }
 
