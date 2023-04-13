@@ -71,6 +71,8 @@ func main() {
 							svisor.Stop()
 							os.Exit(0)
 						}
+						localConn.Close(ctx)
+						fmt.Printf("Current connection count is %d\n", current)
 						if current >= 1 {
 							timeout = time.After(duration)
 							continue
