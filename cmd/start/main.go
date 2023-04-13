@@ -51,7 +51,8 @@ func main() {
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
 	go func() {
-		if err := scaleToZeroWorker(ctx, node, svisor); err != nil {
+		if err := scaleToZeroWorker(ctx, node); err != nil {
+			svisor.Stop()
 			os.Exit(0)
 		}
 	}()
@@ -96,7 +97,7 @@ func main() {
 	}
 }
 
-func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor.Supervisor) error {
+func scaleToZeroWorker(ctx context.Context, node *flypg.Node) error {
 	rawTimeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO")
 	if !exists {
 		return nil
@@ -126,7 +127,6 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 			if current > 1 {
 				continue
 			}
-			svisor.Stop()
 			return errors.New("scale to zero condition hit")
 		}
 	}
