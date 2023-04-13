@@ -61,19 +61,17 @@ func main() {
 				for {
 					select {
 					case <-timeout:
-						localConn, err := node.NewLocalConnection(ctx, "postgres", node.SUCredentials)
+						localConn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
 						if err != nil {
-							fmt.Printf("failed to connect with local node: %s\n", err)
 							svisor.Stop()
 							os.Exit(0)
 						}
 						var current int
 						if err := localConn.QueryRow(ctx, sql).Scan(&current); err != nil {
-							fmt.Printf("failed to determine current connection count, shutting down: %s\n", err)
 							svisor.Stop()
 							os.Exit(0)
 						}
-						if current > 1 {
+						if current >= 1 {
 							timeout = time.After(duration)
 							continue
 						}
