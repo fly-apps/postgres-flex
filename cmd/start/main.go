@@ -57,24 +57,28 @@ func main() {
 			fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
 		} else {
 			go func() {
-				timeout := time.After(duration)
+				timeout := time.NewTimer(duration)
 				for {
 					select {
-					case <-timeout:
+					case <-ctx.Done():
+						return
+					case <-timeout.C:
 						localConn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
 						if err != nil {
-							svisor.Stop()
-							os.Exit(0)
+							fmt.Printf("Failed to open local connection, %s\n", err)
+							timeout.Reset(duration)
+							continue
 						}
 						var current int
 						if err := localConn.QueryRow(ctx, sql).Scan(&current); err != nil {
-							svisor.Stop()
-							os.Exit(0)
+							fmt.Printf("Failed to query current connection count, %s\n", err)
+							timeout.Reset(duration)
+							continue
 						}
 						localConn.Close(ctx)
 						fmt.Printf("Current connection count is %d\n", current)
 						if current > 1 {
-							timeout = time.After(duration)
+							timeout.Reset(duration)
 							continue
 						}
 						svisor.Stop()
