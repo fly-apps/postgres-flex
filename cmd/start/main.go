@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -127,7 +126,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node) error {
 			if current > 1 {
 				continue
 			}
-			return errors.New("scale to zero condition hit")
+			return fmt.Errorf("scale to zero condition hit")
 		}
 	}
 }
