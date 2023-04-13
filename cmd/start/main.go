@@ -50,7 +50,6 @@ func main() {
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
 	if timeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO"); exists {
-		sql := "select count(*) from pg_stat_activity where usename != 'repmgr' and usename != 'flypgadmin' and backend_type = 'client backend';"
 		duration, err := time.ParseDuration(timeout)
 		fmt.Println("Configured scale to zero")
 		if err != nil {
@@ -63,19 +62,12 @@ func main() {
 					case <-ctx.Done():
 						return
 					case <-timeout.C:
-						localConn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
+						current, err := getCurrentConnCount(ctx, node)
 						if err != nil {
-							fmt.Printf("Failed to open local connection, %s\n", err)
+							fmt.Printf("Failed to get current connection count will try again in %s\n", duration.String())
 							timeout.Reset(duration)
 							continue
 						}
-						var current int
-						if err := localConn.QueryRow(ctx, sql).Scan(&current); err != nil {
-							fmt.Printf("Failed to query current connection count, %s\n", err)
-							timeout.Reset(duration)
-							continue
-						}
-						localConn.Close(ctx)
 						fmt.Printf("Current connection count is %d\n", current)
 						if current > 1 {
 							timeout.Reset(duration)
@@ -127,6 +119,21 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func getCurrentConnCount(ctx context.Context, node *flypg.Node) (int, error) {
+	sql := "select count(*) from pg_stat_activity where usename != 'repmgr' and usename != 'flypgadmin' and backend_type = 'client backend';"
+	localConn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
+	if err != nil {
+		return 0, err
+	}
+	defer localConn.Close(ctx)
+
+	var current int
+	if err := localConn.QueryRow(ctx, sql).Scan(&current); err != nil {
+		return 0, err
+	}
+	return current, nil
 }
 
 func panicHandler(err error) {
