@@ -106,6 +106,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 	fmt.Printf("Configured scale to zero with duration of %s\n", duration.String())
 
 	timeout := time.NewTicker(duration)
+	defer timeout.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -114,12 +115,10 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 			current, err := getCurrentConnCount(ctx, node)
 			if err != nil {
 				fmt.Printf("Failed to get current connection count will try again in %s\n", duration.String())
-				timeout.Reset(duration)
 				continue
 			}
 			fmt.Printf("Current connection count is %d\n", current)
 			if current > 1 {
-				timeout.Reset(duration)
 				continue
 			}
 			svisor.Stop()
