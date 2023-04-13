@@ -128,15 +128,15 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 }
 
 func getCurrentConnCount(ctx context.Context, node *flypg.Node) (int, error) {
-	sql := "select count(*) from pg_stat_activity where usename != 'repmgr' and usename != 'flypgadmin' and backend_type = 'client backend';"
-	localConn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
+	const sql = "select count(*) from pg_stat_activity where usename != 'repmgr' and usename != 'flypgadmin' and backend_type = 'client backend';"
+	conn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
 	if err != nil {
 		return 0, err
 	}
-	defer localConn.Close(ctx)
+	defer conn.Close(ctx)
 
 	var current int
-	if err := localConn.QueryRow(ctx, sql).Scan(&current); err != nil {
+	if err := conn.QueryRow(ctx, sql).Scan(&current); err != nil {
 		return 0, err
 	}
 	return current, nil
