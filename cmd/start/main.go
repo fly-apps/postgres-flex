@@ -49,6 +49,13 @@ func main() {
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
+	go func() {
+		if err := scaleToZeroWorker(ctx, node); err != nil {
+			svisor.Stop()
+			os.Exit(0)
+		}
+	}()
+
 	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.Port))
 
 	proxyEnv := map[string]string{
@@ -87,6 +94,56 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func scaleToZeroWorker(ctx context.Context, node *flypg.Node) error {
+	rawTimeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO")
+	if !exists {
+		return nil
+	}
+
+	duration, err := time.ParseDuration(rawTimeout)
+	if err != nil {
+		fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s\n", err)
+		return nil
+	}
+
+	fmt.Printf("Configured scale to zero with duration of %s\n", duration.String())
+
+	ticker := time.NewTicker(duration)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			current, err := getCurrentConnCount(ctx, node)
+			if err != nil {
+				fmt.Printf("Failed to get current connection count will try again in %s\n", duration.String())
+				continue
+			}
+			fmt.Printf("Current connection count is %d\n", current)
+			if current > 1 {
+				continue
+			}
+			return fmt.Errorf("scale to zero condition hit")
+		}
+	}
+}
+
+func getCurrentConnCount(ctx context.Context, node *flypg.Node) (int, error) {
+	const sql = "select count(*) from pg_stat_activity where usename != 'repmgr' and usename != 'flypgadmin' and backend_type = 'client backend';"
+	conn, err := node.NewLocalConnection(ctx, "postgres", node.OperatorCredentials)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	var current int
+	if err := conn.QueryRow(ctx, sql).Scan(&current); err != nil {
+		return 0, err
+	}
+	return current, nil
 }
 
 func panicHandler(err error) {
