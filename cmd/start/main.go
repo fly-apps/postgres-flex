@@ -51,33 +51,11 @@ func main() {
 
 	if timeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO"); exists {
 		duration, err := time.ParseDuration(timeout)
-		fmt.Println("Configured scale to zero")
+		fmt.Printf("Configured scale to zero with duration of %s\n", duration.String())
 		if err != nil {
 			fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
 		} else {
-			go func() {
-				timeout := time.NewTimer(duration)
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-timeout.C:
-						current, err := getCurrentConnCount(ctx, node)
-						if err != nil {
-							fmt.Printf("Failed to get current connection count will try again in %s\n", duration.String())
-							timeout.Reset(duration)
-							continue
-						}
-						fmt.Printf("Current connection count is %d\n", current)
-						if current > 1 {
-							timeout.Reset(duration)
-							continue
-						}
-						svisor.Stop()
-						os.Exit(0)
-					}
-				}
-			}()
+			go scaleToZeroWorker(ctx, node, duration, svisor)
 		}
 	}
 
@@ -118,6 +96,30 @@ func main() {
 	if err := svisor.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+}
+
+func scaleToZeroWorker(ctx context.Context, node *flypg.Node, duration time.Duration, svisor *supervisor.Supervisor) {
+	timeout := time.NewTicker(duration)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timeout.C:
+			current, err := getCurrentConnCount(ctx, node)
+			if err != nil {
+				fmt.Printf("Failed to get current connection count will try again in %s\n", duration.String())
+				timeout.Reset(duration)
+				continue
+			}
+			fmt.Printf("Current connection count is %d\n", current)
+			if current > 1 {
+				timeout.Reset(duration)
+				continue
+			}
+			svisor.Stop()
+			os.Exit(0)
+		}
 	}
 }
 
