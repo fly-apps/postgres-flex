@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -49,7 +50,11 @@ func main() {
 
 	svisor := supervisor.New("flypg", 5*time.Minute)
 
-	go scaleToZeroWorker(ctx, node, svisor)
+	go func() {
+		if err := scaleToZeroWorker(ctx, node, svisor); err != nil {
+			os.Exit(0)
+		}
+	}()
 
 	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D %s -p %d", node.DataDir, node.Port))
 
@@ -91,16 +96,16 @@ func main() {
 	}
 }
 
-func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor.Supervisor) {
+func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor.Supervisor) error {
 	rawTimeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO")
 	if !exists {
-		return
+		return nil
 	}
 
 	duration, err := time.ParseDuration(rawTimeout)
 	if err != nil {
 		fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s\n", err)
-		return
+		return nil
 	}
 
 	fmt.Printf("Configured scale to zero with duration of %s\n", duration.String())
@@ -110,7 +115,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 			current, err := getCurrentConnCount(ctx, node)
 			if err != nil {
@@ -122,8 +127,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 				continue
 			}
 			svisor.Stop()
-			// skipcq: CRT-D0011, RVV-A0003
-			os.Exit(0)
+			return errors.New("scale to zero condition hit")
 		}
 	}
 }
