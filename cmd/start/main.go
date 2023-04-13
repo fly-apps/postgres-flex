@@ -133,7 +133,7 @@ func getCurrentConnCount(ctx context.Context, node *flypg.Node) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	var current int
 	if err := conn.QueryRow(ctx, sql).Scan(&current); err != nil {
