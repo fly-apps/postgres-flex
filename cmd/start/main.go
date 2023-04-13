@@ -89,49 +89,38 @@ func main() {
 	}
 
 	if timeout, exists := os.LookupEnv("FLY_SCALE_TO_ZERO"); exists {
-		retries := 5
-		for retries > 0 {
-			var initial int
-			localConn, err := node.NewLocalConnection(ctx, "postgres", node.SUCredentials)
-			if err != nil {
-				fmt.Printf("failed to connect with local node: %s\n", err)
-				retries = retries - 1
-				time.Sleep(10 * time.Second)
-				return
-			}
-			if err := localConn.QueryRow(ctx, "select count(*) from pg_stat_activity;").Scan(&initial); err != nil {
-				fmt.Printf("failed to determine baseline connection count: %s\n", err)
-				retries = retries - 1
-				time.Sleep(10 * time.Second)
-				return
-			}
-			fmt.Printf("Initial connection count is %d", initial)
-			duration, err := time.ParseDuration(timeout)
-			if err != nil {
-				fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
-			} else {
-				go func() {
-					timeout := time.After(duration)
-					for {
-						select {
-						case <-timeout:
-							var current int
-							if err := localConn.QueryRow(ctx, "select count(*) from pg_stat_activity;").Scan(&current); err != nil {
-								fmt.Printf("failed to determine current connection count, shutting down: %s\n", err)
-								svisor.Stop()
-								os.Exit(0)
-							}
-							fmt.Printf("Initial connection count is %d, current is %d", initial, current)
-							if current > initial {
-								timeout = time.After(duration)
-								continue
-							}
+		sql := "select count(*) from pg_stat_activity where usename != 'repmgr' and usename != 'flypgadmin' and backend_type = 'client backend';"
+		duration, err := time.ParseDuration(timeout)
+		fmt.Println("Configured scale to zero")
+		if err != nil {
+			fmt.Printf("failed to parse FLY_SCALE_TO_ZERO duration %s", err)
+		} else {
+			go func() {
+				timeout := time.After(duration)
+				for {
+					select {
+					case <-timeout:
+						localConn, err := node.NewLocalConnection(ctx, "postgres", node.SUCredentials)
+						if err != nil {
+							fmt.Printf("failed to connect with local node: %s\n", err)
 							svisor.Stop()
 							os.Exit(0)
 						}
+						var current int
+						if err := localConn.QueryRow(ctx, sql).Scan(&current); err != nil {
+							fmt.Printf("failed to determine current connection count, shutting down: %s\n", err)
+							svisor.Stop()
+							os.Exit(0)
+						}
+						if current > 1 {
+							timeout = time.After(duration)
+							continue
+						}
+						svisor.Stop()
+						os.Exit(0)
 					}
-				}()
-			}
+				}
+			}()
 		}
 	}
 }
