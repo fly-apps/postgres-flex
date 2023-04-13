@@ -122,6 +122,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node, svisor *supervisor
 				continue
 			}
 			svisor.Stop()
+			// skipcq: CRT-D0011, RVV-A0003
 			os.Exit(0)
 		}
 	}
