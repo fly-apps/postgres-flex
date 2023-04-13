@@ -73,7 +73,7 @@ func main() {
 						}
 						localConn.Close(ctx)
 						fmt.Printf("Current connection count is %d\n", current)
-						if current >= 1 {
+						if current > 1 {
 							timeout = time.After(duration)
 							continue
 						}
