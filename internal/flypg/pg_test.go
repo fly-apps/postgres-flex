@@ -453,6 +453,21 @@ func TestValidateCompatibility(t *testing.T) {
 		}
 	})
 
+	t.Run("maxConnections", func(t *testing.T) {
+		valid := ConfigMap{
+			"max_connections": "14",
+		}
+		if _, err := pgConf.validateCompatibility(valid); err != nil {
+			t.Fatal(err)
+		}
+
+		invalid := ConfigMap{
+			"max_connections": "4",
+		}
+		if _, err := pgConf.validateCompatibility(invalid); err == nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func stubPGConfigFile() error {

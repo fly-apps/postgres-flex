@@ -397,6 +397,25 @@ func (c *PGConfig) validateCompatibility(requested ConfigMap) (ConfigMap, error)
 		}
 	}
 
+	// Max-connections
+	if v, ok := requested["max_connections"]; ok {
+		{
+			const minConnections = 10
+
+			val := v.(string)
+
+			// Convert string to int
+			maxConnections, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return requested, fmt.Errorf("failed to parse max-connections: %s", err)
+			}
+
+			if maxConnections < minConnections {
+				return requested, fmt.Errorf("max_connections cannot be configured below %d", minConnections)
+			}
+		}
+	}
+
 	return requested, nil
 }
 
