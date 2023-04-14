@@ -274,7 +274,7 @@ func (r *RepMgr) restartDaemon() error {
 }
 
 func (r *RepMgr) daemonRestartRequired(m *Member) bool {
-	return m.Hostname == r.PrivateIP
+	return m.Hostname != r.PrivateIP
 }
 
 func (r *RepMgr) unregisterWitness(id int) error {
