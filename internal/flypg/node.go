@@ -294,7 +294,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				)
 			}
 
-			// Re-register primary to take-on any configuration changes.
+			// Re-register primary to apply any configuration changes.
 			if err := n.RepMgr.registerPrimary(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to re-register existing primary: %s", err)
 			}
@@ -306,7 +306,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 		case StandbyRoleName:
-			// Register existing standby to take-on any configuration changes.
+			// Register existing standby to apply any configuration changes.
 			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)
 			}
@@ -316,7 +316,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to resolve primary member when updating witness: %s", err)
 			}
 
-			// Register existing witness to take-on any configuration changes.
+			// Register existing witness to apply any configuration changes.
 			if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
 				return fmt.Errorf("failed to register existing witness: %s", err)
 			}

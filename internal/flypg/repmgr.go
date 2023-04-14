@@ -268,7 +268,7 @@ func (r *RepMgr) unregisterStandby(id int) error {
 	return err
 }
 
-func (r *RepMgr) restartDaemon() error {
+func (*RepMgr) restartDaemon() error {
 	_, err := utils.RunCommand("restart-repmgrd", "postgres")
 	return err
 }
