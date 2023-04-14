@@ -217,18 +217,34 @@ func (r *RepMgr) resolveNodeID() (string, error) {
 	return nodeID, nil
 }
 
-func (r *RepMgr) registerPrimary() error {
+func (r *RepMgr) registerPrimary(restartDaemon bool) error {
 	cmdStr := fmt.Sprintf("repmgr primary register -f %s -F", r.ConfigPath)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to register primary: %s", err)
+	}
 
-	return err
+	if restartDaemon {
+		if err := r.restartDaemon(); err != nil {
+			return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+		}
+	}
+
+	return nil
 }
 
-func (r *RepMgr) registerStandby() error {
+func (r *RepMgr) registerStandby(restartDaemon bool) error {
 	cmdStr := fmt.Sprintf("repmgr standby register -f %s -F", r.ConfigPath)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+		return fmt.Errorf("failed to register standby: %s", err)
+	}
 
-	return err
+	if restartDaemon {
+		if err := r.restartDaemon(); err != nil {
+			return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+		}
+	}
+
+	return nil
 }
 
 func (r *RepMgr) registerWitness(primaryHostname string) error {
@@ -250,6 +266,15 @@ func (r *RepMgr) unregisterStandby(id int) error {
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
+}
+
+func (*RepMgr) restartDaemon() error {
+	_, err := utils.RunCommand("restart-repmgrd", "postgres")
+	return err
+}
+
+func (r *RepMgr) daemonRestartRequired(m *Member) bool {
+	return m.Hostname != r.PrivateIP
 }
 
 func (r *RepMgr) unregisterWitness(id int) error {
@@ -325,13 +350,18 @@ func (*RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 }
 
 func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
+	myID, err := r.resolveNodeID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve node id: %s", err)
+	}
+
 	members, err := r.Members(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, member := range members {
-		if member.Hostname == r.PrivateIP {
+		if fmt.Sprint(member.ID) == myID {
 			return &member, nil
 		}
 	}

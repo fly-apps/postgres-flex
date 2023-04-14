@@ -260,6 +260,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to resolve member role: %s", err)
 		}
 
+		// Restart repmgrd in the event the IP changes for an already registered node.
+		// This can happen if the underlying volume is moved to a different node.
+		daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
+
 		switch member.Role {
 		case PrimaryRoleName:
 			// Verify cluster state to ensure we are the actual primary and not a zombie.
@@ -290,6 +294,11 @@ func (n *Node) PostInit(ctx context.Context) error {
 				)
 			}
 
+			// Re-register primary to apply any configuration changes.
+			if err := n.RepMgr.registerPrimary(daemonRestartRequired); err != nil {
+				return fmt.Errorf("failed to re-register existing primary: %s", err)
+			}
+
 			// Readonly lock is set when disk capacity is dangerously high.
 			if !ReadOnlyLockExists() {
 				if err := BroadcastReadonlyChange(ctx, n, false); err != nil {
@@ -297,8 +306,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 		case StandbyRoleName:
-			// Register existing standby to take-on any configuration changes.
-			if err := n.RepMgr.registerStandby(); err != nil {
+			// Register existing standby to apply any configuration changes.
+			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)
 			}
 		case WitnessRoleName:
@@ -307,7 +316,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to resolve primary member when updating witness: %s", err)
 			}
 
-			// Register existing witness to take-on any configuration changes.
+			// Register existing witness to apply any configuration changes.
 			if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
 				return fmt.Errorf("failed to register existing witness: %s", err)
 			}
@@ -357,7 +366,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Register ourself as the primary
-			if err := n.RepMgr.registerPrimary(); err != nil {
+			if err := n.RepMgr.registerPrimary(false); err != nil {
 				return fmt.Errorf("failed to register repmgr primary: %s", err)
 			}
 
@@ -395,7 +404,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			} else {
 				log.Println("Registering standby")
-				if err := n.RepMgr.registerStandby(); err != nil {
+				if err := n.RepMgr.registerStandby(false); err != nil {
 					return fmt.Errorf("failed to register new standby: %s", err)
 				}
 			}
