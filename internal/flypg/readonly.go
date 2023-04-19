@@ -159,7 +159,7 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 				continue
 			}
 
-			sql := fmt.Sprintf("ALTER DATABASE %s SET default_transaction_read_only=%v;", db.Name, enable)
+			sql := fmt.Sprintf("ALTER DATABASE %q SET default_transaction_read_only=%v;", db.Name, enable)
 			if _, err = conn.Exec(ctx, sql); err != nil {
 				return fmt.Errorf("failed to alter readonly state on db %s: %s", db.Name, err)
 			}
