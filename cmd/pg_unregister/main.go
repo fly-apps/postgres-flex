@@ -30,7 +30,7 @@ func processUnregistration(ctx context.Context) error {
 
 	node, err := flypg.NewNode()
 	if err != nil {
-		return fmt.Errorf("faied to initialize node: %s", err)
+		return fmt.Errorf("failed to initialize node: %s", err)
 	}
 
 	conn, err := node.RepMgr.NewLocalConnection(ctx)
