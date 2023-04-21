@@ -388,7 +388,7 @@ func (r *RepMgr) VotingMembers(ctx context.Context, conn *pgx.Conn) ([]Member, e
 
 	var voters []Member
 	for _, member := range members {
-		if member.Role == StandbyRoleName || member.Role == WitnessRoleName {
+		if (member.Role == StandbyRoleName || member.Role == WitnessRoleName) && member.Region == r.PrimaryRegion {
 			voters = append(voters, member)
 		}
 	}
