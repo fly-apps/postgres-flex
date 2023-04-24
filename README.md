@@ -15,7 +15,7 @@ fly pg create --name <app-name> --initial-cluster-size 3 --region ord --flex
 ```
 
 ## High Availability
-For HA, it's recommended that you run at least 3 members with your primary region. Automatic failovers will only consider members residing within your primary region. The primary region is represented as an environment variable defined within the `fly.toml` file.
+For HA, it's recommended that you run at least 3 members within your primary region. Automatic failovers will only consider members residing within your primary region. The primary region is represented as an environment variable defined within the `fly.toml` file.
 
 ## Horizontal scaling
 Use the clone command to scale up your cluster.
