@@ -1,7 +1,7 @@
 # Fencing
 
 ## How do we verify the real primary?
-We start out evaluating the cluster state by checking each registered standby for connectivity and asking who their primary is.
+We start out by evaluating the cluster state by checking each registered standby within the primary region for connectivity and asking who their primary is.
 
 The "clusters state" is represented across a few different dimensions:
 
@@ -24,7 +24,7 @@ map[string]int{
 }
 ```
 
-The real primary is resolvable so long as the majority of members can agree on who it is. Quorum being defined as `total_members / 2 + 1`.
+The real primary is resolvable so long as the majority of members can agree on who it is. Quorum being defined as `total_members_in_region / 2 + 1`.
 
 **Note: When the primary being evaluated meets quorum, it will still be fenced in the event a conflict is found. This is to protect against a possible race condition where an old primary comes back up in the middle of an active failover.**
 
@@ -45,11 +45,11 @@ The cluster will be made read-only and the `zombie.lock` file will be created wi
 
 ## Monitoring cluster state
 
-In order to mitigate possible split-brain scenarios, it's important that cluster state is evaluated regularly and when specific events/actions take place.  
+In order to mitigate possible split-brain scenarios, it's important that cluster state is evaluated regularly and when specific events/actions take place.
 
 ### On boot
 This is to ensure the booting primary is not a primary coming back from the dead.
-  
+
 ### During standby connect/reconnect/disconnect events
 There are a myriad of reasons why a standby might disconnect, but we have to assume the possibility of a network partition.  In either case, if quorum is lost, the primary will be fenced.
 
@@ -60,7 +60,7 @@ Cluster state is monitored in the background at regular intervals. This acts as 
 ## Split-brain detection window
 **This pertains to v0.0.36+**
 
-When a network partition is initiated, the following steps are performed: 
+When a network partition is initiated, the following steps are performed:
 
 1. Repmgr will attempt to ping registered members with a 5s connect timeout.
 2. Repmgr will wait up to 30 seconds for the standby to reconnect before issuing a `child_node_disconnect` event.
