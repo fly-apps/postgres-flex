@@ -254,3 +254,30 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 
 	return nil
 }
+
+func EvaluateClusterState(ctx context.Context, conn *pgx.Conn, node *Node) error {
+	primary, err := PerformScreening(ctx, conn, node)
+	if errors.Is(err, ErrZombieDiagnosisUndecided) || errors.Is(err, ErrZombieDiscovered) {
+		if err := Quarantine(ctx, node, primary); err != nil {
+			return fmt.Errorf("failed to quarantine failed primary: %s", err)
+		}
+		log.Println("[WARN] Primary is going read-only to protect against potential split-brain")
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to run zombie diagnosis: %s", err)
+	}
+
+	// Clear zombie lock if it exists
+	if ZombieLockExists() {
+		log.Println("Quorom has been reached. Disabling read-only mode.")
+		if err := RemoveZombieLock(); err != nil {
+			return fmt.Errorf("failed to remove zombie lock file: %s", err)
+		}
+
+		if err := BroadcastReadonlyChange(ctx, node, false); err != nil {
+			log.Printf("failed to disable readonly: %s", err)
+		}
+	}
+
+	return nil
+}
