@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
-	"github.com/jackc/pgx/v5"
 )
 
 type EventRequest struct {
@@ -72,36 +71,8 @@ func processEvent(ctx context.Context, event EventRequest) error {
 			return nil
 		}
 
-		if err := evaluateClusterState(ctx, conn, node); err != nil {
+		if err := flypg.EvaluateClusterState(ctx, conn, node); err != nil {
 			return fmt.Errorf("failed to evaluate cluster state: %s", err)
-		}
-	}
-
-	return nil
-}
-
-// TODO Move this into zombie.go
-func evaluateClusterState(ctx context.Context, conn *pgx.Conn, node *flypg.Node) error {
-	primary, err := flypg.PerformScreening(ctx, conn, node)
-	if errors.Is(err, flypg.ErrZombieDiagnosisUndecided) || errors.Is(err, flypg.ErrZombieDiscovered) {
-		if err := flypg.Quarantine(ctx, node, primary); err != nil {
-			return fmt.Errorf("failed to quarantine failed primary: %s", err)
-		}
-		log.Println("[WARN] Primary is going read-only to protect against potential split-brain")
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("failed to run zombie diagnosis: %s", err)
-	}
-
-	// Clear zombie lock if it exists
-	if flypg.ZombieLockExists() {
-		log.Println("Quorom has been reached. Disabling read-only mode.")
-		if err := flypg.RemoveZombieLock(); err != nil {
-			return fmt.Errorf("failed to remove zombie lock file: %s", err)
-		}
-
-		if err := flypg.BroadcastReadonlyChange(ctx, node, false); err != nil {
-			log.Printf("failed to disable readonly: %s", err)
 		}
 	}
 
