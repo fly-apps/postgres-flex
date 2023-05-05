@@ -6,7 +6,7 @@ _**Note: The promotion candidate must reside within your PRIMARY_REGION.**_
 
 **1. Connect to the Machine you wish to promote**
 ```bash
-fly ssh console -s <app-name>
+fly ssh console -s -a <app-name>
 ```
 
 **2. Confirm the member is healthy**
