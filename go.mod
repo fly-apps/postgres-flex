@@ -10,7 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/term v1.1.0
-	github.com/superfly/fly-checks v0.0.0-20221220181621-bcbf6f4dc6d7
+	github.com/superfly/fly-checks v0.0.0-20230510154016-d189351293f2
 	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3
 	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7
 )
