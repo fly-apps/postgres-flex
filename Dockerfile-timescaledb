@@ -4,7 +4,7 @@ ARG VERSION=custom
 
 FROM golang:1.20
 
-WORKDIR /go/src/github.com/fly-examples/fly-postgres
+WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/event_handler ./cmd/event_handler
