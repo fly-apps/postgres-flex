@@ -119,10 +119,10 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node) error {
 		case <-ticker.C:
 			current, err := getCurrentConnCount(ctx, node)
 			if err != nil {
-				fmt.Printf("Failed to get current connection count will try again in %s\n", duration.String())
+				log.Printf("Failed to get current connection count will try again in %s\n", duration.String())
 				continue
 			}
-			fmt.Printf("Current connection count is %d\n", current)
+			log.Printf("Current connection count is %d\n", current)
 			if current >= 1 {
 				continue
 			}
