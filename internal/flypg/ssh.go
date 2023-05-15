@@ -29,7 +29,7 @@ func writeSSHKey() error {
 	}
 
 	if err := os.Chmod(publicKeyFile, 0600); err != nil {
-		return fmt.Errorf("failed to chmod private key file: %s", err)
+		return fmt.Errorf("failed to chmod public key file: %s", err)
 	}
 
 	return nil

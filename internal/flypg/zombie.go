@@ -269,7 +269,7 @@ func EvaluateClusterState(ctx context.Context, conn *pgx.Conn, node *Node) error
 
 	// Clear zombie lock if it exists
 	if ZombieLockExists() {
-		log.Println("Quorom has been reached. Disabling read-only mode.")
+		log.Println("Quorum has been reached. Disabling read-only mode.")
 		if err := RemoveZombieLock(); err != nil {
 			return fmt.Errorf("failed to remove zombie lock file: %s", err)
 		}
