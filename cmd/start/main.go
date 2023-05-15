@@ -123,7 +123,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node) error {
 				continue
 			}
 			fmt.Printf("Current connection count is %d\n", current)
-			if current > 1 {
+			if current >= 1 {
 				continue
 			}
 			return fmt.Errorf("scale to zero condition hit")
