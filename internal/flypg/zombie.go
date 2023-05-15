@@ -247,7 +247,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 			return fmt.Errorf("failed to stop postgres: %s", err)
 		}
 	} else {
-		// TODO - Provide link to documention on how to address this
+		// TODO - Provide link to documentation on how to address this
 		log.Println("[WARN] Zombie lock file does not contain a hostname.")
 		log.Println("[WARN] This likely means that we were unable to determine who the real primary is.")
 	}
@@ -269,7 +269,7 @@ func EvaluateClusterState(ctx context.Context, conn *pgx.Conn, node *Node) error
 
 	// Clear zombie lock if it exists
 	if ZombieLockExists() {
-		log.Println("Quorom has been reached. Disabling read-only mode.")
+		log.Println("Quorum has been reached. Disabling read-only mode.")
 		if err := RemoveZombieLock(); err != nil {
 			return fmt.Errorf("failed to remove zombie lock file: %s", err)
 		}

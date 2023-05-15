@@ -39,7 +39,7 @@ func DisableReadonly(ctx context.Context, n *Node) error {
 	}
 
 	if err := changeReadOnlyState(ctx, n, false); err != nil {
-		return fmt.Errorf("failed to disabe read-only mode: %s", err)
+		return fmt.Errorf("failed to disable read-only mode: %s", err)
 	}
 
 	if err := removeReadOnlyLock(); err != nil {
@@ -88,7 +88,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 		endpoint := fmt.Sprintf("http://[%s]:5500/%s", member.Hostname, RestartHaproxyEndpoint)
 		resp, err := http.Get(endpoint)
 		if err != nil {
-			log.Printf("[WARN] Failed restart haproxy on member %s: %s", member.Hostname, err)
+			log.Printf("[WARN] Failed to restart haproxy on member %s: %s", member.Hostname, err)
 			continue
 		}
 		defer func() { _ = resp.Body.Close() }()
@@ -150,7 +150,7 @@ func changeReadOnlyState(ctx context.Context, n *Node, enable bool) error {
 	if member.Role == PrimaryRoleName {
 		databases, err := admin.ListDatabases(ctx, conn)
 		if err != nil {
-			return fmt.Errorf("failed to list database: %s", err)
+			return fmt.Errorf("failed to list databases: %s", err)
 		}
 
 		for _, db := range databases {
