@@ -247,7 +247,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 			return fmt.Errorf("failed to stop postgres: %s", err)
 		}
 	} else {
-		// TODO - Provide link to documention on how to address this
+		// TODO - Provide link to documentation on how to address this
 		log.Println("[WARN] Zombie lock file does not contain a hostname.")
 		log.Println("[WARN] This likely means that we were unable to determine who the real primary is.")
 	}
