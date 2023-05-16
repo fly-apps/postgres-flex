@@ -38,7 +38,7 @@ func NewNode() (*Node, error) {
 		AppName:            "local",
 		BarmanHome:         dataDir + "/barman.d",
 		LogFile:            dataDir + "/barman.log",
-		PasswordConfigPath: dataDir + "/.pgpass",
+		PasswordConfigPath: "/root/.pgpass",
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -117,6 +117,10 @@ wal_retention_policy = main
 
 	passStr := fmt.Sprintf("*:*:*:%s:%s", n.ReplCredentials.Username, n.ReplCredentials.Password)
 	if err := os.WriteFile(n.PasswordConfigPath, []byte(passStr), 0700); err != nil {
+		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
+	}
+	// We need this in case the user ssh to the vm as root
+	if err := os.WriteFile("/.pgpass", []byte(passStr), 0700); err != nil {
 		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
 	}
 
