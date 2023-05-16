@@ -10,7 +10,7 @@ const (
 	publicKeyFile  = "/data/.ssh/id_rsa-cert.pub"
 )
 
-func writeSSHKey() error {
+func WriteSSHKey() error {
 	err := os.Mkdir("/data/.ssh", 0700)
 	if err != nil && !os.IsExist(err) {
 		return err

@@ -482,14 +482,14 @@ func (c *PGConfig) setDefaultHBA() error {
 		},
 		{
 			Type:     "host",
-			Database: "all",
+			Database: "replication,all",
 			User:     "all",
 			Address:  "0.0.0.0/0",
 			Method:   "md5",
 		},
 		{
 			Type:     "host",
-			Database: "all",
+			Database: "replication,all",
 			User:     "all",
 			Address:  "::0/0",
 			Method:   "md5",
