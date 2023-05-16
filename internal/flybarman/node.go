@@ -75,7 +75,7 @@ func (n *Node) Init(ctx context.Context) error {
 	if _, err := os.Stat(barmanConfigFile); os.IsNotExist(err) {
 		barmanConfigFileContent := fmt.Sprintf(`[barman]
 barman_user = root
-barman_home = /data/barman-home
+barman_home = /data/barman.d
 log_level = info
 log_file = /data/barman.log
 
