@@ -162,6 +162,22 @@ wal_retention_policy = main
 		log.Println("Started cron service")
 	}
 
+	switchWalCommand := exec.Command("barman", "switch-wal", "--archive", "--force", "pg")
+	if _, err := switchWalCommand.Output(); err != nil {
+		log.Println(fmt.Errorf("failed switching WAL: %s", err))
+		log.Println("try running `barman switch-wal --archive --force pg` or wait for the next WAL")
+	} else {
+		log.Println("successfully switched WAL files to start barman")
+	}
+
+	cronCommand := exec.Command("barman", "cron")
+	if _, err := cronCommand.Output(); err != nil {
+		log.Println(fmt.Errorf("failed running barman cron: %s", err))
+		log.Println("try running `cronCommand` or wait for the next run")
+	} else {
+		log.Println("successfully ran `barman cron`")
+	}
+
 	return nil
 }
 
