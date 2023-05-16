@@ -3,7 +3,6 @@ package flybarman
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
