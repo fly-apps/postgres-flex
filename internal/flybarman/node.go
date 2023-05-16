@@ -93,7 +93,7 @@ retention_policy = RECOVERY WINDOW OF 7 days
 wal_retention_policy = main
 `, n.AppName, n.AppName)
 
-		if err := ioutil.WriteFile(barmanConfigFile, []byte(barmanConfigFileContent), 0644); err != nil {
+		if err := os.WriteFile(barmanConfigFile, []byte(barmanConfigFileContent), 0644); err != nil {
 			return fmt.Errorf("failed write %s: %s", barmanConfigFile, err)
 		}
 
@@ -124,7 +124,7 @@ wal_retention_policy = main
 	if _, err := os.Stat(barmanCronFile); os.IsNotExist(err) {
 		barmanCronFileContent := `* * * * * /usr/bin/barman cron
 `
-		if err := ioutil.WriteFile(barmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
+		if err := os.WriteFile(barmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
 			return fmt.Errorf("failed write %s: %s", barmanCronFile, err)
 		}
 
