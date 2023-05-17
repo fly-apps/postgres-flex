@@ -11,7 +11,7 @@ import (
 )
 
 func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
-	cmd := exec.Command("cat", "/Users/lubien/workspace/postgres-flex/test.txt")
+	cmd := exec.Command("barman", "check", "pg")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
