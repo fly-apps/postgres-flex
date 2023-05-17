@@ -8,6 +8,7 @@ import (
 const (
 	privateKeyFile = "/data/.ssh/id_rsa"
 	publicKeyFile  = "/data/.ssh/id_rsa-cert.pub"
+	sshConfigFile  = "/data/.ssh/config"
 )
 
 func WriteSSHKey() error {
