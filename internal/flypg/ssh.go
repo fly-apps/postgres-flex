@@ -24,6 +24,10 @@ func WriteSSHKey() error {
 		return fmt.Errorf("failed to write cert: %s", err)
 	}
 
+	if err := writeSshConfig(); err != nil {
+		return fmt.Errorf("failed to write .ssh/config: %s", err)
+	}
+
 	if err := os.Chmod(privateKeyFile, 0600); err != nil {
 		return fmt.Errorf("failed to chmod private key file: %s", err)
 	}
@@ -62,6 +66,28 @@ func writePublicKey() error {
 	defer func() { _ = file.Close() }()
 
 	_, err = file.Write([]byte(cert))
+	if err != nil {
+		return fmt.Errorf("failed to write contents to pub key: %s", err)
+	}
+
+	return file.Sync()
+}
+
+func writeSshConfig() error {
+	appName := os.Getenv("FLY_APP_NAME")
+
+	file, err := os.Create(sshConfigFile)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	content := fmt.Sprintf(`Match exec "nslookup '%%h.vm.%s.internal' | awk '/^Address: / { print $2 }' | grep ."
+	HostName %%h.vm.%s.internal
+	StrictHostKeyChecking no
+	UserKnownHostsFile=/dev/null
+`, appName, appName)
+
+	_, err = file.Write([]byte(content))
 	if err != nil {
 		return fmt.Errorf("failed to write contents to pub key: %s", err)
 	}

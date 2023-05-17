@@ -14,7 +14,6 @@ import (
 var dataDir = "/data"
 var barmanConfigFile = dataDir + "/barman.conf"
 var barmanCronFile = dataDir + "/barman.cron"
-
 var globalBarmanConfigFile = "/etc/barman.conf"
 
 type Node struct {
@@ -107,7 +106,13 @@ wal_retention_policy = main
 		return fmt.Errorf("failed symlink %s to %s: %s", barmanConfigFile, globalBarmanConfigFile, err)
 	}
 
-	log.Println("Symbolic link created successfully.")
+	log.Println("Symbolic link to barman config created successfully.")
+
+	if err := os.Symlink("/data/.ssh", "/root/.ssh"); err != nil {
+		return fmt.Errorf("failed symlink /data/.ssh to /root/.ssh: %s", err)
+	}
+
+	log.Println("Symbolic link to .ssh config created successfully.")
 
 	if err := os.MkdirAll(n.BarmanHome, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to mkdir %s: %s", n.BarmanHome, err)
