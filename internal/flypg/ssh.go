@@ -3,6 +3,7 @@ package flypg
 import (
 	"fmt"
 	"os"
+	"os/exec"
 )
 
 const (
@@ -35,6 +36,11 @@ func WriteSSHKey() error {
 
 	if err := os.Chmod(publicKeyFile, 0600); err != nil {
 		return fmt.Errorf("failed to chmod private key file: %s", err)
+	}
+
+	copySshToRootCommand := exec.Command("cp", "-r", "/data/.ssh", "/root/.ssh")
+	if _, err := copySshToRootCommand.Output(); err != nil {
+		return fmt.Errorf("failed symlink /data/.ssh to /root/.ssh: %s", err)
 	}
 
 	return nil

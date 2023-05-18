@@ -108,12 +108,6 @@ wal_retention_policy = main
 
 	log.Println("Symbolic link to barman config created successfully.")
 
-	if err := os.Symlink("/data/.ssh", "/root/.ssh"); err != nil {
-		return fmt.Errorf("failed symlink /data/.ssh to /root/.ssh: %s", err)
-	}
-
-	log.Println("Symbolic link to .ssh config created successfully.")
-
 	if err := os.MkdirAll(n.BarmanHome, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to mkdir %s: %s", n.BarmanHome, err)
 	}
