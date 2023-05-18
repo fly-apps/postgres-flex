@@ -184,6 +184,13 @@ func (r *RepMgr) setDefaults() error {
 		conf["priority"] = "0"
 	}
 
+	barmanMachineId := os.Getenv("BARMAN_MACHINE_ID")
+	if barmanMachineId != "" {
+		conf["barman_host"] = fmt.Sprintf("'root@%s'", barmanMachineId)
+		conf["barman_server"] = "'pg'"
+		conf["restore_command"] = fmt.Sprintf("'/usr/bin/barman-wal-restore -P -U root %s pg %%f %%p'", barmanMachineId)
+	}
+
 	r.internalConfig = conf
 
 	return nil
