@@ -65,7 +65,7 @@ func NewNode() (*Node, error) {
 	return node, nil
 }
 
-func (n *Node) Init(ctx context.Context) error {
+func (n *Node) Init(_ context.Context) error {
 	err := flypg.WriteSSHKey()
 	if err != nil {
 		return fmt.Errorf("failed write ssh keys: %s", err)
