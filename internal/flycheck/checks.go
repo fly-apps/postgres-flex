@@ -21,12 +21,11 @@ func Handler() http.Handler {
 		r.HandleFunc("/flycheck/vm", runVMChecks)
 		r.HandleFunc("/flycheck/connection", runBarmanConnectionChecks)
 		r.HandleFunc("/flycheck/role", runBarmanRoleCheck)
-		return r
+	} else {
+		r.HandleFunc("/flycheck/vm", runVMChecks)
+		r.HandleFunc("/flycheck/pg", runPGChecks)
+		r.HandleFunc("/flycheck/role", runRoleCheck)
 	}
-
-	r.HandleFunc("/flycheck/vm", runVMChecks)
-	r.HandleFunc("/flycheck/pg", runPGChecks)
-	r.HandleFunc("/flycheck/role", runRoleCheck)
 
 	return r
 }
