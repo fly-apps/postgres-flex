@@ -15,7 +15,7 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		checks.AddCheck("connection", func() (string, error) {
-			msg := "Failed running `barman check pg`"
+			msg := "failed running `barman check pg`"
 			return "", errors.New(msg)
 		})
 
