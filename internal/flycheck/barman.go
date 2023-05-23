@@ -2,7 +2,6 @@ package flycheck
 
 import (
 	"errors"
-	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -16,7 +15,7 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		checks.AddCheck("connection", func() (string, error) {
-			msg := fmt.Sprintf("Failed running `barman check pg`")
+			msg := "Failed running `barman check pg`"
 			return "", errors.New(msg)
 		})
 
