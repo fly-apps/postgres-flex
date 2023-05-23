@@ -23,6 +23,9 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 		return checks
 	}
 
+	// Each line besides the first represents a check and will include FAILED or OK
+	// We just separate those lines and create a health check entry of our own
+	// so it's uniform how we handle it
 	lines := strings.Split(string(output), "\n")
 
 	for _, line := range lines {
