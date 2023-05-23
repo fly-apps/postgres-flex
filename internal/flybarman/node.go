@@ -138,7 +138,7 @@ wal_retention_policy = main
 		if err != nil {
 			return fmt.Errorf("failed to touch %s: %s", n.LogFile, err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		log.Println(n.LogFile + " created successfully.")
 	}
