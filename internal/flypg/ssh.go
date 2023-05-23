@@ -26,7 +26,7 @@ func WriteSSHKey() error {
 		return fmt.Errorf("failed to write cert: %s", err)
 	}
 
-	if err := writeSshConfig(); err != nil {
+	if err := writeSSHConfig(); err != nil {
 		return fmt.Errorf("failed to write .ssh/config: %s", err)
 	}
 
@@ -80,7 +80,7 @@ func writePublicKey() error {
 	return file.Sync()
 }
 
-func writeSshConfig() error {
+func writeSSHConfig() error {
 	appName := os.Getenv("FLY_APP_NAME")
 
 	file, err := os.Create(sshConfigFile)
