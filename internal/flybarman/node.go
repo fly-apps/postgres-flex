@@ -19,6 +19,7 @@ var (
 	barmanHome             = dataDir + "/barman.d"
 	logFile                = dataDir + "/barman.log"
 	passwordConfigPath     = "/root/.pgpass"
+	rootPasswordConfigPath = "/.pgpass"
 )
 
 type Node struct {
@@ -34,6 +35,7 @@ type Node struct {
 	BarmanHome             string
 	LogFile                string
 	PasswordConfigPath     string
+	RootPasswordConfigPath string
 
 	SUCredentials       admin.Credential
 	OperatorCredentials admin.Credential
@@ -49,6 +51,7 @@ func NewNode() (*Node, error) {
 		BarmanHome:             barmanHome,
 		LogFile:                logFile,
 		PasswordConfigPath:     passwordConfigPath,
+		RootPasswordConfigPath: rootPasswordConfigPath,
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -132,8 +135,8 @@ wal_retention_policy = main
 		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
 	}
 	// We need this in case the user ssh to the vm as root
-	if err := os.WriteFile(n.PasswordConfigPath, []byte(passStr), 0700); err != nil {
-		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
+	if err := os.WriteFile(n.RootPasswordConfigPath, []byte(passStr), 0700); err != nil {
+		return fmt.Errorf("failed to write file %s: %s", n.RootPasswordConfigPath, err)
 	}
 
 	if _, err := os.Stat(n.BarmanCronFile); os.IsNotExist(err) {

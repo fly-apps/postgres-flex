@@ -18,6 +18,7 @@ var (
 	barmanTestBarmanHome             = barmanTestDirectory + "/barman.d"
 	barmanTestLogFile                = barmanTestDirectory + "/barman.log"
 	barmanTestPasswordConfigPath     = barmanTestDirectory + "/.pgpass"
+	barmanTestRootPasswordConfigPath = barmanTestDirectory + "/.pgpassroot"
 )
 
 func TestBarmanInitialization(t *testing.T) {
@@ -34,6 +35,7 @@ func TestBarmanInitialization(t *testing.T) {
 		BarmanHome:             barmanTestBarmanHome,
 		LogFile:                barmanTestLogFile,
 		PasswordConfigPath:     barmanTestPasswordConfigPath,
+		RootPasswordConfigPath: barmanTestRootPasswordConfigPath,
 		ReplCredentials: admin.Credential{
 			Username: "user",
 			Password: "password",
@@ -84,6 +86,18 @@ func TestBarmanInitialization(t *testing.T) {
 		expectedPwd := fmt.Sprintf("*:*:*:%s:%s", node.ReplCredentials.Username, node.ReplCredentials.Password)
 		if string(pwd) != expectedPwd {
 			t.Fatalf("expected %s to contain %s, but got %s", node.PasswordConfigPath, expectedPwd, string(pwd))
+		}
+	})
+
+	t.Run(".pgpass for root", func(t *testing.T) {
+		pwd, err := os.ReadFile(node.RootPasswordConfigPath)
+		if err != nil {
+			t.Error(err)
+		}
+
+		expectedPwd := fmt.Sprintf("*:*:*:%s:%s", node.ReplCredentials.Username, node.ReplCredentials.Password)
+		if string(pwd) != expectedPwd {
+			t.Fatalf("expected %s to contain %s, but got %s", node.RootPasswordConfigPath, expectedPwd, string(pwd))
 		}
 	})
 }
