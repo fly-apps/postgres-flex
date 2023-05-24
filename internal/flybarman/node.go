@@ -28,9 +28,12 @@ type Node struct {
 	DataDir       string
 	Port          int
 
-	BarmanHome         string
-	LogFile            string
-	PasswordConfigPath string
+	BarmanConfigFile       string
+	BarmanCronFile         string
+	GlobalBarmanConfigFile string
+	BarmanHome             string
+	LogFile                string
+	PasswordConfigPath     string
 
 	SUCredentials       admin.Credential
 	OperatorCredentials admin.Credential
@@ -39,10 +42,13 @@ type Node struct {
 
 func NewNode() (*Node, error) {
 	node := &Node{
-		AppName:            "local",
-		BarmanHome:         barmanHome,
-		LogFile:            logFile,
-		PasswordConfigPath: passwordConfigPath,
+		AppName:                "local",
+		BarmanConfigFile:       barmanConfigFile,
+		BarmanCronFile:         barmanCronFile,
+		GlobalBarmanConfigFile: globalBarmanConfigFile,
+		BarmanHome:             barmanHome,
+		LogFile:                logFile,
+		PasswordConfigPath:     passwordConfigPath,
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
@@ -71,12 +77,14 @@ func NewNode() (*Node, error) {
 }
 
 func (n *Node) Init(_ context.Context) error {
-	err := flypg.WriteSSHKey()
-	if err != nil {
-		return fmt.Errorf("failed write ssh keys: %s", err)
+	if os.Getenv("UNIT_TESTING") == "" {
+		err := flypg.WriteSSHKey()
+		if err != nil {
+			return fmt.Errorf("failed write ssh keys: %s", err)
+		}
 	}
 
-	if _, err := os.Stat(barmanConfigFile); os.IsNotExist(err) {
+	if _, err := os.Stat(n.BarmanConfigFile); os.IsNotExist(err) {
 		barmanConfigFileContent := fmt.Sprintf(`[barman]
 barman_user = root
 barman_home = /data/barman.d
@@ -96,19 +104,19 @@ retention_policy = RECOVERY WINDOW OF 7 days
 wal_retention_policy = main
 `, n.AppName, n.AppName)
 
-		if err := os.WriteFile(barmanConfigFile, []byte(barmanConfigFileContent), 0644); err != nil {
-			return fmt.Errorf("failed write %s: %s", barmanConfigFile, err)
+		if err := os.WriteFile(n.BarmanConfigFile, []byte(barmanConfigFileContent), 0644); err != nil {
+			return fmt.Errorf("failed write %s: %s", n.BarmanConfigFile, err)
 		}
 
-		log.Println(barmanConfigFile + " created successfully.")
+		log.Println(n.BarmanConfigFile + " created successfully.")
 	}
 
-	if err := deleteGlobalBarmanFile(); err != nil {
+	if err := n.deleteGlobalBarmanFile(); err != nil {
 		return fmt.Errorf("failed delete /etc/barman.conf: %s", err)
 	}
 
-	if err := os.Symlink(barmanConfigFile, globalBarmanConfigFile); err != nil {
-		return fmt.Errorf("failed symlink %s to %s: %s", barmanConfigFile, globalBarmanConfigFile, err)
+	if err := os.Symlink(n.BarmanConfigFile, n.GlobalBarmanConfigFile); err != nil {
+		return fmt.Errorf("failed symlink %s to %s: %s", n.BarmanConfigFile, n.GlobalBarmanConfigFile, err)
 	}
 
 	log.Println("Symbolic link to barman config created successfully.")
@@ -124,18 +132,18 @@ wal_retention_policy = main
 		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
 	}
 	// We need this in case the user ssh to the vm as root
-	if err := os.WriteFile("/.pgpass", []byte(passStr), 0700); err != nil {
+	if err := os.WriteFile(n.PasswordConfigPath, []byte(passStr), 0700); err != nil {
 		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
 	}
 
-	if _, err := os.Stat(barmanCronFile); os.IsNotExist(err) {
+	if _, err := os.Stat(n.BarmanCronFile); os.IsNotExist(err) {
 		barmanCronFileContent := `* * * * * /usr/bin/barman cron
 `
-		if err := os.WriteFile(barmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
-			return fmt.Errorf("failed write %s: %s", barmanCronFile, err)
+		if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
+			return fmt.Errorf("failed write %s: %s", n.BarmanCronFile, err)
 		}
 
-		log.Println(barmanCronFile + " created successfully.")
+		log.Println(n.BarmanCronFile + " created successfully.")
 	}
 
 	if _, err := os.Stat(n.LogFile); os.IsNotExist(err) {
@@ -148,52 +156,54 @@ wal_retention_policy = main
 		log.Println(n.LogFile + " created successfully.")
 	}
 
-	crontabCommand := exec.Command("/usr/bin/crontab", barmanCronFile)
-	if _, err := crontabCommand.Output(); err != nil {
-		return fmt.Errorf("failed set crontab: %s", err)
-	}
-
-	log.Println("Crontab updated")
-
-	serviceCmd := exec.Command("/usr/sbin/service", "--version")
-	if err := serviceCmd.Run(); err != nil {
-		log.Println("service command not found, skipping initializing cron service")
-	} else {
-		serviceCronStartCommand := exec.Command("service", "cron", "start")
-		if _, err := serviceCronStartCommand.Output(); err != nil {
-			return fmt.Errorf("failed starting cron service: %s", err)
+	if os.Getenv("UNIT_TESTING") == "" {
+		crontabCommand := exec.Command("/usr/bin/crontab", n.BarmanCronFile)
+		if _, err := crontabCommand.Output(); err != nil {
+			return fmt.Errorf("failed set crontab: %s", err)
 		}
-		log.Println("Started cron service")
-	}
 
-	switchWalCommand := exec.Command("barman", "switch-wal", "--archive", "--force", "pg")
-	if _, err := switchWalCommand.Output(); err != nil {
-		log.Println(fmt.Errorf("failed switching WAL: %s", err))
-		log.Println("try running `barman switch-wal --archive --force pg` or wait for the next WAL")
-	} else {
-		log.Println("successfully switched WAL files to start barman")
-	}
+		log.Println("Crontab updated")
 
-	cronCommand := exec.Command("barman", "cron")
-	if _, err := cronCommand.Output(); err != nil {
-		log.Println(fmt.Errorf("failed running barman cron: %s", err))
-		log.Println("try running `cronCommand` or wait for the next run")
-	} else {
-		log.Println("successfully ran `barman cron`")
+		serviceCmd := exec.Command("/usr/sbin/service", "--version")
+		if err := serviceCmd.Run(); err != nil {
+			log.Println("service command not found, skipping initializing cron service")
+		} else {
+			serviceCronStartCommand := exec.Command("service", "cron", "start")
+			if _, err := serviceCronStartCommand.Output(); err != nil {
+				return fmt.Errorf("failed starting cron service: %s", err)
+			}
+			log.Println("Started cron service")
+		}
+
+		switchWalCommand := exec.Command("barman", "switch-wal", "--archive", "--force", "pg")
+		if _, err := switchWalCommand.Output(); err != nil {
+			log.Println(fmt.Errorf("failed switching WAL: %s", err))
+			log.Println("try running `barman switch-wal --archive --force pg` or wait for the next WAL")
+		} else {
+			log.Println("successfully switched WAL files to start barman")
+		}
+
+		cronCommand := exec.Command("barman", "cron")
+		if _, err := cronCommand.Output(); err != nil {
+			log.Println(fmt.Errorf("failed running barman cron: %s", err))
+			log.Println("try running `cronCommand` or wait for the next run")
+		} else {
+			log.Println("successfully ran `barman cron`")
+		}
 	}
 
 	return nil
 }
 
-func deleteGlobalBarmanFile() error {
-	if _, err := os.Stat(globalBarmanConfigFile); os.IsNotExist(err) {
+func (n *Node) deleteGlobalBarmanFile() error {
+	if _, err := os.Stat(n.GlobalBarmanConfigFile); os.IsNotExist(err) {
 		return nil
 	}
 
-	if err := os.Remove(globalBarmanConfigFile); err != nil {
+	if err := os.Remove(n.GlobalBarmanConfigFile); err != nil {
 		return err
 	}
 
-	log.Println(globalBarmanConfigFile + " deleted successfully")
+	log.Println(n.GlobalBarmanConfigFile + " deleted successfully")
 	return nil
 }
