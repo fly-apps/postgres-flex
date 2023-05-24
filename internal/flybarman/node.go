@@ -11,10 +11,15 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 )
 
-var dataDir = "/data"
-var barmanConfigFile = dataDir + "/barman.conf"
-var barmanCronFile = dataDir + "/barman.cron"
-var globalBarmanConfigFile = "/etc/barman.conf"
+var (
+	dataDir                = "/data"
+	barmanConfigFile       = dataDir + "/barman.conf"
+	barmanCronFile         = dataDir + "/barman.cron"
+	globalBarmanConfigFile = "/etc/barman.conf"
+	barmanHome             = dataDir + "/barman.d"
+	logFile                = dataDir + "/barman.log"
+	passwordConfigPath     = "/root/.pgpass"
+)
 
 type Node struct {
 	AppName       string
@@ -35,9 +40,9 @@ type Node struct {
 func NewNode() (*Node, error) {
 	node := &Node{
 		AppName:            "local",
-		BarmanHome:         dataDir + "/barman.d",
-		LogFile:            dataDir + "/barman.log",
-		PasswordConfigPath: "/root/.pgpass",
+		BarmanHome:         barmanHome,
+		LogFile:            logFile,
+		PasswordConfigPath: passwordConfigPath,
 	}
 
 	if appName := os.Getenv("FLY_APP_NAME"); appName != "" {
