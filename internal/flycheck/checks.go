@@ -17,15 +17,15 @@ const Port = 5500
 func Handler() http.Handler {
 	r := http.NewServeMux()
 
+	r.HandleFunc("/flycheck/vm", runVMChecks)
+
 	if os.Getenv("IS_BARMAN") != "" {
-		r.HandleFunc("/flycheck/vm", runVMChecks)
 		r.HandleFunc("/flycheck/connection", runBarmanConnectionChecks)
-		r.HandleFunc("/flycheck/role", runBarmanRoleCheck)
 	} else {
-		r.HandleFunc("/flycheck/vm", runVMChecks)
 		r.HandleFunc("/flycheck/pg", runPGChecks)
-		r.HandleFunc("/flycheck/role", runRoleCheck)
 	}
+
+	r.HandleFunc("/flycheck/role", runRoleCheck)
 
 	return r
 }
@@ -104,25 +104,6 @@ func runBarmanConnectionChecks(w http.ResponseWriter, r *http.Request) {
 	<-ctx.Done()
 
 	handleCheckResponse(w, suite, false)
-}
-
-func runBarmanRoleCheck(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), (time.Second * 5))
-	defer cancel()
-
-	suite := &check.CheckSuite{Name: "Role"}
-	suite.AddCheck("role", func() (string, error) {
-		return "barman", nil
-	})
-
-	go func() {
-		suite.Process(ctx)
-		cancel()
-	}()
-
-	<-ctx.Done()
-
-	handleCheckResponse(w, suite, true)
 }
 
 func handleCheckResponse(w http.ResponseWriter, suite *check.CheckSuite, raw bool) {
