@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fly-apps/postgres-flex/internal/flybarman"
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/fly-apps/postgres-flex/internal/supervisor"
 )
@@ -20,6 +21,36 @@ func main() {
 		if _, exists := os.LookupEnv(str); !exists {
 			panic(fmt.Errorf("%s is required", str))
 		}
+	}
+
+	if os.Getenv("IS_BARMAN") != "" {
+		node, err := flybarman.NewNode()
+		if err != nil {
+			panicHandler(err)
+			return
+		}
+
+		ctx := context.Background()
+
+		if err = node.Init(ctx); err != nil {
+			panicHandler(err)
+			return
+		}
+
+		svisor := supervisor.New("flybarman", 1*time.Minute)
+		svisor.AddProcess("barman", fmt.Sprintf("tail -f %s", node.LogFile))
+		svisor.AddProcess("admin", "/usr/local/bin/start_admin_server",
+			supervisor.WithRestart(0, 5*time.Second),
+		)
+
+		svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
+
+		if err := svisor.Run(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		return
 	}
 
 	node, err := flypg.NewNode()

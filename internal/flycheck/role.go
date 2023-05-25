@@ -3,6 +3,7 @@ package flycheck
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/pkg/errors"
@@ -11,6 +12,14 @@ import (
 
 // PostgreSQLRole outputs current role
 func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
+	if os.Getenv("IS_BARMAN") != "" {
+		checks.AddCheck("role", func() (string, error) {
+			return "barman", nil
+		})
+
+		return checks, nil
+	}
+
 	node, err := flypg.NewNode()
 	if err != nil {
 		return checks, fmt.Errorf("failed to initialize node: %s", err)

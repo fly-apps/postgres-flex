@@ -144,7 +144,7 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	err := writeSSHKey()
+	err := WriteSSHKey()
 	if err != nil {
 		return fmt.Errorf("failed write ssh keys: %s", err)
 	}

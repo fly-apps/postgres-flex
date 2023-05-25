@@ -475,7 +475,7 @@ func (c *PGConfig) setDefaultHBA() error {
 		},
 		{
 			Type:     "host",
-			Database: c.repmgrDatabase,
+			Database: fmt.Sprintf("replication,%s", c.repmgrDatabase),
 			User:     c.repmgrUsername,
 			Address:  "fdaa::/16",
 			Method:   "trust",

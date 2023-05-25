@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/superfly/fly-checks/check"
@@ -17,7 +18,13 @@ func Handler() http.Handler {
 	r := http.NewServeMux()
 
 	r.HandleFunc("/flycheck/vm", runVMChecks)
-	r.HandleFunc("/flycheck/pg", runPGChecks)
+
+	if os.Getenv("IS_BARMAN") != "" {
+		r.HandleFunc("/flycheck/connection", runBarmanConnectionChecks)
+	} else {
+		r.HandleFunc("/flycheck/pg", runPGChecks)
+	}
+
 	r.HandleFunc("/flycheck/role", runRoleCheck)
 
 	return r
@@ -80,6 +87,23 @@ func runRoleCheck(w http.ResponseWriter, r *http.Request) {
 	<-ctx.Done()
 
 	handleCheckResponse(w, suite, true)
+}
+
+func runBarmanConnectionChecks(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), (5 * time.Second))
+	defer cancel()
+
+	suite := &check.CheckSuite{Name: "Connection"}
+	suite = CheckBarmanConnection(suite)
+
+	go func(ctx context.Context) {
+		suite.Process(ctx)
+		cancel()
+	}(ctx)
+
+	<-ctx.Done()
+
+	handleCheckResponse(w, suite, false)
 }
 
 func handleCheckResponse(w http.ResponseWriter, suite *check.CheckSuite, raw bool) {
