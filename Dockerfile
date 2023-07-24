@@ -22,7 +22,7 @@ ENV PGDATA=/data/postgresql
 ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG POSTGIS_MAJOR=3
-ARG HAPROXY_VERSION=2.7
+ARG HAPROXY_VERSION=2.8
 
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
@@ -40,11 +40,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 # Haproxy
 RUN curl https://haproxy.debian.net/bernat.debian.org.gpg \
-      | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
+    | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
 
 RUN echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-      http://haproxy.debian.net bullseye-backports-${HAPROXY_VERSION} main \
-      > /etc/apt/sources.list.d/haproxy.list
+    http://haproxy.debian.net bookworm-backports-${HAPROXY_VERSION} main \
+    > /etc/apt/sources.list.d/haproxy.list
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     haproxy=$HAPROXY_VERSION.\* \
