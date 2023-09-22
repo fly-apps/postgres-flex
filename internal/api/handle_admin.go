@@ -84,7 +84,7 @@ func handleRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := localConnection(r.Context(), "postgres")
+	conn, err := localConnection(r.Context(), "repmgr")
 	if err != nil {
 		renderErr(w, err)
 		return
