@@ -1,8 +1,8 @@
-ARG PG_VERSION=15.6
-ARG PG_MAJOR_VERSION=15
+ARG PG_VERSION=16.2
+ARG PG_MAJOR_VERSION=16
 ARG VERSION=custom
 
-FROM golang:1.20
+FROM golang:1.21
 
 WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .
@@ -43,19 +43,19 @@ RUN apt-get update && \
 
 # PostGIS
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    postgresql-$PG_MAJOR-postgis-$POSTGIS_MAJOR \
-    postgresql-$PG_MAJOR-postgis-$POSTGIS_MAJOR-scripts
+    postgresql-${PG_MAJOR}-postgis-${POSTGIS_MAJOR} \
+    postgresql-${PG_MAJOR}-postgis-${POSTGIS_MAJOR}-scripts
 
 # Haproxy
 RUN curl https://haproxy.debian.net/bernat.debian.org.gpg \
     | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
 
 RUN echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-    http://haproxy.debian.net bookworm-backports-${HAPROXY_VERSION} main \
+    http://haproxy.debian.net $(. /etc/os-release && echo "$VERSION_CODENAME")-backports-${HAPROXY_VERSION} main \
     > /etc/apt/sources.list.d/haproxy.list
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    haproxy=$HAPROXY_VERSION.\* \
+    haproxy=${HAPROXY_VERSION}.\* \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
