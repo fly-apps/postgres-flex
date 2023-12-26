@@ -1,8 +1,8 @@
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/fly-apps/postgres-flex)
-[![DeepSource](https://deepsource.io/gh/fly-apps/postgres-flex.svg/?label=active+issues&token=VOdkBvMAf90cLzNVB3k0WpJC)](https://deepsource.io/gh/fly-apps/postgres-flex/?ref=repository-badge)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/GRoguelon/postgres-flex)
+[![DeepSource](https://deepsource.io/gh/GRoguelon/postgres-flex.svg/?label=active+issues&token=VOdkBvMAf90cLzNVB3k0WpJC)](https://deepsource.io/gh/GRoguelon/postgres-flex/?ref=repository-badge)
 
 # High Availability Postgres on Fly.io
-This repo contains all the code and configuration necessary to run a [highly available Postgres cluster](https://fly.io/docs/postgres/) in a Fly.io organization's private network. This source is packaged into [Docker images](https://hub.docker.com/r/flyio/postgres-flex/tags) which allow you to track and upgrade versions cleanly as new features are added.
+This repo contains all the code and configuration necessary to run a [highly available Postgres cluster](https://fly.io/docs/postgres/) in a Fly.io organization's private network. This source is packaged into [Docker images](https://github.com/GRoguelon?ecosystem=container&tab=packages&visibility=public&tab=packages&ecosystem=container&visibility=public&q=postgres-flex) which allow you to track and upgrade versions cleanly as new features are added.
 
 
 ## Getting started
@@ -11,7 +11,7 @@ This repo contains all the code and configuration necessary to run a [highly ava
 fly version update
 
 # Provision a 3 member cluster
-fly pg create --name <app-name> --initial-cluster-size 3 --region ord --flex
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.1 --name <app-name> --initial-cluster-size 3 --region ord --flex
 ```
 
 ## High Availability
@@ -43,7 +43,7 @@ fly image update --app <app-name>
 We currently maintain a separate TimescaleDB-enabled image that you can specify at provision time.
 
 ```
-fly pg create  --image-ref flyio/postgres-flex-timescaledb:15
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.1
 ```
 
 ## Having trouble?

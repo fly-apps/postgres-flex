@@ -44,6 +44,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          labels: |
+            org.opencontainers.image.source="https://github.com/GRoguelon/postgres-flex"
           tags: |
             ghcr.io/groguelon/postgres-flex:16
             ghcr.io/groguelon/postgres-flex:16.1
@@ -59,6 +61,8 @@ jobs:
           context: .
           file: ./Dockerfile-timescaledb
           push: true
+          labels: |
+            org.opencontainers.image.source="https://github.com/GRoguelon/postgres-flex"
           tags: |
             ghcr.io/groguelon/postgres-flex-timescaledb:16
             ghcr.io/groguelon/postgres-flex-timescaledb:16.1
