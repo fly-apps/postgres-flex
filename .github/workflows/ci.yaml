@@ -45,8 +45,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/GRoguelon/postgres-flex:16
-            ghcr.io/GRoguelon/postgres-flex:16.1
+            ghcr.io/groguelon/postgres-flex:16
+            ghcr.io/groguelon/postgres-flex:16.1
       -
         name: Build and push Postgres 16 Timescale DB
         id: docker_build_16_timescaledb
@@ -60,8 +60,8 @@ jobs:
           file: ./Dockerfile-timescaledb
           push: true
           tags: |
-            ghcr.io/GRoguelon/postgres-flex-timescaledb:16
-            ghcr.io/GRoguelon/postgres-flex-timescaledb:16.1
+            ghcr.io/groguelon/postgres-flex-timescaledb:16
+            ghcr.io/groguelon/postgres-flex-timescaledb:16.1
       -
         name: Postgres 16 Image digest
         run: echo ${{ steps.docker_build_16.outputs.digest }}
