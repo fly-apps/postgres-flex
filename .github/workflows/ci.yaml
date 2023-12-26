@@ -20,10 +20,11 @@ jobs:
           version: v0.9.1
       -
         name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -44,8 +45,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            flyio/postgres-flex:16
-            flyio/postgres-flex:16.1
+            ghcr.io/GRoguelon/postgres-flex:16
+            ghcr.io/GRoguelon/postgres-flex:16.1
       -
         name: Build and push Postgres 16 Timescale DB
         id: docker_build_16_timescaledb
@@ -59,8 +60,8 @@ jobs:
           file: ./Dockerfile-timescaledb
           push: true
           tags: |
-            flyio/postgres-flex-timescaledb:16
-            flyio/postgres-flex-timescaledb:16.1
+            ghcr.io/GRoguelon/postgres-flex-timescaledb:16
+            ghcr.io/GRoguelon/postgres-flex-timescaledb:16.1
       -
         name: Postgres 16 Image digest
         run: echo ${{ steps.docker_build_16.outputs.digest }}
