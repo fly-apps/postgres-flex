@@ -38,7 +38,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=16.1
+            PG_VERSION=16.2
             PG_MAJOR_VERSION=16
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -48,14 +48,14 @@ jobs:
             org.opencontainers.image.source="https://github.com/GRoguelon/postgres-flex"
           tags: |
             ghcr.io/groguelon/postgres-flex:16
-            ghcr.io/groguelon/postgres-flex:16.1
+            ghcr.io/groguelon/postgres-flex:16.2
       -
         name: Build and push Postgres 16 Timescale DB
         id: docker_build_16_timescaledb
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=16.1
+            PG_VERSION=16.2
             PG_MAJOR_VERSION=16
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -65,7 +65,7 @@ jobs:
             org.opencontainers.image.source="https://github.com/GRoguelon/postgres-flex"
           tags: |
             ghcr.io/groguelon/postgres-flex-timescaledb:16
-            ghcr.io/groguelon/postgres-flex-timescaledb:16.1
+            ghcr.io/groguelon/postgres-flex-timescaledb:16.2
       -
         name: Postgres 16 Image digest
         run: echo ${{ steps.docker_build_16.outputs.digest }}

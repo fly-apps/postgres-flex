@@ -10,8 +10,11 @@ This repo contains all the code and configuration necessary to run a [highly ava
 # Be sure you're running the latest version of flyctl.
 fly version update
 
-# Provision a 3 member cluster
+# Provision a 3 member cluster with Pg 16.1
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.1 --name <app-name> --initial-cluster-size 3 --region ord --flex
+
+# Provision a 3 member cluster with Pg 16.2
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.2 --name <app-name> --initial-cluster-size 3 --region ord --flex
 ```
 
 ## High Availability
@@ -43,7 +46,11 @@ fly image update --app <app-name>
 We currently maintain a separate TimescaleDB-enabled image that you can specify at provision time.
 
 ```
+# With Pg 16.1
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.1
+
+# With Pg 16.2
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.2
 ```
 
 ## Having trouble?
