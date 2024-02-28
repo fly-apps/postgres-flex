@@ -31,8 +31,15 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim haproxy socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
+    ca-certificates iproute2 curl bash dnsutils vim haproxy socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
     && apt autoremove -y
+
+# Repmgr
+RUN curl -L https://launchpad.net/ubuntu/+archive/primary/+files/postgresql-${PG_MAJOR_VERSION}-repmgr_5.3.3-2_amd64.deb -o postgresql-${PG_MAJOR_VERSION}-repmgr_5.3.3-2_amd64.deb
+
+RUN apt-get update && \
+    apt-get install -y ./postgresql-${PG_MAJOR_VERSION}-repmgr_5.3.3-2_amd64.deb \
+    && rm ./postgresql-${PG_MAJOR_VERSION}-repmgr_5.3.3-2_amd64.deb
 
 RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(cat /etc/os-release | grep VERSION_CODENAME | cut -d'=' -f2) main" > /etc/apt/sources.list.d/timescaledb.list \
     && curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add -
