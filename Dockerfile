@@ -30,8 +30,15 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
+    ca-certificates wget iproute2 curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
     && apt autoremove -y
+
+# Repmgr
+RUN wget https://launchpad.net/ubuntu/+archive/primary/+files/postgresql-15-repmgr_5.3.3-2_amd64.deb
+
+RUN apt-get update && \
+    apt-get install -y ./postgresql-15-repmgr_5.3.3-2_amd64.deb \
+    && rm ./postgresql-15-repmgr_5.3.3-2_amd64.deb
 
 # PostGIS
 RUN apt-get update && apt-get install --no-install-recommends -y \
