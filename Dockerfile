@@ -19,6 +19,7 @@ COPY ./bin/* /fly/bin/
 FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/postgresql
+ENV PGPASSFILE=/data/.pgpass
 ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG POSTGIS_MAJOR=3
