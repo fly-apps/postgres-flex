@@ -124,6 +124,7 @@ func (r *RepMgr) initialize() error {
 	if err := os.WriteFile(r.PasswordConfigPath, []byte(passStr), 0600); err != nil {
 		return fmt.Errorf("failed to write file %s: %s", r.PasswordConfigPath, err)
 	}
+
 	if err := utils.SetFileOwnership(r.PasswordConfigPath, "postgres"); err != nil {
 		return fmt.Errorf("failed to set file ownership: %s", err)
 	}
@@ -178,6 +179,7 @@ func (r *RepMgr) setDefaults() error {
 		"priority":                     100,
 		"node_rejoin_timeout":          30,
 		"standby_reconnect_timeout":    30,
+		"passfile":                     fmt.Sprintf("'%s'", r.PasswordConfigPath),
 	}
 
 	if !r.eligiblePrimary() {
