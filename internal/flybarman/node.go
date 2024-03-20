@@ -18,7 +18,7 @@ var (
 	globalBarmanConfigFile = "/etc/barman.conf"
 	barmanHome             = dataDir + "/barman.d"
 	logFile                = dataDir + "/barman.log"
-	passwordConfigPath     = "/root/.pgpass"
+	passwordConfigPath     = "/data/.pgpass"
 	rootPasswordConfigPath = "/.pgpass"
 )
 
