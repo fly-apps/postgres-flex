@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"os/user"
@@ -17,7 +18,7 @@ func RunCommand(cmdStr, usr string) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Printf("> Running command as %s: %s\n", usr, cmdStr)
+	log.Printf("> Running command as %s: %s\n", usr, cmdStr)
 
 	cmd := exec.Command("sh", "-c", cmdStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
