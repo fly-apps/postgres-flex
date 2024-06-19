@@ -85,7 +85,7 @@ func clientConfig() (*api.Config, error) {
 
 	token, set := u.User.Password()
 	if !set {
-		return nil, fmt.Errorf("token not set")
+		return nil, fmt.Errorf("consul token not set")
 	}
 
 	u.User = nil
