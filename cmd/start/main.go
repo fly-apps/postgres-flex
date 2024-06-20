@@ -38,6 +38,7 @@ func main() {
 		}
 
 		svisor := supervisor.New("flybarman", 1*time.Minute)
+		svisor.AddProcess("cron", "/usr/sbin/cron -f", supervisor.WithRestart(0, 5*time.Second))
 		svisor.AddProcess("barman", fmt.Sprintf("tail -f %s", node.LogFile))
 		svisor.AddProcess("admin", "/usr/local/bin/start_admin_server",
 			supervisor.WithRestart(0, 5*time.Second),
