@@ -140,7 +140,7 @@ wal_retention_policy = main
 	}
 
 	if _, err := os.Stat(n.BarmanCronFile); os.IsNotExist(err) {
-		barmanCronFileContent := `* * * * * . $HOME/.profile; /usr/bin/barman cron >> /proc/1/fd/1 2>/proc/1/fd/2
+		barmanCronFileContent := `* * * * * /usr/local/bin/barman_cron
 `
 		if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
 			return fmt.Errorf("failed write %s: %s", n.BarmanCronFile, err)
