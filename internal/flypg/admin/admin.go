@@ -2,7 +2,10 @@ package admin
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"log"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -427,4 +430,110 @@ func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[strin
 	}
 
 	return nil
+}
+
+func fixCollationMismatch(ctx context.Context, db *sql.DB) error {
+	query := `
+    SELECT pg_describe_object(refclassid, refobjid, refobjsubid) AS "Collation",
+           pg_describe_object(classid, objid, objsubid) AS "Object"
+    FROM pg_depend d JOIN pg_collation c
+         ON refclassid = 'pg_collation'::regclass AND refobjid = c.oid
+    WHERE c.collversion <> pg_collation_actual_version(c.oid)
+    ORDER BY 1, 2;`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return fmt.Errorf("failed to query collation mismatches: %v", err)
+	}
+	defer rows.Close()
+
+	var collation, object string
+	for rows.Next() {
+		if err := rows.Scan(&collation, &object); err != nil {
+			return fmt.Errorf("failed to scan row: %v", err)
+		}
+
+		fixObject(db, object)
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate over rows: %v", err)
+	}
+
+	return nil
+}
+
+func fixObject(db *sql.DB, object string) {
+	fmt.Printf("Fixing object: %s\n", object)
+
+	switch {
+	case regexp.MustCompile(`index`).MatchString(object):
+		// reindex(db, object)
+	case regexp.MustCompile(`column`).MatchString(object):
+		// alterColumn(db, object)
+	case regexp.MustCompile(`constraint`).MatchString(object):
+		// dropAndRecreateConstraint(db, object)
+	case regexp.MustCompile(`materialized view`).MatchString(object):
+		// refreshMaterializedView(db, object)
+	case regexp.MustCompile(`function`).MatchString(object):
+		// recreateFunction(db, object)
+	case regexp.MustCompile(`view`).MatchString(object):
+		// recreateView(db, object)
+	case regexp.MustCompile(`trigger`).MatchString(object):
+		// recreateTrigger(db, object)
+	default:
+		log.Printf("Unknown object type: %s", object)
+	}
+}
+
+const refreshCollationSQL = `
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT datname FROM pg_database WHERE datallowconn = true)
+    LOOP
+        BEGIN
+            EXECUTE 'ALTER DATABASE ' || quote_ident(r.datname) || ' REFRESH COLLATION VERSION;';
+        EXCEPTION
+            WHEN OTHERS THEN
+                RAISE NOTICE 'Failed to refresh collation for database: % - %', r.datname, SQLERRM;
+        END;
+    END LOOP;
+END $$;`
+
+// RefreshCollationVersion will refresh the collation version for all databases.
+func RefreshCollationVersion(ctx context.Context, conn *pgx.Conn) error {
+	_, err := conn.Exec(ctx, refreshCollationSQL)
+	return err
+}
+
+const identifyCollationObjectsSQL = `
+SELECT pg_describe_object(refclassid, refobjid, refobjsubid) AS "Collation",
+       pg_describe_object(classid, objid, objsubid) AS "Object"
+  FROM pg_depend d JOIN pg_collation c
+       ON refclassid = 'pg_collation'::regclass AND refobjid = c.oid
+  WHERE c.collversion <> pg_collation_actual_version(c.oid)
+  ORDER BY 1, 2;`
+
+const reIndexSQL = `
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT n.nspname, i.relname
+              FROM pg_index x
+              JOIN pg_class c ON c.oid = x.indrelid
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              JOIN pg_class i ON i.oid = x.indexrelid
+              JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(x.indkey)
+              JOIN pg_collation col ON col.oid = a.attcollation
+              WHERE col.collname = 'en_US.utf8') LOOP
+        EXECUTE 'REINDEX INDEX ' || quote_ident(r.nspname) || '.' || quote_ident(r.relname);
+    END LOOP;
+END $$;`
+
+func ReIndex(ctx context.Context, conn *pgx.Conn) error {
+	_, err := conn.Exec(ctx, reIndexSQL)
+	return err
 }

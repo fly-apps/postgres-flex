@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -19,7 +21,18 @@ func RunCommand(cmdStr, usr string) ([]byte, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
 
-	return cmd.Output()
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+
+	err = cmd.Run()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			ee.Stderr = stderrBuf.Bytes()
+		}
+	}
+
+	return stdoutBuf.Bytes(), err
 }
 
 func SetFileOwnership(pathToFile, owner string) error {

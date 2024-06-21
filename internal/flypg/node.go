@@ -305,6 +305,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to unset read-only: %s", err)
 				}
 			}
+
+			// Refresh collation for all databases.
+			if err := refreshCollation(ctx, conn); err != nil {
+				log.Printf("failed to refresh collation: %s", err)
+			}
+
 		case StandbyRoleName:
 			// Register existing standby to apply any configuration changes.
 			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
@@ -381,18 +387,18 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		} else {
+			// Create required users
+			if err := n.setupCredentials(ctx, conn); err != nil {
+				return fmt.Errorf("failed to create required users: %s", err)
+			}
+
+			// Setup repmgr database and extension
+			if err := n.RepMgr.enable(ctx, conn); err != nil {
+				return fmt.Errorf("failed to enable repmgr: %s", err)
+			}
+
 			if n.RepMgr.Witness {
 				log.Println("Registering witness")
-
-				// Create required users
-				if err := n.setupCredentials(ctx, conn); err != nil {
-					return fmt.Errorf("failed to create required users: %s", err)
-				}
-
-				// Setup repmgr database and extension
-				if err := n.RepMgr.enable(ctx, conn); err != nil {
-					return fmt.Errorf("failed to enable repmgr: %s", err)
-				}
 
 				primary, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 				if err != nil {
@@ -467,6 +473,34 @@ func setDirOwnership() error {
 	cmd := exec.Command("sh", "-c", cmdStr)
 	if _, err = cmd.Output(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (n *Node) fixCollationMismatch(ctx context.Context, conn *pgx.Conn) error {
+	dbs, err := admin.ListDatabases(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to list databases: %s", err)
+	}
+
+	// Add the template1 database to the list of databases to refresh.
+	dbs = append(dbs, admin.DbInfo{Name: "template1"})
+
+	for _, db := range dbs {
+		dbConn, err := n.NewLocalConnection(ctx, db.Name, n.SUCredentials)
+		if err != nil {
+			return fmt.Errorf("failed to establish connection to local node: %s", err)
+		}
+		defer func() { _ = dbConn.Close(ctx) }()
+
+		if err := admin.RefreshCollationVersion(ctx, dbConn); err != nil {
+			return fmt.Errorf("failed to refresh collation: %s", err)
+		}
+
+		if err := admin.ReIndex(ctx, dbConn); err != nil {
+			return fmt.Errorf("failed to reindex database: %s", err)
+		}
 	}
 
 	return nil

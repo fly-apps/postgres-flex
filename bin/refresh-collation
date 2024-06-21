@@ -1,0 +1,18 @@
+#!/bin/bash
+
+psql postgres://postgres:$OPERATOR_PASSWORD@$FLY_APP_NAME.internal:5432/postgres <<'EOF'
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT datname FROM pg_database WHERE datallowconn = true)
+    LOOP
+        BEGIN
+            EXECUTE 'ALTER DATABASE ' || quote_ident(r.datname) || ' REFRESH COLLATION VERSION;';
+        EXCEPTION
+            WHEN OTHERS THEN
+                RAISE NOTICE 'Failed to refresh collation for database: % - %', r.datname, SQLERRM;
+        END;
+    END LOOP;
+END $$;
+EOF
