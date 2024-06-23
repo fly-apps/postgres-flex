@@ -27,7 +27,7 @@ func RunCommand(cmdStr, usr string) ([]byte, error) {
 
 	debug := os.Getenv("DEBUG")
 	if debug != "" {
-    log.Printf("> Running command as %s: %s\n", usr, cmdStr)
+		log.Printf("> Running command as %s: %s\n", usr, cmdStr)
 
 		var stdoutBuf, stderrBuf bytes.Buffer
 		cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
