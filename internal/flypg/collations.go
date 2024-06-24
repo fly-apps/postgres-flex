@@ -26,12 +26,7 @@ func calculateLocaleVersionHash() (string, error) {
 }
 
 func writeCollationVersionFile(versionHash string) error {
-	// Write the collation lock file.
-	if err := os.WriteFile(collationVersionFile, []byte(versionHash), 0600); err != nil {
-		return fmt.Errorf("failed to write collation version file: %w", err)
-	}
-
-	return nil
+	return os.WriteFile(collationVersionFile, []byte(versionHash), 0600)
 }
 
 func collationHashChanged(versionHash string) (bool, error) {

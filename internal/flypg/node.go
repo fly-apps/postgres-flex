@@ -492,11 +492,10 @@ func (n *Node) evaluateCollationIntegrity(ctx context.Context, conn *pgx.Conn) e
 	}
 
 	if !changed {
-		log.Printf("[INFO] Collation version has not changed.\n")
 		return nil
 	}
 
-	fmt.Printf("[INFO] Collation version has changed or has not been evaluated. Evaluating collation integrity.\n")
+	fmt.Printf("[INFO] Evaluating collation integrity.\n")
 
 	dbs, err := admin.ListDatabases(ctx, conn)
 	if err != nil {
@@ -514,8 +513,6 @@ func (n *Node) evaluateCollationIntegrity(ctx context.Context, conn *pgx.Conn) e
 			return fmt.Errorf("failed to establish connection to database %s: %s", db.Name, err)
 		}
 		defer func() { _ = dbConn.Close(ctx) }()
-
-		log.Printf("[INFO] Refreshing collations for database %s\n", db.Name)
 
 		if err := refreshCollations(ctx, dbConn, db.Name); err != nil {
 			return fmt.Errorf("failed to refresh collations for db %s: %s", db.Name, err)
