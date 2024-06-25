@@ -1,5 +1,5 @@
-ARG PG_VERSION=15.6
-ARG PG_MAJOR_VERSION=15
+ARG PG_VERSION=16.2
+ARG PG_MAJOR_VERSION=16
 ARG VERSION=custom
 
 FROM golang:1.20
@@ -23,6 +23,7 @@ ENV PGDATA=/data/postgresql
 ENV PGPASSFILE=/data/.pgpass
 ARG VERSION
 ARG PG_MAJOR_VERSION
+ARG TIMESCALEDB_VERSION=2.14.2
 ARG POSTGIS_MAJOR=3
 ARG HAPROXY_VERSION=2.8
 
@@ -32,7 +33,7 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 curl bash dnsutils vim haproxy socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
+    ca-certificates iproute2 curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
     && apt autoremove -y
 
 # Repmgr
@@ -42,15 +43,15 @@ RUN apt-get update && \
     apt-get install -y ./postgresql-${PG_MAJOR_VERSION}-repmgr_5.3.3-2_amd64.deb \
     && rm ./postgresql-${PG_MAJOR_VERSION}-repmgr_5.3.3-2_amd64.deb
 
-RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(cat /etc/os-release | grep VERSION_CODENAME | cut -d'=' -f2) main" > /etc/apt/sources.list.d/timescaledb.list \
+RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian $(. /etc/os-release && echo "$VERSION_CODENAME") main" > /etc/apt/sources.list.d/timescaledb.list \
     && curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add -
 
 # TimescaleDB and PostGIS
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR \
-    postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR-scripts \
-    timescaledb-2-postgresql-$PG_MAJOR_VERSION \
-    timescaledb-toolkit-postgresql-$PG_MAJOR_VERSION \
+    postgresql-${PG_MAJOR_VERSION}-postgis-${POSTGIS_MAJOR} \
+    postgresql-${PG_MAJOR_VERSION}-postgis-${POSTGIS_MAJOR}-scripts \
+    timescaledb-2-${TIMESCALEDB_VERSION}-postgresql-${PG_MAJOR_VERSION} \
+    timescaledb-toolkit-postgresql-${PG_MAJOR_VERSION} \
     && apt autoremove -y
 
 # Haproxy
@@ -62,7 +63,7 @@ RUN echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
     > /etc/apt/sources.list.d/haproxy.list
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    haproxy=$HAPROXY_VERSION.\* \
+    haproxy=${HAPROXY_VERSION}.\* \
     && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
@@ -76,6 +77,5 @@ RUN usermod -d /data postgres
 ENV TIMESCALEDB_ENABLED=true
 
 EXPOSE 5432
-
 
 CMD ["start"]
