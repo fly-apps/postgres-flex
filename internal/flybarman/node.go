@@ -139,15 +139,12 @@ wal_retention_policy = main
 		return fmt.Errorf("failed to write file %s: %s", n.RootPasswordConfigPath, err)
 	}
 
-	if _, err := os.Stat(n.BarmanCronFile); os.IsNotExist(err) {
-		barmanCronFileContent := `* * * * * /usr/bin/barman cron
+	barmanCronFileContent := `* * * * * /usr/local/bin/barman_cron
 `
-		if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
-			return fmt.Errorf("failed write %s: %s", n.BarmanCronFile, err)
-		}
-
-		log.Println(n.BarmanCronFile + " created successfully.")
+	if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
+		return fmt.Errorf("failed write %s: %s", n.BarmanCronFile, err)
 	}
+	log.Println(n.BarmanCronFile + " created successfully.")
 
 	if _, err := os.Stat(n.LogFile); os.IsNotExist(err) {
 		file, err := os.Create(n.LogFile)
@@ -166,17 +163,6 @@ wal_retention_policy = main
 		}
 
 		log.Println("Crontab updated")
-
-		serviceCmd := exec.Command("/usr/sbin/service", "--version")
-		if err := serviceCmd.Run(); err != nil {
-			log.Println("service command not found, skipping initializing cron service")
-		} else {
-			serviceCronStartCommand := exec.Command("service", "cron", "start")
-			if _, err := serviceCronStartCommand.Output(); err != nil {
-				return fmt.Errorf("failed starting cron service: %s", err)
-			}
-			log.Println("Started cron service")
-		}
 
 		switchWalCommand := exec.Command("barman", "switch-wal", "--archive", "--force", "pg")
 		if _, err := switchWalCommand.Output(); err != nil {
