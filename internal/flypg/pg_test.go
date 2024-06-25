@@ -112,7 +112,76 @@ func TestPGConfigInitialization(t *testing.T) {
 		if cfg["shared_preload_libraries"] != expected {
 			t.Fatalf("expected %s, got %s", expected, cfg["shared_preload_libraries"])
 		}
+	})
 
+	t.Run("cloud-archiving", func(t *testing.T) {
+		t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
+		t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
+		t.Setenv("AWS_ENDPOINT_URL", "https://fly.storage.tigris.dev")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
+		t.Setenv("AWS_BUCKET_NAME", "my-bucket")
+
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["archive_mode"] != "on" {
+			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
+		}
+
+		expected := fmt.Sprintf("'barman-cloud-wal-archive --cloud-provider aws-s3 --endpoint-url %s s3://%s %s %%p'",
+			os.Getenv("AWS_ENDPOINT_URL"),
+			os.Getenv("AWS_BUCKET_NAME"),
+			pgConf.AppName)
+
+		if cfg["archive_command"] != expected {
+			t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])
+		}
+	})
+
+	t.Run("cloud-archiving-disabled", func(t *testing.T) {
+		t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
+		t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
+		t.Setenv("AWS_ENDPOINT_URL", "https://fly.storage.tigris.dev")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
+		t.Setenv("AWS_BUCKET_NAME", "my-bucket")
+
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["archive_mode"] != "on" {
+			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
+		}
+
+		t.Setenv("CLOUD_ARCHIVING_ENABLED", "false")
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err = pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["archive_mode"] != "off" {
+			t.Fatalf("expected archive_mode to be off, got %v", cfg["archive_mode"])
+		}
 	})
 }
 
@@ -208,6 +277,7 @@ func TestPGDefaultPassword(t *testing.T) {
 	defer cleanup()
 
 	pgConf := &PGConfig{
+		AppName:                "my-app",
 		DataDir:                pgTestDirectory,
 		Port:                   5433,
 		ConfigFilePath:         pgConfigFilePath,
@@ -262,6 +332,7 @@ func TestValidateCompatibility(t *testing.T) {
 	defer cleanup()
 
 	pgConf := &PGConfig{
+		AppName:                "my-app",
 		DataDir:                pgTestDirectory,
 		Port:                   5433,
 		ConfigFilePath:         pgConfigFilePath,

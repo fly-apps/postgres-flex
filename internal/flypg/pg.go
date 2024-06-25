@@ -19,6 +19,7 @@ import (
 )
 
 type PGConfig struct {
+	AppName                string
 	ConfigFilePath         string
 	InternalConfigFilePath string
 	UserConfigFilePath     string
@@ -169,6 +170,26 @@ func (c *PGConfig) SetDefaults() error {
 		"wal_log_hints":            true,
 		"hot_standby":              true,
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
+	}
+
+	// Works to configure archiving to object storage if enabled
+	switch strings.ToLower(os.Getenv("CLOUD_ARCHIVING_ENABLED")) {
+	case "true":
+		if err := validateCloudArchiver(); err != nil {
+			return fmt.Errorf("failed to validate s3 archiver: %s", err)
+		}
+
+		bucket := strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME"))
+		endpoint := strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL"))
+
+		archiveCommand := fmt.Sprintf("'barman-cloud-wal-archive --cloud-provider aws-s3 --gzip --endpoint-url %s s3://%s %s %%p'", endpoint, bucket, c.AppName)
+		c.internalConfig["archive_mode"] = "on"
+		c.internalConfig["archive_command"] = archiveCommand
+	case "false":
+		c.internalConfig["archive_mode"] = "off"
+	default:
+		// Noop to remain backwards compatible with existing setups that may have
+		// manually setup archiving.
 	}
 
 	return nil
@@ -536,4 +557,24 @@ func diskSizeInBytes(dir string) (uint64, error) {
 		return 0, err
 	}
 	return stat.Blocks * uint64(stat.Bsize), nil
+}
+
+func validateCloudArchiver() error {
+	if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+		return fmt.Errorf("AWS_ACCESS_KEY_ID secret must be set")
+	}
+
+	if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+		return fmt.Errorf("AWS_SECRET_ACCESS_KEY secret must be set")
+	}
+
+	if os.Getenv("AWS_BUCKET_NAME") == "" {
+		return fmt.Errorf("AWS_BUCKET_NAME envvar must be set")
+	}
+
+	if os.Getenv("AWS_ENDPOINT_URL") == "" {
+		return fmt.Errorf("AWS_ENDPOINT_URL envvar must be set")
+	}
+
+	return nil
 }

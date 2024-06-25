@@ -98,6 +98,7 @@ func NewNode() (*Node, error) {
 	node.RepMgr.Witness = present
 
 	node.PGConfig = PGConfig{
+		AppName:                node.AppName,
 		DataDir:                node.DataDir,
 		Port:                   node.Port,
 		ConfigFilePath:         fmt.Sprintf("%s/postgresql.conf", node.DataDir),
