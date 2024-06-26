@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
@@ -16,6 +17,8 @@ var (
 
 	defaultDeadMemberRemovalThreshold   = time.Hour * 12
 	defaultInactiveSlotRemovalThreshold = time.Hour * 12
+
+	defaultBackupRetentionEvaluationThreshold = time.Hour * 1
 )
 
 func main() {
@@ -35,6 +38,18 @@ func main() {
 			panic(err)
 		}
 	}()
+
+	if os.Getenv("CLOUD_ARCHIVING_ENABLED") == "true" {
+		barman, err := flypg.NewBarman()
+		if err != nil {
+			panic(err)
+		}
+
+		log.Println("Monitoring backup retention")
+		barman.PrintRetentionPolicy()
+
+		go monitorBackupRetention(ctx, barman)
+	}
 
 	// Readonly monitor
 	log.Println("Monitoring cluster state")
