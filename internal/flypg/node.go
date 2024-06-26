@@ -305,6 +305,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to unset read-only: %s", err)
 				}
 			}
+
+			// This is a safety check to ensure collation integrity is maintained.
+			if err := n.evaluateCollationIntegrity(ctx, conn); err != nil {
+				log.Printf("[WARN] Problem occurred while evaluating collation integrity: %s", err)
+			}
+
 		case StandbyRoleName:
 			// Register existing standby to apply any configuration changes.
 			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
@@ -381,18 +387,18 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to issue registration certificate: %s", err)
 			}
 		} else {
+			// Create required users
+			if err := n.setupCredentials(ctx, conn); err != nil {
+				return fmt.Errorf("failed to create required users: %s", err)
+			}
+
+			// Setup repmgr database and extension
+			if err := n.RepMgr.enable(ctx, conn); err != nil {
+				return fmt.Errorf("failed to enable repmgr: %s", err)
+			}
+
 			if n.RepMgr.Witness {
 				log.Println("Registering witness")
-
-				// Create required users
-				if err := n.setupCredentials(ctx, conn); err != nil {
-					return fmt.Errorf("failed to create required users: %s", err)
-				}
-
-				// Setup repmgr database and extension
-				if err := n.RepMgr.enable(ctx, conn); err != nil {
-					return fmt.Errorf("failed to enable repmgr: %s", err)
-				}
 
 				primary, err := n.RepMgr.ResolveMemberOverDNS(ctx)
 				if err != nil {
@@ -467,6 +473,77 @@ func setDirOwnership() error {
 	cmd := exec.Command("sh", "-c", cmdStr)
 	if _, err = cmd.Output(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (n *Node) evaluateCollationIntegrity(ctx context.Context, conn *pgx.Conn) error {
+	// Calculate the current collation version hash.
+	versionHash, err := calculateLocaleVersionHash()
+	if err != nil {
+		return fmt.Errorf("failed to calculate collation sum: %w", err)
+	}
+
+	// Check to see if the collation version has changed.
+	changed, err := collationHashChanged(versionHash)
+	if err != nil {
+		return fmt.Errorf("failed to check collation version file: %s", err)
+	}
+
+	if !changed {
+		return nil
+	}
+
+	fmt.Printf("[INFO] Evaluating collation integrity.\n")
+
+	dbs, err := admin.ListDatabases(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to list databases: %s", err)
+	}
+
+	dbs = append(dbs, admin.DbInfo{Name: "template1"})
+
+	collationIssues := 0
+
+	for _, db := range dbs {
+		// Establish a connection to the database.
+		dbConn, err := n.NewLocalConnection(ctx, db.Name, n.SUCredentials)
+		if err != nil {
+			return fmt.Errorf("failed to establish connection to database %s: %s", db.Name, err)
+		}
+		defer func() { _ = dbConn.Close(ctx) }()
+
+		if err := refreshCollations(ctx, dbConn, db.Name); err != nil {
+			return fmt.Errorf("failed to refresh collations for db %s: %s", db.Name, err)
+		}
+
+		// TODO - Consider logging a link to documentation on how to resolve collation issues not resolved by the refresh process.
+
+		// The collation refresh process should resolve "most" issues, but there are cases that may require
+		// re-indexing or other manual intervention. In the event any objects are found we will log a warning.
+		colObjects, err := impactedCollationObjects(ctx, dbConn)
+		if err != nil {
+			return fmt.Errorf("failed to fetch impacted collation objects: %s", err)
+		}
+
+		for _, obj := range colObjects {
+			log.Printf("[WARN] Collation mismatch detected - Database %s, Collation: %s, Object: %s\n", db.Name, obj.collation, obj.object)
+			collationIssues++
+		}
+	}
+
+	// Don't set the version file if there are collation issues.
+	// This will force the system to re-evaluate the collation integrity on the next boot and ensure
+	// issues continue to be logged.
+	if collationIssues > 0 {
+		return nil
+	}
+
+	// No collation issues found, we can safely update the version file.
+	// This will prevent the system from re-evaluating the collation integrity on every boot.
+	if err := writeCollationVersionFile(versionHash); err != nil {
+		return fmt.Errorf("failed to write collation version file: %s", err)
 	}
 
 	return nil

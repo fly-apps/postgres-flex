@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+
 	"os"
 	"os/exec"
 	"os/user"
@@ -12,30 +13,37 @@ import (
 	"syscall"
 )
 
+// TODO - RunCommand should take a context.
+
 func RunCommand(cmdStr, usr string) ([]byte, error) {
 	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("> Running command as %s: %s\n", usr, cmdStr)
-
 	cmd := exec.Command("sh", "-c", cmdStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+	debug := os.Getenv("DEBUG")
+	if debug != "" {
+		log.Printf("> Running command as %s: %s\n", usr, cmdStr)
 
-	err = cmd.Run()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			ee.Stderr = stderrBuf.Bytes()
+		var stdoutBuf, stderrBuf bytes.Buffer
+		cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+
+		err = cmd.Run()
+		if err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				ee.Stderr = stderrBuf.Bytes()
+			}
 		}
+
+		return stdoutBuf.Bytes(), err
 	}
 
-	return stdoutBuf.Bytes(), err
+	return cmd.Output()
 }
 
 func SetFileOwnership(pathToFile, owner string) error {
