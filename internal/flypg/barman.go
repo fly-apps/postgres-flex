@@ -9,29 +9,6 @@ import (
 	"strings"
 )
 
-const (
-	cronDirectory         = "/data/cron"
-	archivePrunerCronFile = "/data/cron/barman.cron"
-	archivePrunerBinary   = "/usr/local/bin/archive_pruner"
-)
-
-// # TODO - make this configurable
-// retention="RECOVERY WINDOW OF 7 DAYS"
-// # TODO - make this configurable
-// minimum_redundancy=3
-
-// provider="aws-s3"
-// endpoint=$AWS_ENDPOINT_URL
-// bucket=$AWS_BUCKET_NAME
-// name=$FLY_APP_NAME
-
-// barman-cloud-backup-delete \
-//     --cloud-provider "$provider" \
-//     --endpoint-url  "$endpoint" \
-//     --retention "$retention" \
-//     --minimum-redundancy "$minimum_redundancy" \
-//     "s3://$bucket" "$name"
-
 type Barman struct {
 	appName           string
 	provider          string
