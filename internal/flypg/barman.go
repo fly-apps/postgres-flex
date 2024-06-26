@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 type Barman struct {
@@ -39,9 +40,9 @@ func (b *Barman) RetentionPolicy() string {
 	return fmt.Sprintf("'RECOVERY WINDOW OF %s days'", b.retentionDays)
 }
 
+// WALArchiveDelete deletes backups/WAL based on the specified retention policy.
 func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, b.walArchiveDeleteCommandString())
-	return cmd.CombinedOutput()
+	return utils.RunCommand(b.walArchiveDeleteCommandString(), "postgres")
 }
 
 func (b *Barman) PrintRetentionPolicy() {
