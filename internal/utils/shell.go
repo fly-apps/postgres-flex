@@ -12,17 +12,21 @@ import (
 	"syscall"
 )
 
+// TODO - RunCommand needs a context
+
 func RunCommand(cmdStr, usr string) ([]byte, error) {
 	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("> Running command as %s: %s\n", usr, cmdStr)
-
 	cmd := exec.Command("sh", "-c", cmdStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+
+	if os.Getenv("DEBUG") != "" {
+		log.Printf("> Running command as %s: %s\n", usr, cmdStr)
+	}
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
@@ -36,6 +40,7 @@ func RunCommand(cmdStr, usr string) ([]byte, error) {
 	}
 
 	return stdoutBuf.Bytes(), err
+
 }
 
 func SetFileOwnership(pathToFile, owner string) error {
