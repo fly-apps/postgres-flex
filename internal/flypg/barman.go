@@ -45,10 +45,11 @@ func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
 }
 
 func (b *Barman) PrintRetentionPolicy() {
-	str := `Retention Policy
+	str := `
+	Retention Policy
 	-----------------
-	RECOVERY WINDOW OF %d days
-	MINIMUM BACKUP REDUNDANCY: %d
+	RECOVERY WINDOW OF %s days
+	MINIMUM BACKUP REDUNDANCY: %s
 `
 	log.Printf(str, b.retentionDays, b.minimumRedundancy)
 }
