@@ -67,7 +67,8 @@ func (b *Barman) walArchiveDeleteCommandString() string {
 }
 
 func (b *Barman) walArchiveCommandString() string {
-	return fmt.Sprintf("'barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s s3://%s %s %%p'",
+	// TODO - Make compression configurable
+	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s s3://%s %s %%p",
 		b.provider,
 		b.endpoint,
 		b.bucket,

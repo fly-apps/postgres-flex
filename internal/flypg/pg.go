@@ -181,7 +181,7 @@ func (c *PGConfig) SetDefaults() error {
 		}
 
 		c.internalConfig["archive_mode"] = "on"
-		c.internalConfig["archive_command"] = barman.walArchiveCommandString()
+		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommandString())
 	case "false":
 		c.internalConfig["archive_mode"] = "off"
 	default:
