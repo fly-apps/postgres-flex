@@ -17,7 +17,12 @@ const (
 	restoreLockFile = "/data/restore.lock"
 )
 
-func Restore(ctx context.Context, node *Node) error {
+// prepareRemoteRestore will reset the environment to a state where it can be restored
+// from a remote backup. This process includes:
+// * Clearing any locks that may have been set on the original cluster.
+// * Dropping the repmgr database to clear any metadata that belonged to the old cluster.
+// * Ensuring the internal user credentials match the environment.
+func prepareRemoteRestore(ctx context.Context, node *Node) error {
 	// Clear any locks that may have been set on the original cluster
 	if err := clearLocks(); err != nil {
 		return fmt.Errorf("failed to clear locks: %s", err)
@@ -63,8 +68,7 @@ func Restore(ctx context.Context, node *Node) error {
 	defer func() { _ = conn.Close(ctx) }()
 
 	// Drop repmgr database to clear any metadata that belonged to the old cluster.
-	sql := "DROP DATABASE repmgr;"
-	_, err = conn.Exec(ctx, sql)
+	_, err = conn.Exec(ctx, "DROP DATABASE repmgr;")
 	if err != nil {
 		return fmt.Errorf("failed to drop repmgr database: %s", err)
 	}

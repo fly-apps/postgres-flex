@@ -175,10 +175,11 @@ func (c *PGConfig) SetDefaults() error {
 
 	switch strings.ToLower(os.Getenv("CLOUD_ARCHIVING_ENABLED")) {
 	case "true":
-		barman, err := NewBarman()
+		barman, err := NewBarman(true)
 		if err != nil {
 			return err
 		}
+
 		c.internalConfig["archive_mode"] = "on"
 		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
 

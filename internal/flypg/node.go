@@ -132,21 +132,27 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if active {
-			if err := Restore(ctx, n); err != nil {
+			if err := prepareRemoteRestore(ctx, n); err != nil {
 				return fmt.Errorf("failed to issue restore: %s", err)
 			}
 		}
 	}
 
-	// Point-in-time restore
+	// Remote point-in-time restore.
 	if os.Getenv("CLOUD_ARCHIVING_REMOTE_RESTORE") != "" {
+		// TODO - We may need to check for the restore lock her
+
 		restore, err := NewBarmanRestore()
 		if err != nil {
 			return fmt.Errorf("failed to initialize barman restore: %s", err)
 		}
 
-		if err := restore.RestoreFromPIT(ctx); err != nil {
+		if err := restore.Restore(ctx); err != nil {
 			return fmt.Errorf("failed to restore from PIT: %s", err)
+		}
+
+		if err := prepareRemoteRestore(ctx, n); err != nil {
+			return fmt.Errorf("failed to issue restore: %s", err)
 		}
 	}
 

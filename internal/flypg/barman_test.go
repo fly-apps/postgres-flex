@@ -8,9 +8,9 @@ func TestNewBarman(t *testing.T) {
 	t.Run("defaults", func(t *testing.T) {
 		setDefaultEnv(t)
 
-		barman, err := NewBarman()
+		barman, err := NewBarman(true)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("unexpected error: %v", err)
 		}
 
 		if barman.provider != "aws-s3" {
@@ -42,14 +42,12 @@ func TestNewBarman(t *testing.T) {
 
 	t.Run("custom-retention", func(t *testing.T) {
 		setDefaultEnv(t)
-
 		t.Setenv("CLOUD_ARCHIVING_RETENTION_DAYS", "30")
 
-		barman, err := NewBarman()
+		barman, err := NewBarman(true)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("unexpected error: %v", err)
 		}
-
 		if barman.retentionDays != "30" {
 			t.Fatalf("expected retentionDays to be 30, but got %s", barman.retentionDays)
 		}
@@ -59,28 +57,21 @@ func TestNewBarman(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "7")
 
-		barman, err := NewBarman()
+		barman, err := NewBarman(true)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("unexpected error: %v", err)
 		}
-
 		if barman.minimumRedundancy != "7" {
 			t.Fatalf("expected retentionDays to be 7, but got %s", barman.retentionDays)
-		}
-	})
-
-	t.Run("test-failure", func(t *testing.T) {
-		_, err := NewBarman()
-		if err == nil {
-			t.Fatal("expected error, but got nil")
 		}
 	})
 }
 
 func TestValidateBarmanRequirements(t *testing.T) {
+	b, _ := NewBarman(false)
 
 	t.Run("missing-aws-access-key", func(t *testing.T) {
-		err := validateBarman()
+		err := b.ValidateRequiredEnv()
 
 		if err.Error() != "AWS_ACCESS_KEY_ID secret must be set" {
 			t.Fatalf("expected error to be 'AWS_ACCESS_KEY_ID secret must be set', but got %s", err.Error())
@@ -90,7 +81,7 @@ func TestValidateBarmanRequirements(t *testing.T) {
 	t.Run("missing-aws-secret-access-key", func(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("AWS_SECRET_ACCESS_KEY", "")
-		err := validateBarman()
+		err := b.ValidateRequiredEnv()
 
 		if err.Error() != "AWS_SECRET_ACCESS_KEY secret must be set" {
 			t.Fatalf("expected error to be 'AWS_SECRET_ACCESS_KEY secret must be set', but got %s", err.Error())
@@ -100,7 +91,7 @@ func TestValidateBarmanRequirements(t *testing.T) {
 	t.Run("missing-aws-bucket-name", func(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("AWS_BUCKET_NAME", "")
-		err := validateBarman()
+		err := b.ValidateRequiredEnv()
 
 		if err.Error() != "AWS_BUCKET_NAME envvar must be set" {
 			t.Fatalf("expected error to be 'AWS_BUCKET_NAME envvar must be set', but got %s", err.Error())
@@ -110,7 +101,7 @@ func TestValidateBarmanRequirements(t *testing.T) {
 	t.Run("missing-aws-endpoint-url", func(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("AWS_ENDPOINT_URL_S3", "")
-		err := validateBarman()
+		err := b.ValidateRequiredEnv()
 
 		if err.Error() != "AWS_ENDPOINT_URL_S3 envvar must be set" {
 			t.Fatalf("expected error to be 'AWS_ENDPOINT_URL_S3 envvar must be set', but got %s", err.Error())
@@ -121,15 +112,14 @@ func TestValidateBarmanRequirements(t *testing.T) {
 func TestBarmanRetentionPolicy(t *testing.T) {
 	setDefaultEnv(t)
 
-	barman, err := NewBarman()
+	barman, err := NewBarman(true)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if barman.RetentionPolicy() != "'RECOVERY WINDOW OF 7 days'" {
 		t.Fatalf("expected retention policy to be 'RECOVERY WINDOW OF 7 days', but got %s", barman.RetentionPolicy())
 	}
-
 }
 
 func setDefaultEnv(t *testing.T) {

@@ -2,48 +2,31 @@ package flypg
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
-
-	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 type BarmanRestore struct {
-	appName  string
-	provider string
-	endpoint string
-	bucket   string
-
+	*Barman
 	recoveryTarget         string
 	recoveryTargetTimeline string
 	recoveryTargetAction   string
 }
 
-type BarmanBackupList struct {
-	Backups []BarmanBackup `json:"backups_list"`
-}
-
-type BarmanBackup struct {
-	BackupID  string `json:"backup_id"`
-	StartTime string `json:"begin_time"`
-	EndTime   string `json:"end_time"`
-	BeginWal  string `json:"begin_wal"`
-	EndWal    string `json:"end_wal"`
-}
+const (
+	defaultRestoreDir = "/data/postgresql"
+)
 
 func NewBarmanRestore() (*BarmanRestore, error) {
-	if err := validateBarmanRestore(); err != nil {
+	if err := validateRestoreEnv(); err != nil {
 		return nil, err
 	}
 
+	barman, _ := NewBarman(false)
+
 	return &BarmanRestore{
-		appName:  os.Getenv("FLY_APP_NAME"),
-		provider: "aws-s3",
-		endpoint: strings.TrimSpace(os.Getenv("SOURCE_AWS_ENDPOINT_URL_S3")),
-		bucket:   strings.TrimSpace(os.Getenv("SOURCE_AWS_BUCKET_NAME")),
+		Barman: barman,
 
 		recoveryTarget: getenv("WAL_RECOVERY_TARGET", "immediate"),
 		// TODO - Use recovery target time instead.  This is a temporary solution.
@@ -52,81 +35,32 @@ func NewBarmanRestore() (*BarmanRestore, error) {
 	}, nil
 }
 
-func (b *BarmanRestore) RestoreFromPIT(ctx context.Context) error {
+func (b *BarmanRestore) Restore(ctx context.Context) error {
 	// Query available backups from object storage
-	backupsBytes, err := utils.RunCommand(b.backupListCommand(), "postgres")
+	backups, err := b.ListBackups(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list backups: %s", err)
 	}
 
-	// Parse the backups
-	backupList, err := b.parseBackups(backupsBytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse backups: %s", err)
-	}
-
-	if len(backupList.Backups) == 0 {
+	if len(backups.Backups) == 0 {
 		return fmt.Errorf("no backups found")
 	}
 
 	// Resolve the base backup to restore
-	backupID, err := b.resolveBackupTarget(backupList, b.recoveryTargetTimeline)
+	backupID, err := b.resolveBackupTarget(backups, b.recoveryTargetTimeline)
 	if err != nil {
 		return fmt.Errorf("failed to resolve backup target: %s", err)
 	}
 
 	// Download and restore the base backup
-	_, err = utils.RunCommand(b.backupRestoreCommand(backupID), "postgres")
-	if err != nil {
-		return fmt.Errorf("failed to restore base backup: %s", err)
+	if _, err := b.RestoreBackup(ctx, backupID, defaultRestoreDir); err != nil {
+		return fmt.Errorf("failed to restore backup: %s", err)
 	}
 
 	return nil
 }
 
-// restoreCommand returns the command string used to restore a base backup.
-func (b *BarmanRestore) backupRestoreCommand(backupID string) string {
-	return fmt.Sprintf("barman-cloud-restore --cloud-provider %s --endpoint-url %s s3://%s %s %s %s",
-		b.provider,
-		b.endpoint,
-		b.bucket,
-		b.appName,
-		backupID,
-		barmanRecoveryDirectory,
-	)
-}
-
-// walRestoreCommand returns the command string used to restore WAL files.
-// The %f and %p placeholders are replaced with the file path and file name respectively.
-func (b *BarmanRestore) walRestoreCommand() string {
-	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s s3://%s %s %%f %%p",
-		b.provider,
-		b.endpoint,
-		b.bucket,
-		b.appName,
-	)
-}
-
-func (b *BarmanRestore) backupListCommand() string {
-	return fmt.Sprintf("barman-cloud-backup-list --cloud-provider %s --endpoint-url %s s3://%s %s --format json",
-		b.provider,
-		b.endpoint,
-		b.bucket,
-		b.appName,
-	)
-}
-
-func (b *BarmanRestore) parseBackups(backupBytes []byte) (BarmanBackupList, error) {
-	var backupList BarmanBackupList
-
-	if err := json.Unmarshal(backupBytes, &backupList); err != nil {
-		return BarmanBackupList{}, fmt.Errorf("failed to parse backups: %s", err)
-	}
-
-	return backupList, nil
-}
-
-func (b *BarmanRestore) resolveBackupTarget(backupList BarmanBackupList, restoreStr string) (string, error) {
+func (b *BarmanRestore) resolveBackupTarget(backupList BackupList, restoreStr string) (string, error) {
 	if len(backupList.Backups) == 0 {
 		return "", fmt.Errorf("no backups found")
 	}
@@ -189,7 +123,7 @@ func (b *BarmanRestore) resolveBackupTarget(backupList BarmanBackupList, restore
 	return latestBackupID, nil
 }
 
-func validateBarmanRestore() error {
+func validateRestoreEnv() error {
 	if os.Getenv("SOURCE_AWS_ACCESS_KEY_ID") == "" {
 		return fmt.Errorf("SOURCE_AWS_ACCESS_KEY_ID secret must be set")
 	}
