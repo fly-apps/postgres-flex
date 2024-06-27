@@ -45,8 +45,9 @@ func NewBarmanRestore() (*BarmanRestore, error) {
 		endpoint: strings.TrimSpace(os.Getenv("SOURCE_AWS_ENDPOINT_URL")),
 		bucket:   strings.TrimSpace(os.Getenv("SOURCE_AWS_BUCKET_NAME")),
 
-		recoveryTarget:         getenv("WAL_RECOVERY_TARGET", "immediate"),
-		recoveryTargetTimeline: getenv("WAL_RECOVERY_TARGET_TIME", "latest"),
+		recoveryTarget: getenv("WAL_RECOVERY_TARGET", "immediate"),
+		// TODO - Use recovery target time instead.  This is a temporary solution.
+		recoveryTargetTimeline: getenv("WAL_RECOVERY_TARGET_TIMELINE", "latest"),
 		recoveryTargetAction:   getenv("WAL_RECOVERY_TARGET_ACTION", "promote"),
 	}, nil
 }
