@@ -18,8 +18,11 @@ var (
 	defaultDeadMemberRemovalThreshold   = time.Hour * 12
 	defaultInactiveSlotRemovalThreshold = time.Hour * 12
 
-	defaultBackupRetentionEvaluationThreshold = time.Hour * 1
+	defaultBackupRetentionEvalFrequency = time.Hour * 12
+	defaultFullBackupSchedule           = time.Hour * 24
 )
+
+// TODO - Harden this so one failure doesn't take down the whole monitor
 
 func main() {
 	ctx := context.Background()
@@ -40,14 +43,18 @@ func main() {
 	}()
 
 	if os.Getenv("CLOUD_ARCHIVING_ENABLED") == "true" {
-		barman, err := flypg.NewBarman()
+		barman, err := flypg.NewBarman(true)
 		if err != nil {
 			panic(err)
 		}
 
+		// Backup scheduler
+		log.Println("Monitoring backup schedule")
+		go monitorBackupSchedule(ctx, barman)
+
+		// Backup retention monitor
 		log.Println("Monitoring backup retention")
 		barman.PrintRetentionPolicy()
-
 		go monitorBackupRetention(ctx, barman)
 	}
 

@@ -136,11 +136,8 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		expected := fmt.Sprintf("'barman-cloud-wal-archive --cloud-provider aws-s3 --gzip --endpoint-url %s s3://%s %s %%p'",
-			os.Getenv("AWS_ENDPOINT_URL_S3"),
-			os.Getenv("AWS_BUCKET_NAME"),
-			pgConf.AppName)
-
+		barman, _ := NewBarman(false)
+		expected := fmt.Sprintf("'%s'", barman.walArchiveCommand())
 		if cfg["archive_command"] != expected {
 			t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])
 		}

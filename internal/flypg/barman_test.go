@@ -21,7 +21,7 @@ func TestNewBarman(t *testing.T) {
 			t.Fatalf("expected endpoint to be https://fly.storage.tigris.dev, but got %s", barman.endpoint)
 		}
 
-		if barman.bucket != "my-bucket" {
+		if barman.bucket != "s3://my-bucket" {
 			t.Fatalf("expected bucket to be my-bucket, but got %s", barman.bucket)
 		}
 

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +15,35 @@ import (
 
 // TODO - RunCommand needs a context
 
+func RunCmd(ctx context.Context, usr string, name string, args ...string) ([]byte, error) {
+	uid, gid, err := SystemUserIDs(usr)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{}
+	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+
+	if os.Getenv("DEBUG") != "" {
+		log.Printf("> Running command as %s: %s\n", usr, cmd.String())
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+
+	err = cmd.Run()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			ee.Stderr = stderrBuf.Bytes()
+		}
+	}
+
+	return stdoutBuf.Bytes(), err
+}
+
+// Deprecated, use RunCmd instead
 func RunCommand(cmdStr, usr string) ([]byte, error) {
 	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {

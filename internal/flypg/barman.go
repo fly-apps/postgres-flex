@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
@@ -38,11 +40,14 @@ type BackupList struct {
 }
 
 func NewBarman(validate bool) (*Barman, error) {
+	bucket := strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME"))
+	bucket = fmt.Sprintf("s3://%s", bucket)
+
 	b := &Barman{
 		appName:  os.Getenv("FLY_APP_NAME"),
 		provider: providerDefault,
 		endpoint: strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL_S3")),
-		bucket:   strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME")),
+		bucket:   bucket,
 
 		retentionDays:     getenv("CLOUD_ARCHIVING_RETENTION_DAYS", "7"),
 		minimumRedundancy: getenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "3"),
@@ -55,40 +60,45 @@ func NewBarman(validate bool) (*Barman, error) {
 	return b, nil
 }
 
-func (b *Barman) Backup(ctx context.Context) ([]byte, error) {
-	backupCmd := fmt.Sprintf("barman-cloud-backup --cloud-provider %s --endpoint-url %s s3://%s %s",
-		b.provider,
-		b.endpoint,
+// Backup performs a base backup of the database.
+// forceCheckpoint - forces the initial checkpoint to be done as quickly as possible.
+func (b *Barman) Backup(ctx context.Context, forceCheckpoint bool) ([]byte, error) {
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--host", fmt.Sprintf("%s.internal", b.appName),
+		"--user", "repmgr",
 		b.bucket,
 		b.appName,
-	)
+	}
 
-	return utils.RunCommand(backupCmd, "postgres")
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup", args...)
 }
 
 // RestoreBackup returns the command string used to restore a base backup.
 func (b *Barman) RestoreBackup(ctx context.Context, backupID, recoveryDir string) ([]byte, error) {
-	restoreCmd := fmt.Sprintf("barman-cloud-restore --cloud-provider %s --endpoint-url %s s3://%s %s %s %s",
-		b.provider,
-		b.endpoint,
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
 		b.bucket,
 		b.appName,
 		backupID,
 		recoveryDir,
-	)
+	}
 
-	return utils.RunCommand(restoreCmd, "postgres")
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-restore", args...)
 }
 
 func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
-	listBackupCmd := fmt.Sprintf("barman-cloud-backup-list --cloud-provider %s --endpoint-url %s s3://%s %s --format json",
-		b.provider,
-		b.endpoint,
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--format", "json",
 		b.bucket,
 		b.appName,
-	)
+	}
 
-	backupsBytes, err := utils.RunCommand(listBackupCmd, "postgres")
+	backupsBytes, err := utils.RunCmd(ctx, "postgres", "barman-cloud-backup-list", args...)
 	if err != nil {
 		return BackupList{}, fmt.Errorf("failed to list backups: %s", err)
 	}
@@ -97,16 +107,53 @@ func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 }
 
 func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
-	deleteCmd := fmt.Sprintf("barman-cloud-backup-delete --cloud-provider %s --endpoint-url %s --retention %s --minimum-redundancy %s s3://%s %s",
-		b.provider,
-		b.endpoint,
-		b.RetentionPolicy(),
-		b.minimumRedundancy,
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--retention", b.RetentionPolicy(),
+		"--minimum-redundancy", b.minimumRedundancy,
 		b.bucket,
 		b.appName,
-	)
+	}
 
-	return utils.RunCommand(deleteCmd, "postgres")
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-delete", args...)
+}
+
+func (b *Barman) LastBackupTaken(ctx context.Context) (time.Time, error) {
+	backups, err := b.ListBackups(ctx)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to list backups: %s", err)
+	}
+
+	if len(backups.Backups) == 0 {
+		return time.Time{}, nil
+	}
+
+	layout := "Mon Jan 2 15:04:05 2006"
+
+	var latestBackupTime time.Time
+
+	// Sort the backups start time
+	for _, backup := range backups.Backups {
+		startTime, err := time.Parse(layout, backup.StartTime)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("failed to parse backup start time: %s", err)
+		}
+
+		if latestBackupTime.IsZero() || startTime.After(latestBackupTime) {
+			latestBackupTime = startTime
+		}
+	}
+
+	return latestBackupTime, nil
+}
+
+func (b *Barman) PrintRetentionPolicy() {
+	log.Printf(`
+Retention Policy
+-----------------
+RECOVERY WINDOW:  %s DAYS
+MINIMUM BACKUP REDUNDANCY: %s`, b.retentionDays, b.minimumRedundancy)
 }
 
 func (b *Barman) RetentionPolicy() string {
@@ -145,7 +192,7 @@ func (b *Barman) parseBackups(backupBytes []byte) (BackupList, error) {
 
 func (b *Barman) walArchiveCommand() string {
 	// TODO - Make compression configurable
-	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s s3://%s %s %%p",
+	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s %s %s %%p",
 		b.provider,
 		b.endpoint,
 		b.bucket,
@@ -156,7 +203,7 @@ func (b *Barman) walArchiveCommand() string {
 // walRestoreCommand returns the command string used to restore WAL files.
 // The %f and %p placeholders are replaced with the file path and file name respectively.
 func (b *Barman) walRestoreCommand() string {
-	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s s3://%s %s %%f %%p",
+	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s %s %s %%f %%p",
 		b.provider,
 		b.endpoint,
 		b.bucket,

@@ -176,13 +176,13 @@ func (c *PGConfig) SetDefaults() error {
 	switch strings.ToLower(os.Getenv("CLOUD_ARCHIVING_ENABLED")) {
 	case "true":
 		barman, err := NewBarman(true)
-		if err != nil {
-			return err
+		switch {
+		case err != nil:
+			log.Printf("[WARN] Failed to initialize barman: %s", err)
+		default:
+			c.internalConfig["archive_mode"] = "on"
+			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
 		}
-
-		c.internalConfig["archive_mode"] = "on"
-		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
-
 	case "false":
 		c.internalConfig["archive_mode"] = "off"
 		c.internalConfig["archive_command"] = ""
