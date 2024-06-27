@@ -138,6 +138,18 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
+	// Point-in-time restore
+	if os.Getenv("CLOUD_ARCHIVING_REMOTE_RESTORE") != "" {
+		restore, err := NewBarmanRestore()
+		if err != nil {
+			return fmt.Errorf("failed to initialize barman restore: %s", err)
+		}
+
+		if err := restore.RestoreFromPIT(ctx); err != nil {
+			return fmt.Errorf("failed to restore from PIT: %s", err)
+		}
+	}
+
 	// Verify whether we are a booting zombie.
 	if ZombieLockExists() {
 		if err := handleZombieLock(ctx, n); err != nil {

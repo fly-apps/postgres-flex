@@ -1,6 +1,7 @@
 package flypg
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -45,12 +46,12 @@ func NewBarmanRestore() (*BarmanRestore, error) {
 		bucket:   strings.TrimSpace(os.Getenv("SOURCE_AWS_BUCKET_NAME")),
 
 		recoveryTarget:         getenv("WAL_RECOVERY_TARGET", "immediate"),
-		recoveryTargetTimeline: getenv("WAL_RECOVERY_TARGET_TIMELINE", "latest"),
+		recoveryTargetTimeline: getenv("WAL_RECOVERY_TARGET_TIME", "latest"),
 		recoveryTargetAction:   getenv("WAL_RECOVERY_TARGET_ACTION", "promote"),
 	}, nil
 }
 
-func (b *BarmanRestore) RestoreFromPITBackup(restoreStr string) error {
+func (b *BarmanRestore) RestoreFromPIT(ctx context.Context) error {
 	// Query available backups from object storage
 	backupsBytes, err := utils.RunCommand(b.backupListCommand(), "postgres")
 	if err != nil {
@@ -68,7 +69,7 @@ func (b *BarmanRestore) RestoreFromPITBackup(restoreStr string) error {
 	}
 
 	// Resolve the base backup to restore
-	backupID, err := b.resolveBackupTarget(backupList, restoreStr)
+	backupID, err := b.resolveBackupTarget(backupList, b.recoveryTargetTimeline)
 	if err != nil {
 		return fmt.Errorf("failed to resolve backup target: %s", err)
 	}
