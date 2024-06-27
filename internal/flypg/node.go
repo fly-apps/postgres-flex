@@ -124,7 +124,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
-	// Check to see if we were just restored
+	// Snapshot restore
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
 		active, err := isRestoreActive()
 		if err != nil {

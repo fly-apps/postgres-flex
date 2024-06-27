@@ -158,6 +158,7 @@ func (c *PGConfig) SetDefaults() error {
 	}
 
 	c.internalConfig = ConfigMap{
+		"cluster_name":             c.AppName,
 		"random_page_cost":         "1.1",
 		"port":                     c.Port,
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
@@ -170,22 +171,43 @@ func (c *PGConfig) SetDefaults() error {
 		"wal_log_hints":            true,
 		"hot_standby":              true,
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
+		"restore_command":          "",
+		"recovery_target":          "",
+		"recovery_target_timeline": "",
+		"recovery_target_action":   "",
 	}
 
-	// Works to configure archiving to object storage if enabled
 	switch strings.ToLower(os.Getenv("CLOUD_ARCHIVING_ENABLED")) {
 	case "true":
 		barman, err := NewBarman()
 		if err != nil {
 			return err
 		}
-
 		c.internalConfig["archive_mode"] = "on"
-		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommandString())
+		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
+
 	case "false":
 		c.internalConfig["archive_mode"] = "off"
+		c.internalConfig["archive_command"] = ""
 	default:
 		// Noop
+	}
+
+	if os.Getenv("CLOUD_ARCHIVING_WAL_RESTORE") != "" {
+		barmanRestore, err := NewBarmanRestore()
+		if err != nil {
+			return err
+		}
+
+		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
+		c.internalConfig["recovery_target"] = barmanRestore.recoveryTarget
+		c.internalConfig["recovery_target_timeline"] = barmanRestore.recoveryTargetTimeline
+		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
+
+		// Write the recovery.signal file
+		if err := os.WriteFile("/data/postgresql/recovery.signal", []byte(""), 0600); err != nil {
+			return fmt.Errorf("failed to write recovery.signal: %s", err)
+		}
 	}
 
 	return nil

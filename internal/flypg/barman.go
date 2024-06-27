@@ -10,29 +10,39 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
+const (
+	barmanRecoveryDirectory = "/data/postgresql"
+)
+
 type Barman struct {
-	appName           string
-	provider          string
-	endpoint          string
-	bucket            string
+	appName  string
+	provider string
+	endpoint string
+	bucket   string
+
+	// fullBackupFrequency string
 	minimumRedundancy string
 	retentionDays     string
 }
 
 func NewBarman() (*Barman, error) {
-	if err := validateBarmanRequirements(); err != nil {
+	if err := validateBarman(); err != nil {
 		return nil, err
 	}
 
 	// TODO - Validate minimum and retention day values
+	minRedundancy := getenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "3")
+	retentionDays := getenv("CLOUD_ARCHIVING_RETENTION_DAYS", "7")
 
 	return &Barman{
-		appName:           os.Getenv("FLY_APP_NAME"),
-		provider:          "aws-s3",
-		endpoint:          strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL")),
-		bucket:            strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME")),
-		minimumRedundancy: getenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "3"),
-		retentionDays:     getenv("CLOUD_ARCHIVING_RETENTION_DAYS", "7"),
+		appName:  os.Getenv("FLY_APP_NAME"),
+		provider: "aws-s3",
+		endpoint: strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL")),
+		bucket:   strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME")),
+
+		// fullBackupFrequency: getenv("CLOUD_ARCHIVING_FULL_BACKUP_FREQUENCY", "1"),
+		minimumRedundancy: minRedundancy,
+		retentionDays:     retentionDays,
 	}, nil
 }
 
@@ -42,7 +52,7 @@ func (b *Barman) RetentionPolicy() string {
 
 // WALArchiveDelete deletes backups/WAL based on the specified retention policy.
 func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
-	return utils.RunCommand(b.walArchiveDeleteCommandString(), "postgres")
+	return utils.RunCommand(b.walArchiveDeleteCommand(), "postgres")
 }
 
 func (b *Barman) PrintRetentionPolicy() {
@@ -51,11 +61,12 @@ func (b *Barman) PrintRetentionPolicy() {
 	-----------------
 	RECOVERY WINDOW OF %s days
 	MINIMUM BACKUP REDUNDANCY: %s
+	FULL BACKUP FREQUENCY: %s day(s)
 `
 	log.Printf(str, b.retentionDays, b.minimumRedundancy)
 }
 
-func (b *Barman) walArchiveDeleteCommandString() string {
+func (b *Barman) walArchiveDeleteCommand() string {
 	return fmt.Sprintf("barman-cloud-backup-delete --cloud-provider %s --endpoint-url %s --retention %s --minimum-redundancy %s s3://%s %s",
 		b.provider,
 		b.endpoint,
@@ -66,7 +77,7 @@ func (b *Barman) walArchiveDeleteCommandString() string {
 	)
 }
 
-func (b *Barman) walArchiveCommandString() string {
+func (b *Barman) walArchiveCommand() string {
 	// TODO - Make compression configurable
 	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s s3://%s %s %%p",
 		b.provider,
@@ -76,7 +87,7 @@ func (b *Barman) walArchiveCommandString() string {
 	)
 }
 
-func validateBarmanRequirements() error {
+func validateBarman() error {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
 		return fmt.Errorf("AWS_ACCESS_KEY_ID secret must be set")
 	}

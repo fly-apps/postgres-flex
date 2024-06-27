@@ -5,7 +5,6 @@ import (
 )
 
 func TestNewBarman(t *testing.T) {
-
 	t.Run("defaults", func(t *testing.T) {
 		setDefaultEnv(t)
 
@@ -81,7 +80,7 @@ func TestNewBarman(t *testing.T) {
 func TestValidateBarmanRequirements(t *testing.T) {
 
 	t.Run("missing-aws-access-key", func(t *testing.T) {
-		err := validateBarmanRequirements()
+		err := validateBarman()
 
 		if err.Error() != "AWS_ACCESS_KEY_ID secret must be set" {
 			t.Fatalf("expected error to be 'AWS_ACCESS_KEY_ID secret must be set', but got %s", err.Error())
@@ -91,7 +90,7 @@ func TestValidateBarmanRequirements(t *testing.T) {
 	t.Run("missing-aws-secret-access-key", func(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("AWS_SECRET_ACCESS_KEY", "")
-		err := validateBarmanRequirements()
+		err := validateBarman()
 
 		if err.Error() != "AWS_SECRET_ACCESS_KEY secret must be set" {
 			t.Fatalf("expected error to be 'AWS_SECRET_ACCESS_KEY secret must be set', but got %s", err.Error())
@@ -101,7 +100,7 @@ func TestValidateBarmanRequirements(t *testing.T) {
 	t.Run("missing-aws-bucket-name", func(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("AWS_BUCKET_NAME", "")
-		err := validateBarmanRequirements()
+		err := validateBarman()
 
 		if err.Error() != "AWS_BUCKET_NAME envvar must be set" {
 			t.Fatalf("expected error to be 'AWS_BUCKET_NAME envvar must be set', but got %s", err.Error())
@@ -111,7 +110,7 @@ func TestValidateBarmanRequirements(t *testing.T) {
 	t.Run("missing-aws-endpoint-url", func(t *testing.T) {
 		setDefaultEnv(t)
 		t.Setenv("AWS_ENDPOINT_URL", "")
-		err := validateBarmanRequirements()
+		err := validateBarman()
 
 		if err.Error() != "AWS_ENDPOINT_URL envvar must be set" {
 			t.Fatalf("expected error to be 'AWS_ENDPOINT_URL envvar must be set', but got %s", err.Error())
