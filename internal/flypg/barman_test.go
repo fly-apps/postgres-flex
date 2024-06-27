@@ -109,11 +109,11 @@ func TestValidateBarmanRequirements(t *testing.T) {
 
 	t.Run("missing-aws-endpoint-url", func(t *testing.T) {
 		setDefaultEnv(t)
-		t.Setenv("AWS_ENDPOINT_URL", "")
+		t.Setenv("AWS_ENDPOINT_URL_S3", "")
 		err := validateBarman()
 
-		if err.Error() != "AWS_ENDPOINT_URL envvar must be set" {
-			t.Fatalf("expected error to be 'AWS_ENDPOINT_URL envvar must be set', but got %s", err.Error())
+		if err.Error() != "AWS_ENDPOINT_URL_S3 envvar must be set" {
+			t.Fatalf("expected error to be 'AWS_ENDPOINT_URL_S3 envvar must be set', but got %s", err.Error())
 		}
 	})
 }
@@ -136,7 +136,7 @@ func setDefaultEnv(t *testing.T) {
 	t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 	t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
-	t.Setenv("AWS_ENDPOINT_URL", "https://fly.storage.tigris.dev")
+	t.Setenv("AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
 	t.Setenv("AWS_BUCKET_NAME", "my-bucket")
 }

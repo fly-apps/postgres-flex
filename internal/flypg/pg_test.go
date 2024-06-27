@@ -117,7 +117,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	t.Run("cloud-archiving", func(t *testing.T) {
 		t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
 		t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
-		t.Setenv("AWS_ENDPOINT_URL", "https://fly.storage.tigris.dev")
+		t.Setenv("AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
 		t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
 		t.Setenv("AWS_BUCKET_NAME", "my-bucket")
 
@@ -137,7 +137,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		}
 
 		expected := fmt.Sprintf("'barman-cloud-wal-archive --cloud-provider aws-s3 --gzip --endpoint-url %s s3://%s %s %%p'",
-			os.Getenv("AWS_ENDPOINT_URL"),
+			os.Getenv("AWS_ENDPOINT_URL_S3"),
 			os.Getenv("AWS_BUCKET_NAME"),
 			pgConf.AppName)
 
@@ -149,7 +149,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	t.Run("cloud-archiving-disabled", func(t *testing.T) {
 		t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
 		t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
-		t.Setenv("AWS_ENDPOINT_URL", "https://fly.storage.tigris.dev")
+		t.Setenv("AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
 		t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
 		t.Setenv("AWS_BUCKET_NAME", "my-bucket")
 

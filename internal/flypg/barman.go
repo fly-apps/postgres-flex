@@ -37,7 +37,7 @@ func NewBarman() (*Barman, error) {
 	return &Barman{
 		appName:  os.Getenv("FLY_APP_NAME"),
 		provider: "aws-s3",
-		endpoint: strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL")),
+		endpoint: strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL_S3")),
 		bucket:   strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME")),
 
 		// fullBackupFrequency: getenv("CLOUD_ARCHIVING_FULL_BACKUP_FREQUENCY", "1"),
@@ -100,8 +100,8 @@ func validateBarman() error {
 		return fmt.Errorf("AWS_BUCKET_NAME envvar must be set")
 	}
 
-	if os.Getenv("AWS_ENDPOINT_URL") == "" {
-		return fmt.Errorf("AWS_ENDPOINT_URL envvar must be set")
+	if os.Getenv("AWS_ENDPOINT_URL_S3") == "" {
+		return fmt.Errorf("AWS_ENDPOINT_URL_S3 envvar must be set")
 	}
 
 	return nil

@@ -171,10 +171,6 @@ func (c *PGConfig) SetDefaults() error {
 		"wal_log_hints":            true,
 		"hot_standby":              true,
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
-		"restore_command":          "",
-		"recovery_target":          "",
-		"recovery_target_timeline": "",
-		"recovery_target_action":   "",
 	}
 
 	switch strings.ToLower(os.Getenv("CLOUD_ARCHIVING_ENABLED")) {

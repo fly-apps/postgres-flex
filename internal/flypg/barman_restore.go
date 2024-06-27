@@ -42,7 +42,7 @@ func NewBarmanRestore() (*BarmanRestore, error) {
 	return &BarmanRestore{
 		appName:  os.Getenv("FLY_APP_NAME"),
 		provider: "aws-s3",
-		endpoint: strings.TrimSpace(os.Getenv("SOURCE_AWS_ENDPOINT_URL")),
+		endpoint: strings.TrimSpace(os.Getenv("SOURCE_AWS_ENDPOINT_URL_S3")),
 		bucket:   strings.TrimSpace(os.Getenv("SOURCE_AWS_BUCKET_NAME")),
 
 		recoveryTarget: getenv("WAL_RECOVERY_TARGET", "immediate"),
@@ -202,8 +202,8 @@ func validateBarmanRestore() error {
 		return fmt.Errorf("SOURCE_AWS_BUCKET_NAME envvar must be set")
 	}
 
-	if os.Getenv("SOURCE_AWS_ENDPOINT_URL") == "" {
-		return fmt.Errorf("SOURCE_AWS_ENDPOINT_URL envvar must be set")
+	if os.Getenv("SOURCE_AWS_ENDPOINT_URL_S3") == "" {
+		return fmt.Errorf("SOURCE_AWS_ENDPOINT_URL_S3 envvar must be set")
 	}
 
 	return nil

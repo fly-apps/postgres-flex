@@ -218,6 +218,6 @@ func setRestoreDefaultEnv(t *testing.T) {
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 	t.Setenv("SOURCE_AWS_ACCESS_KEY_ID", "my-key")
 	t.Setenv("SOURCE_AWS_SECRET_ACCESS_KEY", "my-secret")
-	t.Setenv("SOURCE_AWS_ENDPOINT_URL", "https://fly.storage.tigris.dev")
+	t.Setenv("SOURCE_AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
 	t.Setenv("SOURCE_AWS_BUCKET_NAME", "my-bucket")
 }
