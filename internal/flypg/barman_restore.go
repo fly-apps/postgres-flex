@@ -3,8 +3,12 @@ package flypg
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
+	"os"
 	"time"
+
+	"github.com/fly-apps/postgres-flex/internal/supervisor"
 )
 
 type BarmanRestore struct {
@@ -52,7 +56,73 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 	return restore, nil
 }
 
-func (b *BarmanRestore) Restore(ctx context.Context) error {
+func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error {
+
+	// create a copy of the pg_hba.conf file so we can revert back to it when needed.
+	if err := backupHBAFile(); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed backing up pg_hba.conf: %s", err)
+	}
+
+	// Grant local access so we can update internal credentials
+	// to match the environment.
+	if err := grantLocalAccess(); err != nil {
+		return fmt.Errorf("failed to grant local access: %s", err)
+	}
+
+	// Boot postgres and wait for WAL replay to complete
+	svisor := supervisor.New("flypg", 5*time.Minute)
+	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D /data/postgresql -p 5433 -h %s", node.PrivateIP))
+
+	// Start the postgres process in the background.
+	go func() {
+		if err := svisor.Run(); err != nil {
+			log.Printf("[ERROR] failed to boot postgres in the background: %s", err)
+		}
+	}()
+
+	// Wait for the WAL replay to complete.
+	if err := b.waitOnRecoveryMode(ctx, node.PrivateIP); err != nil {
+		return fmt.Errorf("failed to monitor recovery mode: %s", err)
+	}
+
+	// Open read/write connection
+	conn, err := openConn(ctx, node.PrivateIP, false)
+	if err != nil {
+		return fmt.Errorf("failed to establish connection to local node: %s", err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	// Drop repmgr database to clear any metadata that belonged to the old cluster.
+	_, err = conn.Exec(ctx, "DROP DATABASE repmgr;")
+	if err != nil {
+		return fmt.Errorf("failed to drop repmgr database: %s", err)
+	}
+
+	// Ensure auth is configured to match the environment.
+	if err := node.setupCredentials(ctx, conn); err != nil {
+		return fmt.Errorf("failed creating required users: %s", err)
+	}
+
+	// Stop the postgres process
+	svisor.Stop()
+
+	// Revert back to the original config file
+	if err := restoreHBAFile(); err != nil {
+		return fmt.Errorf("failed to restore original pg_hba.conf: %s", err)
+	}
+
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close connection: %s", err)
+	}
+
+	return nil
+
+}
+
+func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 	// Query available backups from object storage
 	backups, err := b.ListBackups(ctx)
 	if err != nil {
@@ -173,4 +243,33 @@ func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr 
 	}
 
 	return latestBackupID, nil
+}
+
+func (b *BarmanRestore) waitOnRecoveryMode(ctx context.Context, privateIP string) error {
+	conn, err := openConn(ctx, privateIP, true)
+	if err != nil {
+		return fmt.Errorf("failed to establish connection to local node: %s", err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	timeout := time.After(10 * time.Minute)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			return fmt.Errorf("timed out waiting for PG to exit recovery mode")
+		case <-ticker.C:
+			var inRecovery bool
+			if err := conn.QueryRow(ctx, "SELECT pg_is_in_recovery();").Scan(&inRecovery); err != nil {
+				return fmt.Errorf("failed to check recovery status: %w", err)
+			}
+			if !inRecovery {
+				return nil
+			}
+		}
+	}
 }

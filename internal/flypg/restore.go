@@ -61,7 +61,7 @@ func prepareRemoteRestore(ctx context.Context, node *Node) error {
 		}
 	}()
 
-	conn, err := openConn(ctx, node)
+	conn, err := openConn(ctx, node.PrivateIP, false)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
@@ -187,8 +187,12 @@ func setRestoreLock() error {
 	return file.Sync()
 }
 
-func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
-	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=any", n.PrivateIP)
+func openConn(ctx context.Context, privateIP string, readOnly bool) (*pgx.Conn, error) {
+	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=any", privateIP)
+	if readOnly {
+		url += "&default_transaction_read_only=on"
+	}
+
 	conf, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, err

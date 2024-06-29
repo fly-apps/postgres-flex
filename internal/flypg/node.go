@@ -15,7 +15,6 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/privnet"
-	"github.com/fly-apps/postgres-flex/internal/supervisor"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
 )
@@ -146,54 +145,46 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Remote point-in-time restore.
 	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
-		// TODO - We may need to check for the restore lock her
-
-		restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+		active, err := isRestoreActive()
 		if err != nil {
-			return fmt.Errorf("failed to initialize barman restore: %s", err)
+			return fmt.Errorf("failed to verify active restore: %s", err)
 		}
 
-		// Write the source AWS credentials
-		if err := restore.writeAWSCredentials("default", awsCredentialsPath); err != nil {
-			return fmt.Errorf("failed to write aws credentials: %s", err)
+		if active {
+			restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+			if err != nil {
+				return fmt.Errorf("failed to initialize barman restore: %s", err)
+			}
+
+			// Write the source AWS credentials
+			if err := restore.writeAWSCredentials("default", awsCredentialsPath); err != nil {
+				return fmt.Errorf("failed to write aws credentials: %s", err)
+			}
+
+			log.Println("Restoring base backup")
+			if err := restore.RestoreFromBackup(ctx); err != nil {
+				return fmt.Errorf("failed to restore base backup: %s", err)
+			}
+
+			// Set restore configuration
+			if err := n.PGConfig.initialize(store); err != nil {
+				return fmt.Errorf("failed to initialize pg config: %s", err)
+			}
+
+			if err := restore.WALReplayAndReset(ctx, n); err != nil {
+				return fmt.Errorf("failed to replay WAL: %s", err)
+			}
+
+			os.Remove("/data/postgresql/recovery.signal")
+
+			os.Unsetenv("BARMAN_REMOTE_RESTORE")
+
+			// Set the lock file so the init process knows not to restart the restore process.
+			if err := setRestoreLock(); err != nil {
+				return fmt.Errorf("failed to set restore lock: %s", err)
+			}
 		}
 
-		log.Println("Restoring base backup")
-		if err := restore.Restore(ctx); err != nil {
-			return fmt.Errorf("failed to restore from PIT: %s", err)
-		}
-
-		// Ensure PG is properly configured before we boot.
-		if err := n.PGConfig.initialize(store); err != nil {
-			return fmt.Errorf("failed to initialize pg config: %s", err)
-		}
-
-		log.Printf("Starting supervisor process to replay WAL\n")
-		// Start the postgres process and wait for it to exit.
-		svisor := supervisor.New("flypg", 5*time.Minute)
-
-		args := []string{"-D", n.DataDir}
-
-		svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres %s", strings.Join(args, " ")))
-
-		if err := svisor.Run(); err != nil {
-			return fmt.Errorf("postgres replay process failed with: %s", err)
-		}
-
-		log.Printf("Supervisor finished!\n")
-
-		if err := os.Remove("/data/postgresql/recovery.signal"); err != nil {
-			return fmt.Errorf("failed to remove recovery.signal: %s", err)
-		}
-
-		os.Unsetenv("BARMAN_REMOTE_RESTORE")
-
-		// utils.RunCmd(ctx, "postgres", "postgres", args...)
-
-		log.Println("Resetting environment for restore")
-		if err := prepareRemoteRestore(ctx, n); err != nil {
-			return fmt.Errorf("failed to issue restore: %s", err)
-		}
 	}
 
 	// Verify whether we are a booting zombie.

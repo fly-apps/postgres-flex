@@ -196,17 +196,8 @@ func (c *PGConfig) SetDefaults() error {
 			return err
 		}
 
-		// At most one of:
-		// recovery_target,
-		// recovery_target_lsn,
-		// recovery_target_name,
-		// recovery_target_time,
-		// recovery_target_xid can be used;
-		// if more than one of these is specified in the configuration file, an error will be raised
-
 		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
-		c.internalConfig["recovery_target_action"] = "shutdown"
-		// c.internalConfig["recovery_target_timeline"] = "latest"
+		c.internalConfig["recovery_target_action"] = "promote"
 
 		switch {
 		case barmanRestore.recoveryTargetName != "":
