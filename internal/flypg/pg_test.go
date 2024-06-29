@@ -115,11 +115,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("cloud-archiving", func(t *testing.T) {
-		t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
-		t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
-		t.Setenv("AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
-		t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
-		t.Setenv("AWS_BUCKET_NAME", "my-bucket")
+		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket")
 
 		store, _ := state.NewStore()
 
@@ -136,7 +132,10 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		barman, _ := NewBarman(false)
+		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
+		if err != nil {
+			t.Fatal(err)
+		}
 		expected := fmt.Sprintf("'%s'", barman.walArchiveCommand())
 		if cfg["archive_command"] != expected {
 			t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])
@@ -144,12 +143,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("cloud-archiving-disabled", func(t *testing.T) {
-		t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
-		t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
-		t.Setenv("AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
-		t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
-		t.Setenv("AWS_BUCKET_NAME", "my-bucket")
-
+		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
@@ -165,7 +159,7 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		t.Setenv("CLOUD_ARCHIVING_ENABLED", "false")
+		t.Setenv("BARMAN_ENABLED", "")
 
 		if err := pgConf.initialize(store); err != nil {
 			t.Fatal(err)

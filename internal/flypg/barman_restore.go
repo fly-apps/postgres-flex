@@ -3,36 +3,53 @@ package flypg
 import (
 	"context"
 	"fmt"
-	"os"
+	"net/url"
 	"time"
 )
 
 type BarmanRestore struct {
 	*Barman
-	recoveryTarget         string
-	recoveryTargetTimeline string
-	recoveryTargetAction   string
+
+	recoveryTargetName string
+	recoveryTargetTime string
 }
 
 const (
 	defaultRestoreDir = "/data/postgresql"
 )
 
-func NewBarmanRestore() (*BarmanRestore, error) {
-	if err := validateRestoreEnv(); err != nil {
-		return nil, err
+func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
+	barman, err := NewBarman(configURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create barman client: %s", err)
 	}
 
-	barman, _ := NewBarman(false)
+	url, err := url.Parse(configURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid restore config url: %w", err)
+	}
 
-	return &BarmanRestore{
+	restore := &BarmanRestore{
 		Barman: barman,
+	}
 
-		recoveryTarget: getenv("WAL_RECOVERY_TARGET", "immediate"),
-		// TODO - Use recovery target time instead.  This is a temporary solution.
-		recoveryTargetTimeline: getenv("WAL_RECOVERY_TARGET_TIMELINE", "latest"),
-		recoveryTargetAction:   getenv("WAL_RECOVERY_TARGET_ACTION", "promote"),
-	}, nil
+	// evaluate the query parameters
+	for key, value := range url.Query() {
+		switch key {
+		case "targetName":
+			restore.recoveryTargetName = value[0]
+		case "targetTime":
+			restore.recoveryTargetTime = value[0]
+		default:
+			return nil, fmt.Errorf("unknown query parameter: %s", key)
+		}
+	}
+
+	if restore.recoveryTargetName == "" && restore.recoveryTargetTime == "" {
+		return nil, fmt.Errorf("restore target not specified")
+	}
+
+	return restore, nil
 }
 
 func (b *BarmanRestore) Restore(ctx context.Context) error {
@@ -46,10 +63,30 @@ func (b *BarmanRestore) Restore(ctx context.Context) error {
 		return fmt.Errorf("no backups found")
 	}
 
-	// Resolve the base backup to restore
-	backupID, err := b.resolveBackupTarget(backups, b.recoveryTargetTimeline)
-	if err != nil {
-		return fmt.Errorf("failed to resolve backup target: %s", err)
+	var backupID string
+
+	switch {
+	case b.recoveryTargetName != "":
+		// Resolve the target base backup
+
+		// TODO - the id needs to be prefixed with barman_
+		backupID, err = b.resolveBackupFromID(backups, b.recoveryTargetName)
+		if err != nil {
+			return fmt.Errorf("failed to resolve backup target by id: %s", err)
+		}
+	case b.recoveryTargetTime != "":
+		// Resolve the target base backup
+		backupID, err = b.resolveBackupFromTime(backups, b.recoveryTargetTime)
+		if err != nil {
+			return fmt.Errorf("failed to resolve backup target by time: %s", err)
+		}
+	default:
+		return fmt.Errorf("restore target not specified")
+	}
+
+	// TODO - Consider just using the last available backup if the target is not found
+	if backupID == "" {
+		return fmt.Errorf("no backup found")
 	}
 
 	// Download and restore the base backup
@@ -60,7 +97,21 @@ func (b *BarmanRestore) Restore(ctx context.Context) error {
 	return nil
 }
 
-func (b *BarmanRestore) resolveBackupTarget(backupList BackupList, restoreStr string) (string, error) {
+func (b *BarmanRestore) resolveBackupFromID(backupList BackupList, id string) (string, error) {
+	if len(backupList.Backups) == 0 {
+		return "", fmt.Errorf("no backups found")
+	}
+
+	for _, backup := range backupList.Backups {
+		if backup.BackupID == id {
+			return backup.BackupID, nil
+		}
+	}
+
+	return "", fmt.Errorf("no backup found with id %s", id)
+}
+
+func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr string) (string, error) {
 	if len(backupList.Backups) == 0 {
 		return "", fmt.Errorf("no backups found")
 	}
@@ -71,6 +122,7 @@ func (b *BarmanRestore) resolveBackupTarget(backupList BackupList, restoreStr st
 	if restoreStr == "latest" {
 		restoreTime = time.Now()
 	} else {
+
 		var err error
 		restoreTime, err = time.Parse(time.RFC3339, restoreStr)
 		if err != nil {
@@ -121,24 +173,4 @@ func (b *BarmanRestore) resolveBackupTarget(backupList BackupList, restoreStr st
 	}
 
 	return latestBackupID, nil
-}
-
-func validateRestoreEnv() error {
-	if os.Getenv("SOURCE_AWS_ACCESS_KEY_ID") == "" {
-		return fmt.Errorf("SOURCE_AWS_ACCESS_KEY_ID secret must be set")
-	}
-
-	if os.Getenv("SOURCE_AWS_SECRET_ACCESS_KEY") == "" {
-		return fmt.Errorf("SOURCE_AWS_SECRET_ACCESS_KEY secret must be set")
-	}
-
-	if os.Getenv("SOURCE_AWS_BUCKET_NAME") == "" {
-		return fmt.Errorf("SOURCE_AWS_BUCKET_NAME envvar must be set")
-	}
-
-	if os.Getenv("SOURCE_AWS_ENDPOINT_URL_S3") == "" {
-		return fmt.Errorf("SOURCE_AWS_ENDPOINT_URL_S3 envvar must be set")
-	}
-
-	return nil
 }

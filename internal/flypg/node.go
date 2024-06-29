@@ -15,6 +15,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/privnet"
+	"github.com/fly-apps/postgres-flex/internal/supervisor"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
 )
@@ -138,19 +139,58 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
+	store, err := state.NewStore()
+	if err != nil {
+		return fmt.Errorf("failed initialize cluster state store: %s", err)
+	}
+
 	// Remote point-in-time restore.
-	if os.Getenv("CLOUD_ARCHIVING_REMOTE_RESTORE") != "" {
+	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
 		// TODO - We may need to check for the restore lock her
 
-		restore, err := NewBarmanRestore()
+		restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
 		if err != nil {
 			return fmt.Errorf("failed to initialize barman restore: %s", err)
 		}
 
+		// Write the source AWS credentials
+		if err := restore.writeAWSCredentials("default", awsCredentialsPath); err != nil {
+			return fmt.Errorf("failed to write aws credentials: %s", err)
+		}
+
+		log.Println("Restoring base backup")
 		if err := restore.Restore(ctx); err != nil {
 			return fmt.Errorf("failed to restore from PIT: %s", err)
 		}
 
+		// Ensure PG is properly configured before we boot.
+		if err := n.PGConfig.initialize(store); err != nil {
+			return fmt.Errorf("failed to initialize pg config: %s", err)
+		}
+
+		log.Printf("Starting supervisor process to replay WAL\n")
+		// Start the postgres process and wait for it to exit.
+		svisor := supervisor.New("flypg", 5*time.Minute)
+
+		args := []string{"-D", n.DataDir}
+
+		svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres %s", strings.Join(args, " ")))
+
+		if err := svisor.Run(); err != nil {
+			return fmt.Errorf("postgres replay process failed with: %s", err)
+		}
+
+		log.Printf("Supervisor finished!\n")
+
+		if err := os.Remove("/data/postgresql/recovery.signal"); err != nil {
+			return fmt.Errorf("failed to remove recovery.signal: %s", err)
+		}
+
+		os.Unsetenv("BARMAN_REMOTE_RESTORE")
+
+		// utils.RunCmd(ctx, "postgres", "postgres", args...)
+
+		log.Println("Resetting environment for restore")
 		if err := prepareRemoteRestore(ctx, n); err != nil {
 			return fmt.Errorf("failed to issue restore: %s", err)
 		}
@@ -163,14 +203,8 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	err := WriteSSHKey()
-	if err != nil {
+	if err = WriteSSHKey(); err != nil {
 		return fmt.Errorf("failed write ssh keys: %s", err)
-	}
-
-	store, err := state.NewStore()
-	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
 	if err := n.RepMgr.initialize(); err != nil {

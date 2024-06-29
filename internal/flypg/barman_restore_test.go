@@ -1,6 +1,7 @@
 package flypg
 
 import (
+	"os"
 	"testing"
 )
 
@@ -104,11 +105,49 @@ const backupsResponse = `{
     ]
 }`
 
+func TestNewBarmanRestore(t *testing.T) {
+	setRestoreDefaultEnv(t)
+
+	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+	if err != nil {
+		t.Fatalf("NewBarmanRestore failed with: %v", err)
+	}
+
+	if restore.bucket != "my-bucket" {
+		t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
+	}
+
+	if restore.Bucket() != "s3://my-bucket" {
+		t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
+	}
+
+	if restore.appName != "postgres-flex" {
+		t.Fatalf("expected app name to be postgres-flex, got %s", restore.appName)
+	}
+
+	if restore.provider != "aws-s3" {
+		t.Fatalf("expected provider to be aws-s3, got %s", restore.provider)
+	}
+
+	if restore.endpoint != "https://fly.storage.tigris.dev" {
+		t.Fatalf("expected endpoint to be https://fly.storage.tigris.dev, got %s", restore.endpoint)
+	}
+
+	if restore.recoveryTargetName != "" {
+		t.Fatalf("expected recovery target name to be empty, got %s", restore.recoveryTargetName)
+	}
+
+	if restore.recoveryTargetTime != "1212121212" {
+		t.Fatalf("expected recovery target time to be 1212121212, got %s", restore.recoveryTargetTime)
+	}
+
+}
+
 func TestParseBackups(t *testing.T) {
 	t.Run("parseBackups", func(t *testing.T) {
 		setRestoreDefaultEnv(t)
 
-		restore, err := NewBarmanRestore()
+		restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
 		if err != nil {
 			t.Fatalf("NewBarmanRestore failed with: %v", err)
 		}
@@ -154,7 +193,7 @@ func TestParseBackups(t *testing.T) {
 func TestResolveBackupTarget(t *testing.T) {
 	setRestoreDefaultEnv(t)
 
-	restore, err := NewBarmanRestore()
+	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
 	if err != nil {
 		t.Fatalf("NewBarmanRestore failed with: %v", err)
 	}
@@ -165,7 +204,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	}
 
 	t.Run("resolve-latest-backup-target", func(t *testing.T) {
-		backupID, err := restore.resolveBackupTarget(list, "latest")
+		backupID, err := restore.resolveBackupFromTime(list, "latest")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -176,7 +215,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	})
 
 	t.Run("resolve-earliest-backup-target", func(t *testing.T) {
-		backupID, err := restore.resolveBackupTarget(list, "2024-06-25T19:44:12Z")
+		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:12Z")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -189,7 +228,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	// "begin_time": "Tue Jun 25 19:44:12 2024"
 	// "end_time": "Tue Jun 25 19:44:18 2024",
 	t.Run("resolve-backup-within-first-window", func(t *testing.T) {
-		backupID, err := restore.resolveBackupTarget(list, "2024-06-25T19:44:15Z")
+		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:15Z")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -202,7 +241,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	// "begin_time": "Wed Jun 26 17:24:43 2024",
 	// "end_time": "Wed Jun 26 17:27:02 2024",
 	t.Run("resolve-backup-within-second-window", func(t *testing.T) {
-		backupID, err := restore.resolveBackupTarget(list, "2024-06-26T17:25:15Z")
+		backupID, err := restore.resolveBackupFromTime(list, "2024-06-26T17:25:15Z")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -214,10 +253,6 @@ func TestResolveBackupTarget(t *testing.T) {
 }
 
 func setRestoreDefaultEnv(t *testing.T) {
-	t.Setenv("CLOUD_ARCHIVING_WAL_RESTORE", "true")
+	t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket?targetTime=1212121212")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
-	t.Setenv("SOURCE_AWS_ACCESS_KEY_ID", "my-key")
-	t.Setenv("SOURCE_AWS_SECRET_ACCESS_KEY", "my-secret")
-	t.Setenv("SOURCE_AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
-	t.Setenv("SOURCE_AWS_BUCKET_NAME", "my-bucket")
 }

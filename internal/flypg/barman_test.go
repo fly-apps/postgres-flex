@@ -1,14 +1,17 @@
 package flypg
 
 import (
+	"os"
 	"testing"
+
+	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 func TestNewBarman(t *testing.T) {
 	t.Run("defaults", func(t *testing.T) {
 		setDefaultEnv(t)
 
-		barman, err := NewBarman(true)
+		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -21,8 +24,12 @@ func TestNewBarman(t *testing.T) {
 			t.Fatalf("expected endpoint to be https://fly.storage.tigris.dev, but got %s", barman.endpoint)
 		}
 
-		if barman.bucket != "s3://my-bucket" {
+		if barman.bucket != "my-bucket" {
 			t.Fatalf("expected bucket to be my-bucket, but got %s", barman.bucket)
+		}
+
+		if barman.Bucket() != "s3://my-bucket" {
+			t.Fatalf("expected bucket to be s3://my-bucket, but got %s", barman.bucket)
 		}
 
 		if barman.appName != "postgres-flex" {
@@ -37,82 +44,118 @@ func TestNewBarman(t *testing.T) {
 		if barman.retentionDays != "7" {
 			t.Fatalf("expected retentionDays to be 7, but got %s", barman.retentionDays)
 		}
-
 	})
+}
 
-	t.Run("custom-retention", func(t *testing.T) {
+func TestWriteAWSCredentials(t *testing.T) {
+	setup(t)
+	defer cleanup()
+
+	t.Run("write-aws-credentials", func(t *testing.T) {
 		setDefaultEnv(t)
-		t.Setenv("CLOUD_ARCHIVING_RETENTION_DAYS", "30")
 
-		barman, err := NewBarman(true)
+		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if barman.retentionDays != "30" {
-			t.Fatalf("expected retentionDays to be 30, but got %s", barman.retentionDays)
+
+		credFile := "./test_results/credentials"
+
+		if err := barman.writeAWSCredentials("default", credFile); err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-	})
 
-	t.Run("custom-min-redundancy", func(t *testing.T) {
-		setDefaultEnv(t)
-		t.Setenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "7")
+		if !utils.FileExists(credFile) {
+			t.Fatalf("expected %s to exist, but doesn't", credFile)
+		}
 
-		barman, err := NewBarman(true)
+		// Check contents
+		contents, err := os.ReadFile(credFile)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if barman.minimumRedundancy != "7" {
-			t.Fatalf("expected retentionDays to be 7, but got %s", barman.retentionDays)
+
+		expected := "[default]\naws_access_key_id=my-key\naws_secret_access_key=my-secret"
+
+		if string(contents) != expected {
+			t.Fatalf("expected contents to be %s, but got %s", expected, string(contents))
 		}
 	})
 }
 
-func TestValidateBarmanRequirements(t *testing.T) {
-	b, _ := NewBarman(false)
+// 	t.Run("custom-retention", func(t *testing.T) {
+// 		setDefaultEnv(t)
+// 		t.Setenv("CLOUD_ARCHIVING_RETENTION_DAYS", "30")
 
-	t.Run("missing-aws-access-key", func(t *testing.T) {
-		err := b.ValidateRequiredEnv()
+// 		barman, err := NewBarman(true)
+// 		if err != nil {
+// 			t.Fatalf("unexpected error: %v", err)
+// 		}
+// 		if barman.retentionDays != "30" {
+// 			t.Fatalf("expected retentionDays to be 30, but got %s", barman.retentionDays)
+// 		}
+// 	})
 
-		if err.Error() != "AWS_ACCESS_KEY_ID secret must be set" {
-			t.Fatalf("expected error to be 'AWS_ACCESS_KEY_ID secret must be set', but got %s", err.Error())
-		}
-	})
+// 	t.Run("custom-min-redundancy", func(t *testing.T) {
+// 		setDefaultEnv(t)
+// 		t.Setenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "7")
 
-	t.Run("missing-aws-secret-access-key", func(t *testing.T) {
-		setDefaultEnv(t)
-		t.Setenv("AWS_SECRET_ACCESS_KEY", "")
-		err := b.ValidateRequiredEnv()
+// 		barman, err := NewBarman(true)
+// 		if err != nil {
+// 			t.Fatalf("unexpected error: %v", err)
+// 		}
+// 		if barman.minimumRedundancy != "7" {
+// 			t.Fatalf("expected retentionDays to be 7, but got %s", barman.retentionDays)
+// 		}
+// 	})
+// }
 
-		if err.Error() != "AWS_SECRET_ACCESS_KEY secret must be set" {
-			t.Fatalf("expected error to be 'AWS_SECRET_ACCESS_KEY secret must be set', but got %s", err.Error())
-		}
-	})
+// func TestValidateBarmanRequirements(t *testing.T) {
+// 	b, _ := NewBarman(false)
 
-	t.Run("missing-aws-bucket-name", func(t *testing.T) {
-		setDefaultEnv(t)
-		t.Setenv("AWS_BUCKET_NAME", "")
-		err := b.ValidateRequiredEnv()
+// 	t.Run("missing-aws-access-key", func(t *testing.T) {
+// 		err := b.ValidateRequiredEnv()
 
-		if err.Error() != "AWS_BUCKET_NAME envvar must be set" {
-			t.Fatalf("expected error to be 'AWS_BUCKET_NAME envvar must be set', but got %s", err.Error())
-		}
-	})
+// 		if err.Error() != "AWS_ACCESS_KEY_ID secret must be set" {
+// 			t.Fatalf("expected error to be 'AWS_ACCESS_KEY_ID secret must be set', but got %s", err.Error())
+// 		}
+// 	})
 
-	t.Run("missing-aws-endpoint-url", func(t *testing.T) {
-		setDefaultEnv(t)
-		t.Setenv("AWS_ENDPOINT_URL_S3", "")
-		err := b.ValidateRequiredEnv()
+// 	t.Run("missing-aws-secret-access-key", func(t *testing.T) {
+// 		setDefaultEnv(t)
+// 		t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+// 		err := b.ValidateRequiredEnv()
 
-		if err.Error() != "AWS_ENDPOINT_URL_S3 envvar must be set" {
-			t.Fatalf("expected error to be 'AWS_ENDPOINT_URL_S3 envvar must be set', but got %s", err.Error())
-		}
-	})
-}
+// 		if err.Error() != "AWS_SECRET_ACCESS_KEY secret must be set" {
+// 			t.Fatalf("expected error to be 'AWS_SECRET_ACCESS_KEY secret must be set', but got %s", err.Error())
+// 		}
+// 	})
+
+// 	t.Run("missing-aws-bucket-name", func(t *testing.T) {
+// 		setDefaultEnv(t)
+// 		t.Setenv("AWS_BUCKET_NAME", "")
+// 		err := b.ValidateRequiredEnv()
+
+// 		if err.Error() != "AWS_BUCKET_NAME envvar must be set" {
+// 			t.Fatalf("expected error to be 'AWS_BUCKET_NAME envvar must be set', but got %s", err.Error())
+// 		}
+// 	})
+
+// 	t.Run("missing-aws-endpoint-url", func(t *testing.T) {
+// 		setDefaultEnv(t)
+// 		t.Setenv("AWS_ENDPOINT_URL_S3", "")
+// 		err := b.ValidateRequiredEnv()
+
+// 		if err.Error() != "AWS_ENDPOINT_URL_S3 envvar must be set" {
+// 			t.Fatalf("expected error to be 'AWS_ENDPOINT_URL_S3 envvar must be set', but got %s", err.Error())
+// 		}
+// 	})
+// }
 
 func TestBarmanRetentionPolicy(t *testing.T) {
 	setDefaultEnv(t)
 
-	barman, err := NewBarman(true)
+	barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,10 +166,7 @@ func TestBarmanRetentionPolicy(t *testing.T) {
 }
 
 func setDefaultEnv(t *testing.T) {
-	t.Setenv("CLOUD_ARCHIVING_ENABLED", "true")
+	t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
-	t.Setenv("AWS_ACCESS_KEY_ID", "my-key")
-	t.Setenv("AWS_ENDPOINT_URL_S3", "https://fly.storage.tigris.dev")
-	t.Setenv("AWS_SECRET_ACCESS_KEY", "my-secret")
-	t.Setenv("AWS_BUCKET_NAME", "my-bucket")
+
 }

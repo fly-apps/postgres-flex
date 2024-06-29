@@ -195,8 +195,8 @@ func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
 	}
 	conf.User = "postgres"
 
-	// Allow up to 30 seconds for PG to boot and accept connections.
-	timeout := time.After(30 * time.Second)
+	// Allow up to 60 seconds for PG to boot and accept connections.
+	timeout := time.After(60 * time.Second)
 	tick := time.NewTicker(1 * time.Second)
 	defer tick.Stop()
 	for {

@@ -42,8 +42,8 @@ func main() {
 		}
 	}()
 
-	if os.Getenv("CLOUD_ARCHIVING_ENABLED") == "true" {
-		barman, err := flypg.NewBarman(true)
+	if os.Getenv("BARMAN_ENABLED") == "true" {
+		barman, err := flypg.NewBarman(os.Getenv("BARMAN_ENABLED"))
 		if err != nil {
 			panic(err)
 		}

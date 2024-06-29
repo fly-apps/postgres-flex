@@ -173,33 +173,49 @@ func (c *PGConfig) SetDefaults() error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
-	switch strings.ToLower(os.Getenv("CLOUD_ARCHIVING_ENABLED")) {
-	case "true":
-		barman, err := NewBarman(true)
+	if os.Getenv("BARMAN_ENABLED") != "" {
+		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
 		switch {
 		case err != nil:
 			log.Printf("[WARN] Failed to initialize barman: %s", err)
 		default:
+			if err := barman.writeAWSCredentials("default", awsCredentialsPath); err != nil {
+				log.Printf("[WARN] Failed to write AWS credentials: %s", err)
+			}
+
 			c.internalConfig["archive_mode"] = "on"
 			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
 		}
-	case "false":
+	} else {
 		c.internalConfig["archive_mode"] = "off"
-		c.internalConfig["archive_command"] = ""
-	default:
-		// Noop
 	}
 
-	if os.Getenv("CLOUD_ARCHIVING_WAL_RESTORE") != "" {
-		barmanRestore, err := NewBarmanRestore()
+	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+		barmanRestore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
 		if err != nil {
 			return err
 		}
 
+		// At most one of:
+		// recovery_target,
+		// recovery_target_lsn,
+		// recovery_target_name,
+		// recovery_target_time,
+		// recovery_target_xid can be used;
+		// if more than one of these is specified in the configuration file, an error will be raised
+
 		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
-		c.internalConfig["recovery_target"] = barmanRestore.recoveryTarget
-		c.internalConfig["recovery_target_timeline"] = barmanRestore.recoveryTargetTimeline
-		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
+		c.internalConfig["recovery_target_action"] = "shutdown"
+		// c.internalConfig["recovery_target_timeline"] = "latest"
+
+		switch {
+		case barmanRestore.recoveryTargetName != "":
+			c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
+		case barmanRestore.recoveryTargetTime != "":
+			c.internalConfig["recovery_target_time"] = "2024-06-27 20:24:34 UTC"
+		default:
+			return errors.New("recovery target name or time must be specified")
+		}
 
 		// Write the recovery.signal file
 		if err := os.WriteFile("/data/postgresql/recovery.signal", []byte(""), 0600); err != nil {

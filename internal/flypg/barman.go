@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,7 +15,8 @@ import (
 )
 
 const (
-	providerDefault = "aws-s3"
+	providerDefault    = "aws-s3"
+	awsCredentialsPath = "/data/.aws/credentials"
 )
 
 type Barman struct {
@@ -22,9 +25,10 @@ type Barman struct {
 	endpoint string
 	bucket   string
 
-	fullBackupFrequency string // TODO - Implement
-	minimumRedundancy   string
-	retentionDays       string
+	configURL string
+
+	retentionDays     string
+	minimumRedundancy string
 }
 
 type Backup struct {
@@ -39,37 +43,71 @@ type BackupList struct {
 	Backups []Backup `json:"backups_list"`
 }
 
-func NewBarman(validate bool) (*Barman, error) {
-	bucket := strings.TrimSpace(os.Getenv("AWS_BUCKET_NAME"))
-	bucket = fmt.Sprintf("s3://%s", bucket)
-
-	b := &Barman{
-		appName:  os.Getenv("FLY_APP_NAME"),
-		provider: providerDefault,
-		endpoint: strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL_S3")),
-		bucket:   bucket,
-
-		retentionDays:     getenv("CLOUD_ARCHIVING_RETENTION_DAYS", "7"),
-		minimumRedundancy: getenv("CLOUD_ARCHIVING_MINIMUM_REDUNDANCY", "3"),
+// NewBarman creates a new Barman instance.
+// The configURL is expected to be in the format:
+// barman://access-key:secret-key@endpoint/bucket
+func NewBarman(configURL string) (*Barman, error) {
+	parsedURL, err := url.Parse(configURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid credential url: %w", err)
 	}
 
-	if validate {
-		return b, b.ValidateRequiredEnv()
+	endpoint := parsedURL.Host
+	if endpoint == "" {
+		return nil, fmt.Errorf("object storage endpoint missing")
 	}
 
-	return b, nil
+	bucket := strings.TrimLeft(parsedURL.Path, "/")
+	if bucket == "" {
+		return nil, fmt.Errorf("bucket name is missing")
+	}
+
+	// Extract user information for credentials (not used here but necessary for the complete parsing)
+	username := parsedURL.User.Username()
+	password, _ := parsedURL.User.Password()
+
+	// Ensure the credentials are not empty
+	if username == "" || password == "" {
+		return nil, fmt.Errorf("access key or secret key is missing")
+	}
+
+	// Set the environment variable within the Go process
+	if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
+		fmt.Printf("Error setting environment variable: %s\n", err)
+		return nil, err
+	}
+
+	return &Barman{
+		appName:   os.Getenv("FLY_APP_NAME"),
+		provider:  providerDefault,
+		endpoint:  fmt.Sprintf("https://%s", endpoint),
+		bucket:    bucket,
+		configURL: configURL,
+
+		retentionDays:     "7",
+		minimumRedundancy: "3",
+	}, nil
+
+}
+
+func (b *Barman) Bucket() string {
+	return fmt.Sprintf("s3://%s", b.bucket)
 }
 
 // Backup performs a base backup of the database.
-// forceCheckpoint - forces the initial checkpoint to be done as quickly as possible.
-func (b *Barman) Backup(ctx context.Context, forceCheckpoint bool) ([]byte, error) {
+// immediateCheckpoint - forces the initial checkpoint to be done as quickly as possible.
+func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
-		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--endpoint-url", b.endpoint,
 		"--host", fmt.Sprintf("%s.internal", b.appName),
 		"--user", "repmgr",
-		b.bucket,
+		b.Bucket(),
 		b.appName,
+	}
+
+	if immediateCheckpoint {
+		args = append(args, "--immediate-checkpoint")
 	}
 
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup", args...)
@@ -79,9 +117,9 @@ func (b *Barman) Backup(ctx context.Context, forceCheckpoint bool) ([]byte, erro
 func (b *Barman) RestoreBackup(ctx context.Context, backupID, recoveryDir string) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
-		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--endpoint-url", b.endpoint,
+		b.Bucket(),
 		b.bucket,
-		b.appName,
 		backupID,
 		recoveryDir,
 	}
@@ -92,10 +130,10 @@ func (b *Barman) RestoreBackup(ctx context.Context, backupID, recoveryDir string
 func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
-		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--endpoint-url", b.endpoint,
 		"--format", "json",
+		b.Bucket(),
 		b.bucket,
-		b.appName,
 	}
 
 	backupsBytes, err := utils.RunCmd(ctx, "postgres", "barman-cloud-backup-list", args...)
@@ -109,10 +147,10 @@ func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
-		"--endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"),
+		"--endpoint-url", b.endpoint,
 		"--retention", b.RetentionPolicy(),
 		"--minimum-redundancy", b.minimumRedundancy,
-		b.bucket,
+		b.Bucket(),
 		b.appName,
 	}
 
@@ -160,26 +198,6 @@ func (b *Barman) RetentionPolicy() string {
 	return fmt.Sprintf("'RECOVERY WINDOW OF %s days'", b.retentionDays)
 }
 
-func (b *Barman) ValidateRequiredEnv() error {
-	if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
-		return fmt.Errorf("AWS_ACCESS_KEY_ID secret must be set")
-	}
-
-	if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		return fmt.Errorf("AWS_SECRET_ACCESS_KEY secret must be set")
-	}
-
-	if os.Getenv("AWS_BUCKET_NAME") == "" {
-		return fmt.Errorf("AWS_BUCKET_NAME envvar must be set")
-	}
-
-	if os.Getenv("AWS_ENDPOINT_URL_S3") == "" {
-		return fmt.Errorf("AWS_ENDPOINT_URL_S3 envvar must be set")
-	}
-
-	return nil
-}
-
 func (b *Barman) parseBackups(backupBytes []byte) (BackupList, error) {
 	var backupList BackupList
 
@@ -195,8 +213,8 @@ func (b *Barman) walArchiveCommand() string {
 	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s %s %s %%p",
 		b.provider,
 		b.endpoint,
+		b.Bucket(),
 		b.bucket,
-		b.appName,
 	)
 }
 
@@ -206,9 +224,40 @@ func (b *Barman) walRestoreCommand() string {
 	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s %s %s %%f %%p",
 		b.provider,
 		b.endpoint,
+		b.Bucket(),
 		b.bucket,
-		b.appName,
 	)
+}
+
+func (b *Barman) writeAWSCredentials(profile string, credentialsPath string) error {
+	barmanURL, err := url.Parse(b.configURL)
+	if err != nil {
+		return fmt.Errorf("invalid configURL: %w", err)
+	}
+
+	accessKey := barmanURL.User.Username()
+	if accessKey == "" {
+		return fmt.Errorf("AWS ACCESS KEY is missing")
+	}
+
+	secretAccessKey, _ := barmanURL.User.Password()
+	if secretAccessKey == "" {
+		return fmt.Errorf("AWS SECRET KEY is missing")
+	}
+
+	credentials := fmt.Sprintf("[%s]\naws_access_key_id=%s\naws_secret_access_key=%s",
+		profile, accessKey, secretAccessKey)
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(credentialsPath), 0700); err != nil {
+		return fmt.Errorf("failed to create AWS credentials directory: %w", err)
+	}
+
+	if err := os.WriteFile(credentialsPath, []byte(credentials), 0644); err != nil {
+		return fmt.Errorf("failed to write AWS credentials file: %w", err)
+	}
+
+	return nil
 }
 
 func getenv(key, fallback string) string {
