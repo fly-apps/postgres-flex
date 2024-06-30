@@ -14,8 +14,11 @@ import (
 type BarmanRestore struct {
 	*Barman
 
-	recoveryTargetName string
-	recoveryTargetTime string
+	recoveryTarget          string
+	recoveryTargetName      string
+	recoveryTargetTime      string
+	recoveryTargetAction    string
+	recoveryTargetInclusive bool
 }
 
 const (
@@ -40,24 +43,33 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 	// evaluate the query parameters
 	for key, value := range url.Query() {
 		switch key {
+		case "target":
+			restore.recoveryTarget = value[0]
 		case "targetName":
 			restore.recoveryTargetName = value[0]
 		case "targetTime":
 			restore.recoveryTargetTime = value[0]
+		case "targetInclusive":
+			restore.recoveryTargetInclusive = value[0] == "true"
+		case "targetAction":
+			restore.recoveryTargetAction = value[0]
 		default:
 			return nil, fmt.Errorf("unknown query parameter: %s", key)
 		}
 	}
 
-	if restore.recoveryTargetName == "" && restore.recoveryTargetTime == "" {
-		return nil, fmt.Errorf("restore target not specified")
+	if restore.recoveryTargetAction == "" {
+		restore.recoveryTargetAction = "promote"
+	}
+
+	if restore.recoveryTargetName == "" && restore.recoveryTargetTime == "" && restore.recoveryTarget == "" {
+		return nil, fmt.Errorf("no restore target not specified")
 	}
 
 	return restore, nil
 }
 
 func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error {
-
 	// create a copy of the pg_hba.conf file so we can revert back to it when needed.
 	if err := backupHBAFile(); err != nil {
 		if os.IsNotExist(err) {
@@ -84,9 +96,11 @@ func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error
 	}()
 
 	// Wait for the WAL replay to complete.
-	if err := b.waitOnRecoveryMode(ctx, node.PrivateIP); err != nil {
+	if err := b.waitOnRecovery(ctx, node.PrivateIP); err != nil {
 		return fmt.Errorf("failed to monitor recovery mode: %s", err)
 	}
+
+	// os.Remove("/data/postgresql/recovery.signal")
 
 	// Open read/write connection
 	conn, err := openConn(ctx, node.PrivateIP, false)
@@ -138,15 +152,17 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 	switch {
 	case b.recoveryTargetName != "":
 		// Resolve the target base backup
-
-		// TODO - the id needs to be prefixed with barman_
 		backupID, err = b.resolveBackupFromID(backups, b.recoveryTargetName)
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by id: %s", err)
 		}
 	case b.recoveryTargetTime != "":
-		// Resolve the target base backup
 		backupID, err = b.resolveBackupFromTime(backups, b.recoveryTargetTime)
+		if err != nil {
+			return fmt.Errorf("failed to resolve backup target by time: %s", err)
+		}
+	case b.recoveryTarget != "":
+		backupID, err = b.resolveBackupFromTime(backups, time.Now().String())
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by time: %s", err)
 		}
@@ -160,7 +176,7 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 	}
 
 	// Download and restore the base backup
-	if _, err := b.RestoreBackup(ctx, backupID, defaultRestoreDir); err != nil {
+	if _, err := b.RestoreBackup(ctx, backupID); err != nil {
 		return fmt.Errorf("failed to restore backup: %s", err)
 	}
 
@@ -245,8 +261,8 @@ func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr 
 	return latestBackupID, nil
 }
 
-func (b *BarmanRestore) waitOnRecoveryMode(ctx context.Context, privateIP string) error {
-	conn, err := openConn(ctx, privateIP, true)
+func (b *BarmanRestore) waitOnRecovery(ctx context.Context, privateIP string) error {
+	conn, err := openConn(ctx, privateIP, false)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}

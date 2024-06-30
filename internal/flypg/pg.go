@@ -182,7 +182,6 @@ func (c *PGConfig) SetDefaults() error {
 			if err := barman.writeAWSCredentials("default", awsCredentialsPath); err != nil {
 				log.Printf("[WARN] Failed to write AWS credentials: %s", err)
 			}
-
 			c.internalConfig["archive_mode"] = "on"
 			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
 		}
@@ -197,13 +196,15 @@ func (c *PGConfig) SetDefaults() error {
 		}
 
 		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
-		c.internalConfig["recovery_target_action"] = "promote"
+		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
 
 		switch {
+		case barmanRestore.recoveryTarget != "":
+			c.internalConfig["recovery_target"] = barmanRestore.recoveryTarget
 		case barmanRestore.recoveryTargetName != "":
 			c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
 		case barmanRestore.recoveryTargetTime != "":
-			c.internalConfig["recovery_target_time"] = "2024-06-27 20:24:34 UTC"
+			c.internalConfig["recovery_target_time"] = barmanRestore.recoveryTargetTime
 		default:
 			return errors.New("recovery target name or time must be specified")
 		}

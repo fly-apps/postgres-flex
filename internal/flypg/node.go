@@ -175,8 +175,6 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to replay WAL: %s", err)
 			}
 
-			os.Remove("/data/postgresql/recovery.signal")
-
 			os.Unsetenv("BARMAN_REMOTE_RESTORE")
 
 			// Set the lock file so the init process knows not to restart the restore process.
@@ -184,7 +182,6 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to set restore lock: %s", err)
 			}
 		}
-
 	}
 
 	// Verify whether we are a booting zombie.

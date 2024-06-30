@@ -114,14 +114,14 @@ func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, 
 }
 
 // RestoreBackup returns the command string used to restore a base backup.
-func (b *Barman) RestoreBackup(ctx context.Context, backupID, recoveryDir string) ([]byte, error) {
+func (b *Barman) RestoreBackup(ctx context.Context, backupID string) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
 		b.Bucket(),
 		b.bucket,
 		backupID,
-		recoveryDir,
+		defaultRestoreDir,
 	}
 
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-restore", args...)
