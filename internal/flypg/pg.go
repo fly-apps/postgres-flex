@@ -184,6 +184,10 @@ func (c *PGConfig) SetDefaults() error {
 			}
 			c.internalConfig["archive_mode"] = "on"
 			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
+			// TODO - Make this configurable
+			// This controls the minimum frequency WAL files are archived to barman
+			// in the event there is database activity.
+			c.internalConfig["archive_timeout"] = "60s"
 		}
 	} else {
 		c.internalConfig["archive_mode"] = "off"
