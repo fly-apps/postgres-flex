@@ -145,6 +145,7 @@ func (n *Node) Init(ctx context.Context) error {
 
 	// Remote point-in-time restore.
 	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+		// TODO - Probably not safe to use the same lock as the snapshot restore.
 		active, err := isRestoreActive()
 		if err != nil {
 			return fmt.Errorf("failed to verify active restore: %s", err)
@@ -174,8 +175,6 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := restore.WALReplayAndReset(ctx, n); err != nil {
 				return fmt.Errorf("failed to replay WAL: %s", err)
 			}
-
-			os.Unsetenv("BARMAN_REMOTE_RESTORE")
 
 			// Set the lock file so the init process knows not to restart the restore process.
 			if err := setRestoreLock(); err != nil {

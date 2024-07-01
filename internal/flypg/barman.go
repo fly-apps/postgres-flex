@@ -47,7 +47,7 @@ type BackupList struct {
 
 // NewBarman creates a new Barman instance.
 // The configURL is expected to be in the format:
-// https://s3-access-key:s3-secret-key@s3-endpoint/bucket/directory
+// https://s3-access-key:s3-secret-key@s3-endpoint/bucket/bucket-directory
 func NewBarman(configURL string) (*Barman, error) {
 	parsedURL, err := url.Parse(configURL)
 	if err != nil {
@@ -169,6 +169,7 @@ func (b *Barman) LastBackupTaken(ctx context.Context) (time.Time, error) {
 		return time.Time{}, nil
 	}
 
+	// Layout used by barman.
 	layout := "Mon Jan 2 15:04:05 2006"
 
 	var latestBackupTime time.Time
