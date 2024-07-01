@@ -68,13 +68,13 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 	}
 
 	if restore.recoveryTargetName == "" && restore.recoveryTargetTime == "" && restore.recoveryTarget == "" {
-		return nil, fmt.Errorf("no restore target not specified")
+		return nil, fmt.Errorf("no restore target specified")
 	}
 
 	return restore, nil
 }
 
-func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error {
+func (b *BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
 	// create a copy of the pg_hba.conf file so we can revert back to it when needed.
 	if err := backupHBAFile(); err != nil {
 		if os.IsNotExist(err) {
@@ -141,7 +141,7 @@ func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error
 
 }
 
-func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
+func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 	// Query available backups from object storage
 	backups, err := b.ListBackups(ctx)
 	if err != nil {

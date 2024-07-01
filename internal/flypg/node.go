@@ -163,7 +163,7 @@ func (n *Node) Init(ctx context.Context) error {
 			}
 
 			log.Println("Restoring base backup")
-			if err := restore.RestoreFromBackup(ctx); err != nil {
+			if err := restore.restoreFromBackup(ctx); err != nil {
 				return fmt.Errorf("failed to restore base backup: %s", err)
 			}
 
@@ -172,7 +172,7 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize pg config: %s", err)
 			}
 
-			if err := restore.WALReplayAndReset(ctx, n); err != nil {
+			if err := restore.walReplayAndReset(ctx, n); err != nil {
 				return fmt.Errorf("failed to replay WAL: %s", err)
 			}
 
