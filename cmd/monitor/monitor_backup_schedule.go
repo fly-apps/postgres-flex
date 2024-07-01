@@ -16,6 +16,8 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 		log.Printf("Failed to resolve the last backup taken: %s", err)
 	}
 
+	// TODO - Wait for Postgres to be ready before proceeding.
+
 	// Ensure we have a least one backup before proceeding.
 	if lastBackupTime.IsZero() {
 		log.Println("No backups found! Performing the initial base backup.")
