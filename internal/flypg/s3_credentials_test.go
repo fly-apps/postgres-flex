@@ -10,7 +10,9 @@ import (
 )
 
 func TestWriteAWSCredentials(t *testing.T) {
-	setup(t)
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
 	defer cleanup()
 
 	authDir := "./test_results/.aws"

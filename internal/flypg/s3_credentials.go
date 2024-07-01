@@ -72,7 +72,7 @@ func writeCredentialsToFile(credentials []*s3Credentials, pathToCredentialFile s
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Write the credentials to disk
 	for _, cred := range credentials {
@@ -83,7 +83,7 @@ func writeCredentialsToFile(credentials []*s3Credentials, pathToCredentialFile s
 		}
 	}
 
-	return nil
+	return file.Sync()
 }
 
 func parseCredentialsFromConfigURL(configURL, assignedProfile string) (*s3Credentials, error) {
