@@ -18,11 +18,12 @@ type BarmanRestore struct {
 	recoveryTargetName      string
 	recoveryTargetTime      string
 	recoveryTargetAction    string
-	recoveryTargetInclusive bool
+	recoveryTargetInclusive string
 }
 
 const (
 	defaultRestoreDir = "/data/postgresql"
+	ISO8601           = "2006-01-02T15:04:05-07:00"
 )
 
 func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
@@ -48,9 +49,13 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		case "targetName":
 			restore.recoveryTargetName = value[0]
 		case "targetTime":
-			restore.recoveryTargetTime = value[0]
+			ts, err := time.Parse(ISO8601, value[0])
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse target time: %s", err)
+			}
+			restore.recoveryTargetTime = ts.Format(ISO8601)
 		case "targetInclusive":
-			restore.recoveryTargetInclusive = value[0] == "true"
+			restore.recoveryTargetInclusive = value[0]
 		case "targetAction":
 			restore.recoveryTargetAction = value[0]
 		default:
@@ -151,7 +156,7 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 
 	switch {
 	case b.recoveryTarget != "":
-		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(time.RFC3339))
+		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(ISO8601))
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by time: %s", err)
 		}
@@ -178,6 +183,11 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 	// Download and restore the base backup
 	if _, err := b.RestoreBackup(ctx, backupID); err != nil {
 		return fmt.Errorf("failed to restore backup: %s", err)
+	}
+
+	// Write the recovery.signal file
+	if err := os.WriteFile("/data/postgresql/recovery.signal", []byte(""), 0600); err != nil {
+		return fmt.Errorf("failed to write recovery.signal: %s", err)
 	}
 
 	return nil
@@ -208,9 +218,8 @@ func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr 
 	if restoreStr == "latest" {
 		restoreTime = time.Now()
 	} else {
-
 		var err error
-		restoreTime, err = time.Parse(time.RFC3339, restoreStr)
+		restoreTime, err = time.Parse(ISO8601, restoreStr)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse restore time: %s", err)
 		}
@@ -222,6 +231,7 @@ func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr 
 	earliestBackupID := ""
 	earliestEndTime := time.Time{}
 
+	// This is the layout presented by barman
 	layout := "Mon Jan 2 15:04:05 2006"
 
 	for _, backup := range backupList.Backups {

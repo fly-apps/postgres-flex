@@ -141,8 +141,8 @@ func TestNewBarmanRestore(t *testing.T) {
 		t.Fatalf("expected recovery target name to be empty, got %s", restore.recoveryTargetName)
 	}
 
-	if restore.recoveryTargetTime != "1212121212" {
-		t.Fatalf("expected recovery target time to be 1212121212, got %s", restore.recoveryTargetTime)
+	if restore.recoveryTargetTime != "2024-06-30T11:15:00-06:00" {
+		t.Fatalf("expected recovery target time to be 2024-06-30T11:15:00-06:00, got %s", restore.recoveryTargetTime)
 	}
 
 }
@@ -219,7 +219,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	})
 
 	t.Run("resolve-earliest-backup-target", func(t *testing.T) {
-		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:12Z")
+		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:12-00:00")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -232,7 +232,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	// "begin_time": "Tue Jun 25 19:44:12 2024"
 	// "end_time": "Tue Jun 25 19:44:18 2024",
 	t.Run("resolve-backup-within-first-window", func(t *testing.T) {
-		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:15Z")
+		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:15-00:00")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -245,7 +245,7 @@ func TestResolveBackupTarget(t *testing.T) {
 	// "begin_time": "Wed Jun 26 17:24:43 2024",
 	// "end_time": "Wed Jun 26 17:27:02 2024",
 	t.Run("resolve-backup-within-second-window", func(t *testing.T) {
-		backupID, err := restore.resolveBackupFromTime(list, "2024-06-26T17:25:15Z")
+		backupID, err := restore.resolveBackupFromTime(list, "2024-06-26T17:25:15-00:00")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -257,6 +257,6 @@ func TestResolveBackupTarget(t *testing.T) {
 }
 
 func setRestoreDefaultEnv(t *testing.T) {
-	t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=1212121212")
+	t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 }

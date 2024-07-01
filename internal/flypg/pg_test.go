@@ -114,7 +114,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		}
 	})
 
-	t.Run("cloud-archiving", func(t *testing.T) {
+	t.Run("barman-enabled", func(t *testing.T) {
 		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		store, _ := state.NewStore()
@@ -142,7 +142,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		}
 	})
 
-	t.Run("cloud-archiving-disabled", func(t *testing.T) {
+	t.Run("barman-disabled", func(t *testing.T) {
 		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 		store, _ := state.NewStore()
 
@@ -172,6 +172,82 @@ func TestPGConfigInitialization(t *testing.T) {
 
 		if cfg["archive_mode"] != "off" {
 			t.Fatalf("expected archive_mode to be off, got %v", cfg["archive_mode"])
+		}
+	})
+
+	t.Run("barman-restore-from-time", func(t *testing.T) {
+		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["recovery_target_time"] != "'2024-06-30T11:15:00-06:00'" {
+			t.Fatalf("expected recovery_target_time to be 2024-06-30T11:15:00-06:00, got %v", cfg["recovery_target_time"])
+		}
+	})
+
+	t.Run("barman-restore-from-name", func(t *testing.T) {
+		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240626T172443")
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["recovery_target_name"] != "barman_20240626T172443" {
+			t.Fatalf("expected recovery_target_name to be barman_20240626T172443, got %v", cfg["recovery_target_name"])
+		}
+	})
+
+	t.Run("barman-restore-from-target", func(t *testing.T) {
+		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?target=immediate")
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["recovery_target"] != "immediate" {
+			t.Fatalf("expected recovery_target to be immediate, got %v", cfg["recovery_target_name"])
+		}
+	})
+
+	t.Run("barman-restore-from-target-time-non-inclusive", func(t *testing.T) {
+		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00&targetInclusive=false")
+		store, _ := state.NewStore()
+
+		if err := pgConf.initialize(store); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := pgConf.CurrentConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg["recovery_target_time"] != "'2024-06-30T11:15:00-06:00'" {
+			t.Fatalf("expected recovery_target_time to be 2024-06-30T11:15:00-06:00, got %v", cfg["recovery_target_time"])
+		}
+
+		if cfg["recovery_target_inclusive"] != "false" {
+			t.Fatalf("expected recovery_target_inclusive to be false, got %v", cfg["recovery_target_inclusive"])
 		}
 	})
 }

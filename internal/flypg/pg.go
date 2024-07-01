@@ -202,7 +202,7 @@ func (c *PGConfig) SetDefaults() error {
 		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
 		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
 
-		if barmanRestore.recoveryTargetInclusive {
+		if barmanRestore.recoveryTargetInclusive != "" {
 			c.internalConfig["recovery_target_inclusive"] = barmanRestore.recoveryTargetInclusive
 		}
 
@@ -212,14 +212,9 @@ func (c *PGConfig) SetDefaults() error {
 		case barmanRestore.recoveryTargetName != "":
 			c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
 		case barmanRestore.recoveryTargetTime != "":
-			c.internalConfig["recovery_target_time"] = barmanRestore.recoveryTargetTime
+			c.internalConfig["recovery_target_time"] = fmt.Sprintf("'%s'", barmanRestore.recoveryTargetTime)
 		default:
 			return errors.New("recovery target name or time must be specified")
-		}
-
-		// Write the recovery.signal file
-		if err := os.WriteFile("/data/postgresql/recovery.signal", []byte(""), 0600); err != nil {
-			return fmt.Errorf("failed to write recovery.signal: %s", err)
 		}
 	}
 
