@@ -184,9 +184,9 @@ func (c *PGConfig) SetDefaults() error {
 			}
 			c.internalConfig["archive_mode"] = "on"
 			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
-			// TODO - Make this configurable
 			// This controls the minimum frequency WAL files are archived to barman
 			// in the event there is database activity.
+			// TODO - Make this configurable
 			c.internalConfig["archive_timeout"] = "60s"
 		}
 	} else {
@@ -201,6 +201,10 @@ func (c *PGConfig) SetDefaults() error {
 
 		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
 		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
+
+		if barmanRestore.recoveryTargetInclusive {
+			c.internalConfig["recovery_target_inclusive"] = barmanRestore.recoveryTargetInclusive
+		}
 
 		switch {
 		case barmanRestore.recoveryTarget != "":

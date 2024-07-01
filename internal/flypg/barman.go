@@ -78,13 +78,6 @@ func NewBarman(configURL string) (*Barman, error) {
 		return nil, fmt.Errorf("access key or secret key is missing")
 	}
 
-	// Set the environment variable within the Go process
-	// TODO - We need to find a better way to do this.
-	if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
-		fmt.Printf("Error setting environment variable: %s\n", err)
-		return nil, err
-	}
-
 	return &Barman{
 		appName:         os.Getenv("FLY_APP_NAME"),
 		provider:        providerDefault,

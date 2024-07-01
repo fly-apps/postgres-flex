@@ -86,7 +86,7 @@ func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error
 
 	// Boot postgres and wait for WAL replay to complete
 	svisor := supervisor.New("flypg", 5*time.Minute)
-	svisor.AddProcess("postgres", fmt.Sprintf("gosu postgres postgres -D /data/postgresql -p 5433 -h %s", node.PrivateIP))
+	svisor.AddProcess("restore", fmt.Sprintf("gosu postgres postgres -D /data/postgresql -p 5433 -h %s", node.PrivateIP))
 
 	// Start the postgres process in the background.
 	go func() {
@@ -103,7 +103,7 @@ func (b *BarmanRestore) WALReplayAndReset(ctx context.Context, node *Node) error
 	// os.Remove("/data/postgresql/recovery.signal")
 
 	// Open read/write connection
-	conn, err := openConn(ctx, node.PrivateIP, false)
+	conn, err := openConn(ctx, node.PrivateIP)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
@@ -151,7 +151,7 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 
 	switch {
 	case b.recoveryTarget != "":
-		backupID, err = b.resolveBackupFromTime(backups, time.Now().String())
+		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(time.RFC3339))
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by time: %s", err)
 		}
@@ -262,7 +262,7 @@ func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr 
 }
 
 func (b *BarmanRestore) waitOnRecovery(ctx context.Context, privateIP string) error {
-	conn, err := openConn(ctx, privateIP, false)
+	conn, err := openConn(ctx, privateIP)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
