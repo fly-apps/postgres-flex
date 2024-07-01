@@ -1,6 +1,7 @@
 package flypg
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -144,7 +145,20 @@ func TestNewBarmanRestore(t *testing.T) {
 	if restore.recoveryTargetTime != "2024-06-30T11:15:00-06:00" {
 		t.Fatalf("expected recovery target time to be 2024-06-30T11:15:00-06:00, got %s", restore.recoveryTargetTime)
 	}
+}
 
+func TestWALRestoreCommand(t *testing.T) {
+	setRestoreDefaultEnv(t)
+	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := fmt.Sprintf("barman-cloud-wal-restore --cloud-provider aws-s3 --endpoint-url https://fly.storage.tigris.dev --profile restore s3://my-bucket my-directory %%f %%p")
+
+	if restore.walRestoreCommand() != expected {
+		t.Fatalf("expected WALRestoreCommand to be %s, but got %s", expected, restore.walRestoreCommand())
+	}
 }
 
 func TestParseBackups(t *testing.T) {

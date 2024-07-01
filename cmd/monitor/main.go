@@ -42,8 +42,8 @@ func main() {
 		}
 	}()
 
-	if os.Getenv("BARMAN_ENABLED") == "true" {
-		barman, err := flypg.NewBarman(os.Getenv("BARMAN_ENABLED"))
+	if os.Getenv("BARMAN_ENABLED") != "" {
+		barman, err := flypg.NewBarman(os.Getenv("BARMAN_ENABLED"), flypg.DefaultAuthProfile)
 		if err != nil {
 			panic(err)
 		}

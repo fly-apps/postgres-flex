@@ -132,7 +132,7 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
+		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"), "barman")
 		if err != nil {
 			t.Fatal(err)
 		}

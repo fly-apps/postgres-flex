@@ -23,6 +23,7 @@ func main() {
 		}
 	}
 
+	// Deprecated - We are moving away from having a separate barman Machine
 	if os.Getenv("IS_BARMAN") != "" {
 		node, err := flybarman.NewNode()
 		if err != nil {
@@ -54,7 +55,6 @@ func main() {
 		return
 	}
 
-	// Set the environment variable within the Go process
 	// TODO - We need to find a better way to do this.
 	if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
 		panicHandler(err)

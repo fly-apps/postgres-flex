@@ -1,18 +1,16 @@
 package flypg
 
 import (
-	"fmt"
 	"os"
 	"testing"
-
-	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
 func TestNewBarman(t *testing.T) {
 	t.Run("defaults", func(t *testing.T) {
 		setDefaultEnv(t)
 
-		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
+		configURL := os.Getenv("BARMAN_ENABLED")
+		barman, err := NewBarman(configURL, "barman")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -52,61 +50,10 @@ func TestNewBarman(t *testing.T) {
 	})
 }
 
-func TestWALRestoreCommand(t *testing.T) {
-	setDefaultEnv(t)
-
-	barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := fmt.Sprintf("barman-cloud-wal-restore --cloud-provider aws-s3 --endpoint-url https://fly.storage.tigris.dev s3://my-bucket my-directory %%f %%p")
-
-	if barman.walRestoreCommand() != expected {
-		t.Fatalf("expected WALRestoreCommand to be %s, but got %s", expected, barman.walRestoreCommand())
-	}
-}
-
-func TestWriteAWSCredentials(t *testing.T) {
-	setup(t)
-	defer cleanup()
-
-	t.Run("write-aws-credentials", func(t *testing.T) {
-		setDefaultEnv(t)
-
-		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		credFile := "./test_results/credentials"
-
-		if err := barman.writeAWSCredentials("default", credFile); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if !utils.FileExists(credFile) {
-			t.Fatalf("expected %s to exist, but doesn't", credFile)
-		}
-
-		// Check contents
-		contents, err := os.ReadFile(credFile)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		expected := "[default]\naws_access_key_id=my-key\naws_secret_access_key=my-secret"
-
-		if string(contents) != expected {
-			t.Fatalf("expected contents to be %s, but got %s", expected, string(contents))
-		}
-	})
-}
-
 func TestBarmanRetentionPolicy(t *testing.T) {
 	setDefaultEnv(t)
-
-	barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
+	configURL := os.Getenv("BARMAN_ENABLED")
+	barman, err := NewBarman(configURL, DefaultAuthProfile)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

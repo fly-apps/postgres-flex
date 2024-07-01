@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,8 +14,11 @@ import (
 )
 
 const (
-	providerDefault    = "aws-s3"
-	awsCredentialsPath = "/data/.aws/credentials"
+	providerDefault = "aws-s3"
+	// DefaultAuthProfile is the default AWS profile used for barman operations.
+	DefaultAuthProfile = "barman"
+	// RestoreAuthProfile is the AWS profile used for barman restore operations.
+	RestoreAuthProfile = "restore"
 )
 
 type Barman struct {
@@ -25,10 +27,9 @@ type Barman struct {
 	endpoint        string
 	bucket          string
 	bucketDirectory string
+	authProfile     string
 
-	// TODO - This was for convenience, but should probably be removed.
-	configURL string
-
+	// TODO - Make these configurable
 	retentionDays     string
 	minimumRedundancy string
 }
@@ -48,7 +49,7 @@ type BackupList struct {
 // NewBarman creates a new Barman instance.
 // The configURL is expected to be in the format:
 // https://s3-access-key:s3-secret-key@s3-endpoint/bucket/bucket-directory
-func NewBarman(configURL string) (*Barman, error) {
+func NewBarman(configURL, authProfile string) (*Barman, error) {
 	parsedURL, err := url.Parse(configURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid credential url: %w", err)
@@ -84,7 +85,7 @@ func NewBarman(configURL string) (*Barman, error) {
 		endpoint:        fmt.Sprintf("https://%s", endpoint),
 		bucket:          pathSlice[0],
 		bucketDirectory: pathSlice[1],
-		configURL:       configURL,
+		authProfile:     authProfile,
 
 		retentionDays:     "7",
 		minimumRedundancy: "3",
@@ -102,6 +103,7 @@ func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, 
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
 		"--host", fmt.Sprintf("%s.internal", b.appName),
 		"--user", "repmgr",
 		b.BucketURL(),
@@ -120,6 +122,7 @@ func (b *Barman) RestoreBackup(ctx context.Context, backupID string) ([]byte, er
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
 		b.BucketURL(),
 		b.bucketDirectory,
 		backupID,
@@ -133,6 +136,7 @@ func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
 		"--format", "json",
 		b.BucketURL(),
 		b.bucketDirectory,
@@ -150,6 +154,7 @@ func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
 		"--retention", b.RetentionPolicy(),
 		"--minimum-redundancy", b.minimumRedundancy,
 		b.BucketURL(),
@@ -213,9 +218,10 @@ func (b *Barman) parseBackups(backupBytes []byte) (BackupList, error) {
 
 func (b *Barman) walArchiveCommand() string {
 	// TODO - Make compression configurable
-	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s %s %s %%p",
+	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s --profile %s %s %s %%p",
 		b.provider,
 		b.endpoint,
+		b.authProfile,
 		b.BucketURL(),
 		b.bucketDirectory,
 	)
@@ -224,43 +230,13 @@ func (b *Barman) walArchiveCommand() string {
 // walRestoreCommand returns the command string used to restore WAL files.
 // The %f and %p placeholders are replaced with the file path and file name respectively.
 func (b *Barman) walRestoreCommand() string {
-	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s %s %s %%f %%p",
+	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s --profile %s %s %s %%f %%p",
 		b.provider,
 		b.endpoint,
+		b.authProfile,
 		b.BucketURL(),
 		b.bucketDirectory,
 	)
-}
-
-func (b *Barman) writeAWSCredentials(profile string, credentialsPath string) error {
-	barmanURL, err := url.Parse(b.configURL)
-	if err != nil {
-		return fmt.Errorf("invalid configURL: %w", err)
-	}
-
-	accessKey := barmanURL.User.Username()
-	if accessKey == "" {
-		return fmt.Errorf("AWS ACCESS KEY is missing")
-	}
-
-	secretAccessKey, _ := barmanURL.User.Password()
-	if secretAccessKey == "" {
-		return fmt.Errorf("AWS SECRET KEY is missing")
-	}
-
-	credentials := fmt.Sprintf("[%s]\naws_access_key_id=%s\naws_secret_access_key=%s",
-		profile, accessKey, secretAccessKey)
-
-	// Ensure the directory exists
-	if err := os.MkdirAll(filepath.Dir(credentialsPath), 0700); err != nil {
-		return fmt.Errorf("failed to create AWS credentials directory: %w", err)
-	}
-
-	if err := os.WriteFile(credentialsPath, []byte(credentials), 0644); err != nil {
-		return fmt.Errorf("failed to write AWS credentials file: %w", err)
-	}
-
-	return nil
 }
 
 func getenv(key, fallback string) string {

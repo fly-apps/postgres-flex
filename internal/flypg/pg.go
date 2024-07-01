@@ -174,14 +174,13 @@ func (c *PGConfig) SetDefaults() error {
 	}
 
 	if os.Getenv("BARMAN_ENABLED") != "" {
-		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"))
+		configURL := os.Getenv("BARMAN_ENABLED")
+
+		barman, err := NewBarman(configURL, "barman")
 		switch {
 		case err != nil:
 			log.Printf("[WARN] Failed to initialize barman: %s", err)
 		default:
-			if err := barman.writeAWSCredentials("default", awsCredentialsPath); err != nil {
-				log.Printf("[WARN] Failed to write AWS credentials: %s", err)
-			}
 			c.internalConfig["archive_mode"] = "on"
 			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
 			// This controls the minimum frequency WAL files are archived to barman

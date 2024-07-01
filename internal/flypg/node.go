@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -120,7 +119,7 @@ func NewNode() (*Node, error) {
 
 func (n *Node) Init(ctx context.Context) error {
 	// Ensure directory and files have proper permissions
-	if err := setDirOwnership(); err != nil {
+	if err := setDirOwnership(ctx, "/data"); err != nil {
 		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
@@ -143,6 +142,12 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
+	if os.Getenv("BARMAN_ENABLED") != "" || os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
+			return fmt.Errorf("failed to write s3 credentials: %s", err)
+		}
+	}
+
 	// Remote point-in-time restore.
 	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
 		// TODO - Probably not safe to use the same lock as the snapshot restore.
@@ -152,17 +157,12 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if active {
-			restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+			configURL := os.Getenv("BARMAN_REMOTE_RESTORE")
+			restore, err := NewBarmanRestore(configURL)
 			if err != nil {
 				return fmt.Errorf("failed to initialize barman restore: %s", err)
 			}
 
-			// Write the source AWS credentials
-			if err := restore.writeAWSCredentials("default", awsCredentialsPath); err != nil {
-				return fmt.Errorf("failed to write aws credentials: %s", err)
-			}
-
-			log.Println("Restoring base backup")
 			if err := restore.restoreFromBackup(ctx); err != nil {
 				return fmt.Errorf("failed to restore base backup: %s", err)
 			}
@@ -251,7 +251,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize pg config: %s", err)
 	}
 
-	if err := setDirOwnership(); err != nil {
+	if err := setDirOwnership(ctx, "/data"); err != nil {
 		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
@@ -497,16 +497,20 @@ func openConnection(parentCtx context.Context, host string, database string, cre
 	return pgx.ConnectConfig(ctx, conf)
 }
 
-func setDirOwnership() error {
+func setDirOwnership(ctx context.Context, pathToDir string) error {
+	if os.Getenv("UNIT_TESTING") == "true" {
+		return nil
+	}
+
 	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
 	if err != nil {
 		return fmt.Errorf("failed to find postgres user ids: %s", err)
 	}
 
-	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
-	cmd := exec.Command("sh", "-c", cmdStr)
-	if _, err = cmd.Output(); err != nil {
-		return err
+	args := []string{"-R", fmt.Sprintf("%d:%d", pgUID, pgGID), pathToDir}
+
+	if _, err := utils.RunCmd(ctx, "root", "chown", args...); err != nil {
+		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
 	return nil

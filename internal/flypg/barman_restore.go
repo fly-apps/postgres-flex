@@ -23,11 +23,12 @@ type BarmanRestore struct {
 
 const (
 	defaultRestoreDir = "/data/postgresql"
-	ISO8601           = "2006-01-02T15:04:05-07:00"
+	// ISO8601 is the format required for the barman restore targets.
+	ISO8601 = "2006-01-02T15:04:05-07:00"
 )
 
 func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
-	barman, err := NewBarman(configURL)
+	barman, err := NewBarman(configURL, RestoreAuthProfile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create barman client: %s", err)
 	}
@@ -41,7 +42,6 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		Barman: barman,
 	}
 
-	// evaluate the query parameters
 	for key, value := range url.Query() {
 		switch key {
 		case "target":
@@ -83,8 +83,7 @@ func (b *BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error
 		return fmt.Errorf("failed backing up pg_hba.conf: %s", err)
 	}
 
-	// Grant local access so we can update internal credentials
-	// to match the environment.
+	// Grant local access so we can update internal credentials to match the environment.
 	if err := grantLocalAccess(); err != nil {
 		return fmt.Errorf("failed to grant local access: %s", err)
 	}
@@ -104,8 +103,6 @@ func (b *BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error
 	if err := b.waitOnRecovery(ctx, node.PrivateIP); err != nil {
 		return fmt.Errorf("failed to monitor recovery mode: %s", err)
 	}
-
-	// os.Remove("/data/postgresql/recovery.signal")
 
 	// Open read/write connection
 	conn, err := openConn(ctx, node.PrivateIP)
