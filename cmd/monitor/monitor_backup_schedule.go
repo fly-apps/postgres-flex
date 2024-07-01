@@ -33,7 +33,7 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 	log.Printf("Last backup taken at: %s", lastBackupTime)
 
 	// Calculate the time until the next backup is due.
-	timeUntilNextBackup := lastBackupTime.Add(defaultFullBackupSchedule).Sub(time.Now())
+	timeUntilNextBackup := time.Until(lastBackupTime.Add(defaultFullBackupSchedule))
 
 	// Perform backup immediately if the time until the next backup is negative.
 	if timeUntilNextBackup < 0 {

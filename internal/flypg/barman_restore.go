@@ -100,7 +100,7 @@ func (b *BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error
 	}()
 
 	// Wait for the WAL replay to complete.
-	if err := b.waitOnRecovery(ctx, node.PrivateIP); err != nil {
+	if err := waitOnRecovery(ctx, node.PrivateIP); err != nil {
 		return fmt.Errorf("failed to monitor recovery mode: %s", err)
 	}
 
@@ -190,7 +190,7 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 	return nil
 }
 
-func (b *BarmanRestore) resolveBackupFromID(backupList BackupList, id string) (string, error) {
+func (*BarmanRestore) resolveBackupFromID(backupList BackupList, id string) (string, error) {
 	if len(backupList.Backups) == 0 {
 		return "", fmt.Errorf("no backups found")
 	}
@@ -204,7 +204,7 @@ func (b *BarmanRestore) resolveBackupFromID(backupList BackupList, id string) (s
 	return "", fmt.Errorf("no backup found with id %s", id)
 }
 
-func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr string) (string, error) {
+func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr string) (string, error) {
 	if len(backupList.Backups) == 0 {
 		return "", fmt.Errorf("no backups found")
 	}
@@ -268,7 +268,7 @@ func (b *BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr 
 	return latestBackupID, nil
 }
 
-func (b *BarmanRestore) waitOnRecovery(ctx context.Context, privateIP string) error {
+func waitOnRecovery(ctx context.Context, privateIP string) error {
 	conn, err := openConn(ctx, privateIP)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)

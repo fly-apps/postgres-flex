@@ -206,16 +206,6 @@ func (b *Barman) RetentionPolicy() string {
 	return fmt.Sprintf("'RECOVERY WINDOW OF %s days'", b.retentionDays)
 }
 
-func (b *Barman) parseBackups(backupBytes []byte) (BackupList, error) {
-	var backupList BackupList
-
-	if err := json.Unmarshal(backupBytes, &backupList); err != nil {
-		return BackupList{}, fmt.Errorf("failed to parse backups: %s", err)
-	}
-
-	return backupList, nil
-}
-
 func (b *Barman) walArchiveCommand() string {
 	// TODO - Make compression configurable
 	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s --profile %s %s %s %%p",
@@ -239,10 +229,12 @@ func (b *Barman) walRestoreCommand() string {
 	)
 }
 
-func getenv(key, fallback string) string {
-	value := os.Getenv(key)
-	if len(value) == 0 {
-		return fallback
+func (*Barman) parseBackups(backupBytes []byte) (BackupList, error) {
+	var backupList BackupList
+
+	if err := json.Unmarshal(backupBytes, &backupList); err != nil {
+		return BackupList{}, fmt.Errorf("failed to parse backups: %s", err)
 	}
-	return value
+
+	return backupList, nil
 }
