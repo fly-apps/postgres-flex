@@ -117,8 +117,12 @@ func TestNewBarmanRestore(t *testing.T) {
 		t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
 	}
 
-	if restore.Bucket() != "s3://my-bucket" {
+	if restore.BucketURL() != "s3://my-bucket" {
 		t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
+	}
+
+	if restore.bucketDirectory != "my-directory" {
+		t.Fatalf("expected bucket directory to be my-directory, got %s", restore.bucketDirectory)
 	}
 
 	if restore.appName != "postgres-flex" {
@@ -253,6 +257,6 @@ func TestResolveBackupTarget(t *testing.T) {
 }
 
 func setRestoreDefaultEnv(t *testing.T) {
-	t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket?targetTime=1212121212")
+	t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=1212121212")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 }

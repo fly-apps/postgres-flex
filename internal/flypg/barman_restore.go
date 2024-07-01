@@ -150,6 +150,11 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 	var backupID string
 
 	switch {
+	case b.recoveryTarget != "":
+		backupID, err = b.resolveBackupFromTime(backups, time.Now().String())
+		if err != nil {
+			return fmt.Errorf("failed to resolve backup target by time: %s", err)
+		}
 	case b.recoveryTargetName != "":
 		// Resolve the target base backup
 		backupID, err = b.resolveBackupFromID(backups, b.recoveryTargetName)
@@ -158,11 +163,6 @@ func (b *BarmanRestore) RestoreFromBackup(ctx context.Context) error {
 		}
 	case b.recoveryTargetTime != "":
 		backupID, err = b.resolveBackupFromTime(backups, b.recoveryTargetTime)
-		if err != nil {
-			return fmt.Errorf("failed to resolve backup target by time: %s", err)
-		}
-	case b.recoveryTarget != "":
-		backupID, err = b.resolveBackupFromTime(backups, time.Now().String())
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by time: %s", err)
 		}
@@ -268,6 +268,7 @@ func (b *BarmanRestore) waitOnRecovery(ctx context.Context, privateIP string) er
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
+	// TODO - Figure out a more reasonable timeout to use here.
 	timeout := time.After(10 * time.Minute)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()

@@ -20,11 +20,13 @@ const (
 )
 
 type Barman struct {
-	appName  string
-	provider string
-	endpoint string
-	bucket   string
+	appName         string
+	provider        string
+	endpoint        string
+	bucket          string
+	bucketDirectory string
 
+	// TODO - This was for convenience, but should probably be removed.
 	configURL string
 
 	retentionDays     string
@@ -45,7 +47,7 @@ type BackupList struct {
 
 // NewBarman creates a new Barman instance.
 // The configURL is expected to be in the format:
-// barman://access-key:secret-key@endpoint/bucket
+// https://s3-access-key:s3-secret-key@s3-endpoint/bucket/directory
 func NewBarman(configURL string) (*Barman, error) {
 	parsedURL, err := url.Parse(configURL)
 	if err != nil {
@@ -57,9 +59,14 @@ func NewBarman(configURL string) (*Barman, error) {
 		return nil, fmt.Errorf("object storage endpoint missing")
 	}
 
-	bucket := strings.TrimLeft(parsedURL.Path, "/")
-	if bucket == "" {
-		return nil, fmt.Errorf("bucket name is missing")
+	path := strings.TrimLeft(parsedURL.Path, "/")
+	if path == "" {
+		return nil, fmt.Errorf("bucket and directory missing")
+	}
+
+	pathSlice := strings.Split(path, "/")
+	if len(pathSlice) != 2 {
+		return nil, fmt.Errorf("invalid bucket and directory format")
 	}
 
 	// Extract user information for credentials (not used here but necessary for the complete parsing)
@@ -72,17 +79,19 @@ func NewBarman(configURL string) (*Barman, error) {
 	}
 
 	// Set the environment variable within the Go process
+	// TODO - We need to find a better way to do this.
 	if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
 		fmt.Printf("Error setting environment variable: %s\n", err)
 		return nil, err
 	}
 
 	return &Barman{
-		appName:   os.Getenv("FLY_APP_NAME"),
-		provider:  providerDefault,
-		endpoint:  fmt.Sprintf("https://%s", endpoint),
-		bucket:    bucket,
-		configURL: configURL,
+		appName:         os.Getenv("FLY_APP_NAME"),
+		provider:        providerDefault,
+		endpoint:        fmt.Sprintf("https://%s", endpoint),
+		bucket:          pathSlice[0],
+		bucketDirectory: pathSlice[1],
+		configURL:       configURL,
 
 		retentionDays:     "7",
 		minimumRedundancy: "3",
@@ -90,7 +99,7 @@ func NewBarman(configURL string) (*Barman, error) {
 
 }
 
-func (b *Barman) Bucket() string {
+func (b *Barman) BucketURL() string {
 	return fmt.Sprintf("s3://%s", b.bucket)
 }
 
@@ -102,8 +111,8 @@ func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, 
 		"--endpoint-url", b.endpoint,
 		"--host", fmt.Sprintf("%s.internal", b.appName),
 		"--user", "repmgr",
-		b.Bucket(),
-		b.appName,
+		b.BucketURL(),
+		b.bucketDirectory,
 	}
 
 	if immediateCheckpoint {
@@ -118,8 +127,8 @@ func (b *Barman) RestoreBackup(ctx context.Context, backupID string) ([]byte, er
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
-		b.Bucket(),
-		b.bucket,
+		b.BucketURL(),
+		b.bucketDirectory,
 		backupID,
 		defaultRestoreDir,
 	}
@@ -132,8 +141,8 @@ func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
 		"--format", "json",
-		b.Bucket(),
-		b.bucket,
+		b.BucketURL(),
+		b.bucketDirectory,
 	}
 
 	backupsBytes, err := utils.RunCmd(ctx, "postgres", "barman-cloud-backup-list", args...)
@@ -150,8 +159,8 @@ func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
 		"--endpoint-url", b.endpoint,
 		"--retention", b.RetentionPolicy(),
 		"--minimum-redundancy", b.minimumRedundancy,
-		b.Bucket(),
-		b.appName,
+		b.BucketURL(),
+		b.bucketDirectory,
 	}
 
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-delete", args...)
@@ -213,8 +222,8 @@ func (b *Barman) walArchiveCommand() string {
 	return fmt.Sprintf("barman-cloud-wal-archive --cloud-provider %s --gzip --endpoint-url %s %s %s %%p",
 		b.provider,
 		b.endpoint,
-		b.Bucket(),
-		b.bucket,
+		b.BucketURL(),
+		b.bucketDirectory,
 	)
 }
 
@@ -224,8 +233,8 @@ func (b *Barman) walRestoreCommand() string {
 	return fmt.Sprintf("barman-cloud-wal-restore --cloud-provider %s --endpoint-url %s %s %s %%f %%p",
 		b.provider,
 		b.endpoint,
-		b.Bucket(),
-		b.bucket,
+		b.BucketURL(),
+		b.bucketDirectory,
 	)
 }
 

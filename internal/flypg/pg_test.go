@@ -115,7 +115,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("cloud-archiving", func(t *testing.T) {
-		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket")
+		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		store, _ := state.NewStore()
 
@@ -143,7 +143,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("cloud-archiving-disabled", func(t *testing.T) {
-		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket")
+		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
