@@ -300,7 +300,7 @@ func handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, resp, http.StatusOK)
 }
 
-func handleViewBarmanSettings(w http.ResponseWriter, r *http.Request) {
+func handleViewBarmanSettings(w http.ResponseWriter, _ *http.Request) {
 	if os.Getenv("BARMAN_ENABLED") == "" {
 		renderErr(w, fmt.Errorf("barman is not enabled"))
 		return

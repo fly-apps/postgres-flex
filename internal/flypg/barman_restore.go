@@ -75,7 +75,7 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 	return restore, nil
 }
 
-func (b *BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
+func (*BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
 	// create a copy of the pg_hba.conf file so we can revert back to it when needed.
 	if err := backupHBAFile(); err != nil {
 		if os.IsNotExist(err) {

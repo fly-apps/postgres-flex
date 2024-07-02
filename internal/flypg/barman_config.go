@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -118,32 +119,34 @@ func (c *BarmanConfig) Validate(requestedChanges map[string]interface{}) error {
 		}
 	}
 
-	// Verify that the values provided are valid
 	for k, v := range requestedChanges {
 		switch k {
 		case "archive_timeout":
-			if _, ok := v.(string); !ok {
+			// Ensure that the value is a valid duration
+			if _, err := time.ParseDuration(v.(string)); err != nil {
 				return fmt.Errorf("invalid value for archive_timeout: %v", v)
 			}
-			// TODO - validate
-
 		case "recovery_window":
-			if _, ok := v.(string); !ok {
+			// Ensure that the value is a valid duration
+			re := regexp.MustCompile(`^(\d+)([dwy])$`)
+			matches := re.FindStringSubmatch(v.(string))
+			if len(matches) != 3 {
 				return fmt.Errorf("invalid value for recovery_window: %v", v)
 			}
-			// TODO - validate
+
+			fmt.Println(matches)
+			log.Printf("matches: %v\n", matches)
+
+			_, err := strconv.Atoi(matches[1])
+			if err != nil {
+				return fmt.Errorf("failed to parse recovery_window: %w", err)
+			}
 
 		case "full_backup_frequency":
-			if _, ok := v.(string); !ok {
+			if _, err := time.ParseDuration(v.(string)); err != nil {
 				return fmt.Errorf("invalid value for full_backup_frequency: %v", v)
 			}
-			// TODO - validate
 		case "minimum_redundancy":
-			if _, ok := v.(string); !ok {
-				return fmt.Errorf("invalid value for minimum_redundancy: %v", v)
-			}
-
-			// Ensure that the value is a non-negative integer
 			val, err := strconv.Atoi(v.(string))
 			if err != nil {
 				return fmt.Errorf("invalid value for minimum_redundancy: %v", v)
