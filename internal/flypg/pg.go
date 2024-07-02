@@ -173,48 +173,66 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
-	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
-		barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-		if err != nil {
-			return fmt.Errorf("failed to initialize barman instance: %s", err)
-		}
-
-		if err := barman.LoadConfig(c.barmanConfigPath); err != nil {
-			return fmt.Errorf("failed to load barman config: %s", err)
-		}
-
-		c.internalConfig["archive_mode"] = "on"
-		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
-		c.internalConfig["archive_timeout"] = barman.Settings.ArchiveTimeout
-
-	} else {
-		c.internalConfig["archive_mode"] = "off"
+	if err := c.setArchiveConfig(os.Getenv("S3_ARCHIVE_CONFIG"), store); err != nil {
+		return fmt.Errorf("failed to set archive config: %s", err)
 	}
 
-	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
-		barmanRestore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
-		if err != nil {
-			return err
-		}
+	if err := c.setRecoveryTargetConfig(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG")); err != nil {
+		return fmt.Errorf("failed to set recovery target config: %s", err)
+	}
 
-		// Set restore command and associated recovery target settings
-		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
-		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
+	return nil
+}
 
-		if barmanRestore.recoveryTargetInclusive != "" {
-			c.internalConfig["recovery_target_inclusive"] = barmanRestore.recoveryTargetInclusive
-		}
+func (c *PGConfig) setArchiveConfig(configURL string, store *state.Store) error {
+	if configURL == "" {
+		c.internalConfig["archive_mode"] = "off"
+		return nil
+	}
 
-		switch {
-		case barmanRestore.recoveryTarget != "":
-			c.internalConfig["recovery_target"] = barmanRestore.recoveryTarget
-		case barmanRestore.recoveryTargetName != "":
-			c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
-		case barmanRestore.recoveryTargetTime != "":
-			c.internalConfig["recovery_target_time"] = fmt.Sprintf("'%s'", barmanRestore.recoveryTargetTime)
-		default:
-			return errors.New("recovery target name or time must be specified")
-		}
+	barman, err := NewBarman(store, configURL, DefaultAuthProfile)
+	if err != nil {
+		return fmt.Errorf("failed to initialize barman instance: %s", err)
+	}
+
+	if err := barman.LoadConfig(c.barmanConfigPath); err != nil {
+		return fmt.Errorf("failed to load barman config: %s", err)
+	}
+
+	c.internalConfig["archive_mode"] = "on"
+	c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
+	c.internalConfig["archive_timeout"] = barman.Settings.ArchiveTimeout
+
+	return nil
+}
+
+func (c *PGConfig) setRecoveryTargetConfig(configURL string) error {
+	if configURL == "" {
+		return nil
+	}
+
+	barmanRestore, err := NewBarmanRestore(configURL)
+	if err != nil {
+		return err
+	}
+
+	// Set restore command and associated recovery target settings
+	c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
+	c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
+
+	if barmanRestore.recoveryTargetInclusive != "" {
+		c.internalConfig["recovery_target_inclusive"] = barmanRestore.recoveryTargetInclusive
+	}
+
+	switch {
+	case barmanRestore.recoveryTarget != "":
+		c.internalConfig["recovery_target"] = barmanRestore.recoveryTarget
+	case barmanRestore.recoveryTargetName != "":
+		c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
+	case barmanRestore.recoveryTargetTime != "":
+		c.internalConfig["recovery_target_time"] = fmt.Sprintf("'%s'", barmanRestore.recoveryTargetTime)
+	default:
+		return fmt.Errorf("recovery target name or time must be specified")
 	}
 
 	return nil
