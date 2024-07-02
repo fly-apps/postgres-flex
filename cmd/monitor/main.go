@@ -35,8 +35,11 @@ func main() {
 		panic(fmt.Sprintf("failed to reference node: %s\n", err))
 	}
 
+	// Wait for postgres to boot and become accessible.
+	log.Println("Waiting for Postgres to be ready...")
+	waitOnPostgres(ctx, node)
+
 	// Dead member monitor
-	log.Println("Monitoring dead members")
 	go func() {
 		if err := monitorDeadMembers(ctx, node); err != nil {
 			panic(err)
@@ -59,19 +62,41 @@ func main() {
 		}
 
 		// Backup scheduler
-		log.Println("Monitoring backup schedule")
-		go monitorBackupSchedule(ctx, barman)
+\		go monitorBackupSchedule(ctx, barman)
 
 		// Backup retention monitor
-		log.Println("Monitoring backup retention")
 		go monitorBackupRetention(ctx, barman)
 	}
 
 	// Readonly monitor
-	log.Println("Monitoring cluster state")
 	go monitorClusterState(ctx, node)
 
 	// Replication slot monitor
-	log.Println("Monitoring replication slots")
 	monitorReplicationSlots(ctx, node)
+}
+
+func waitOnPostgres(ctx context.Context, node *flypg.Node) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			conn, err := node.NewLocalConnection(ctx, "postgres", node.SUCredentials)
+			if err != nil {
+				log.Printf("failed to open local connection: %s", err)
+				continue
+			}
+			defer func() { _ = conn.Close(ctx) }()
+
+			if err := conn.Ping(ctx); err != nil {
+				log.Printf("failed to ping local connection: %s", err)
+				continue
+			}
+
+			return
+		}
+	}
 }

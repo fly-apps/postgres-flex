@@ -13,8 +13,6 @@ import (
 	"syscall"
 )
 
-// TODO - RunCommand needs a context
-
 func RunCmd(ctx context.Context, usr string, name string, args ...string) ([]byte, error) {
 	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {
@@ -27,20 +25,22 @@ func RunCmd(ctx context.Context, usr string, name string, args ...string) ([]byt
 
 	if os.Getenv("DEBUG") != "" {
 		log.Printf("> Running command as %s: %s\n", usr, cmd.String())
-	}
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+		var stdoutBuf, stderrBuf bytes.Buffer
+		cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
 
-	err = cmd.Run()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			ee.Stderr = stderrBuf.Bytes()
+		err = cmd.Run()
+		if err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				ee.Stderr = stderrBuf.Bytes()
+			}
 		}
+
+		return stdoutBuf.Bytes(), err
 	}
 
-	return stdoutBuf.Bytes(), err
+	return cmd.Output()
 }
 
 // Deprecated, use RunCmd instead

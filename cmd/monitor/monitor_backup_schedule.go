@@ -16,8 +16,6 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 		log.Printf("Failed to resolve the last backup taken: %s", err)
 	}
 
-	// TODO - Wait for Postgres to be ready before proceeding.
-
 	// Ensure we have a least one backup before proceeding.
 	if lastBackupTime.IsZero() {
 		log.Println("No backups found! Performing the initial base backup.")
@@ -29,8 +27,6 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 
 		lastBackupTime = time.Now()
 	}
-
-	log.Printf("Last backup taken at: %s", lastBackupTime)
 
 	// Calculate the time until the next backup is due.
 	timeUntilNextBackup := time.Until(lastBackupTime.Add(defaultFullBackupSchedule))
@@ -46,7 +42,7 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 		timeUntilNextBackup = defaultFullBackupSchedule
 	}
 
-	log.Printf("Next backup due in: %s", timeUntilNextBackup)
+	log.Printf("Next full backup due in: %s", timeUntilNextBackup)
 
 	ticker := time.NewTicker(timeUntilNextBackup)
 	defer ticker.Stop()
