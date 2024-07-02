@@ -109,7 +109,7 @@ const backupsResponse = `{
 func TestNewBarmanRestore(t *testing.T) {
 	setRestoreDefaultEnv(t)
 
-	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+	restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
 	if err != nil {
 		t.Fatalf("NewBarmanRestore failed with: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestWALRestoreCommand(t *testing.T) {
 	defer cleanup()
 
 	setRestoreDefaultEnv(t)
-	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+	restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestParseBackups(t *testing.T) {
 	t.Run("parseBackups", func(t *testing.T) {
 		setRestoreDefaultEnv(t)
 
-		restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
 		if err != nil {
 			t.Fatalf("NewBarmanRestore failed with: %v", err)
 		}
@@ -226,7 +226,7 @@ func TestResolveBackupTarget(t *testing.T) {
 
 	setRestoreDefaultEnv(t)
 
-	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+	restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
 	if err != nil {
 		t.Fatalf("NewBarmanRestore failed with: %v", err)
 	}
@@ -286,6 +286,6 @@ func TestResolveBackupTarget(t *testing.T) {
 }
 
 func setRestoreDefaultEnv(t *testing.T) {
-	t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
+	t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 }

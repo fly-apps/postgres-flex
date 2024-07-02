@@ -47,13 +47,13 @@ func main() {
 		}
 	}()
 
-	if os.Getenv("BARMAN_ENABLED") != "" {
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
 		store, err := state.NewStore()
 		if err != nil {
 			panic(fmt.Errorf("failed initialize cluster state store: %s", err))
 		}
 
-		barman, err := flypg.NewBarman(store, os.Getenv("BARMAN_ENABLED"), flypg.DefaultAuthProfile)
+		barman, err := flypg.NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), flypg.DefaultAuthProfile)
 		if err != nil {
 			panic(err)
 		}

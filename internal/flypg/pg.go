@@ -173,8 +173,8 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
-	if os.Getenv("BARMAN_ENABLED") != "" {
-		barman, err := NewBarman(store, os.Getenv("BARMAN_ENABLED"), DefaultAuthProfile)
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
+		barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
 		if err != nil {
 			return fmt.Errorf("failed to initialize barman instance: %s", err)
 		}
@@ -191,8 +191,8 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 		c.internalConfig["archive_mode"] = "off"
 	}
 
-	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
-		barmanRestore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
+	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
+		barmanRestore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
 		if err != nil {
 			return err
 		}

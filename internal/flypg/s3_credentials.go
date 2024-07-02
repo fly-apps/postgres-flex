@@ -22,16 +22,16 @@ type s3Credentials struct {
 func writeS3Credentials(ctx context.Context, s3AuthDir string) error {
 	var creds []*s3Credentials
 
-	if os.Getenv("BARMAN_ENABLED") != "" {
-		cred, err := parseCredentialsFromConfigURL(os.Getenv("BARMAN_ENABLED"), DefaultAuthProfile)
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
+		cred, err := parseCredentialsFromConfigURL(os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
 		if err != nil {
 			return fmt.Errorf("failed to parse credentials from barman configURL: %v", err)
 		}
 		creds = append(creds, cred)
 	}
 
-	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
-		cred, err := parseCredentialsFromConfigURL(os.Getenv("BARMAN_REMOTE_RESTORE"), RestoreAuthProfile)
+	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
+		cred, err := parseCredentialsFromConfigURL(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"), RestoreAuthProfile)
 		if err != nil {
 			return fmt.Errorf("failed to parse credentials from barman restore configURL: %v", err)
 		}

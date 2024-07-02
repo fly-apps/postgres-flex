@@ -108,7 +108,7 @@ func NewNode() (*Node, error) {
 		repmgrDatabase:   node.RepMgr.DatabaseName,
 	}
 
-	if os.Getenv("BARMAN_ENABLED") != "" {
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
 		// Specific PG configuration is injected when Barman is enabled.
 		node.PGConfig.barmanConfigPath = DefaultBarmanConfigDir
 	}
@@ -141,7 +141,7 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	if os.Getenv("BARMAN_ENABLED") != "" || os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" || os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
 		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
 			return fmt.Errorf("failed to write s3 credentials: %s", err)
 		}
@@ -153,7 +153,7 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	// Remote point-in-time restore.
-	if os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
 		// TODO - Probably not safe to use the same lock as the snapshot restore.
 		active, err := isRestoreActive()
 		if err != nil {
@@ -161,7 +161,7 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 
 		if active {
-			configURL := os.Getenv("BARMAN_REMOTE_RESTORE")
+			configURL := os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG")
 			restore, err := NewBarmanRestore(configURL)
 			if err != nil {
 				return fmt.Errorf("failed to initialize barman restore: %s", err)

@@ -301,7 +301,7 @@ func handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleViewBarmanSettings(w http.ResponseWriter, _ *http.Request) {
-	if os.Getenv("BARMAN_ENABLED") == "" {
+	if os.Getenv("S3_ARCHIVE_CONFIG") == "" {
 		renderErr(w, fmt.Errorf("barman is not enabled"))
 		return
 	}
@@ -312,7 +312,7 @@ func handleViewBarmanSettings(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	barman, err := flypg.NewBarman(store, os.Getenv("BARMAN_ENABLED"), flypg.DefaultAuthProfile)
+	barman, err := flypg.NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), flypg.DefaultAuthProfile)
 	if err != nil {
 		renderErr(w, err)
 		return
@@ -334,7 +334,7 @@ func handleViewBarmanSettings(w http.ResponseWriter, _ *http.Request) {
 }
 
 func handleUpdateBarmanSettings(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("BARMAN_ENABLED") == "" {
+	if os.Getenv("S3_ARCHIVE_CONFIG") == "" {
 		renderErr(w, fmt.Errorf("barman is not enabled"))
 		return
 	}
@@ -345,7 +345,7 @@ func handleUpdateBarmanSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	barman, err := flypg.NewBarman(store, os.Getenv("BARMAN_ENABLED"), flypg.DefaultAuthProfile)
+	barman, err := flypg.NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), flypg.DefaultAuthProfile)
 	if err != nil {
 		renderErr(w, err)
 		return

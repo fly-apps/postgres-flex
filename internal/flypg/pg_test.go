@@ -117,7 +117,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-enabled", func(t *testing.T) {
-		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
+		t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		store, _ := state.NewStore()
 		if err := pgConf.initialize(store); err != nil {
@@ -133,7 +133,7 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		barman, err := NewBarman(store, os.Getenv("BARMAN_ENABLED"), DefaultAuthProfile)
+		barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-disabled", func(t *testing.T) {
-		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
+		t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
@@ -165,7 +165,7 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		t.Setenv("BARMAN_ENABLED", "")
+		t.Setenv("S3_ARCHIVE_CONFIG", "")
 
 		if err := pgConf.initialize(store); err != nil {
 			t.Fatal(err)
@@ -182,7 +182,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-restore-from-time", func(t *testing.T) {
-		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
@@ -200,7 +200,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-restore-from-name", func(t *testing.T) {
-		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240626T172443")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240626T172443")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
@@ -218,7 +218,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-restore-from-target", func(t *testing.T) {
-		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?target=immediate")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?target=immediate")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
@@ -236,7 +236,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-restore-from-target-time-non-inclusive", func(t *testing.T) {
-		t.Setenv("BARMAN_REMOTE_RESTORE", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00&targetInclusive=false")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00&targetInclusive=false")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {

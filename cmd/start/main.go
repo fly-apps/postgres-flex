@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// TODO - Find a better way to handle this
-	if os.Getenv("BARMAN_ENABLED") != "" || os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" || os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
 		if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
 			panicHandler(err)
 			return

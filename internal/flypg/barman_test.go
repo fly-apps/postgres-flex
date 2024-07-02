@@ -15,14 +15,14 @@ func TestNewBarman(t *testing.T) {
 	if err := setup(t); err != nil {
 		t.Fatal(err)
 	}
-	// defer cleanup()
+	defer cleanup()
 
 	store, _ := state.NewStore()
 
 	t.Run("defaults", func(t *testing.T) {
 		setDefaultEnv(t)
 
-		configURL := os.Getenv("BARMAN_ENABLED")
+		configURL := os.Getenv("S3_ARCHIVE_CONFIG")
 		barman, err := NewBarman(store, configURL, DefaultAuthProfile)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -76,7 +76,7 @@ func TestNewBarman(t *testing.T) {
 }
 
 func setDefaultEnv(t *testing.T) {
-	t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
+	t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 
 }

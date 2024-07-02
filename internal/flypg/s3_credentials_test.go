@@ -19,7 +19,7 @@ func TestWriteAWSCredentials(t *testing.T) {
 	pathToCredentials := fmt.Sprintf("%s/credentials", authDir)
 
 	t.Run("write-barman-credentials", func(t *testing.T) {
-		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
+		t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		if err := writeS3Credentials(context.TODO(), authDir); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -43,7 +43,7 @@ func TestWriteAWSCredentials(t *testing.T) {
 	})
 
 	t.Run("write-restore-credentials", func(t *testing.T) {
-		t.Setenv("BARMAN_REMOTE_RESTORE", "https://source-key:source-secret@fly.storage.tigris.dev/my-bucket/my-directory")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://source-key:source-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		if err := writeS3Credentials(context.TODO(), authDir); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -67,8 +67,8 @@ func TestWriteAWSCredentials(t *testing.T) {
 	})
 
 	t.Run("write-barman-and-restore-credentials", func(t *testing.T) {
-		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
-		t.Setenv("BARMAN_REMOTE_RESTORE", "https://source-key:source-secret@fly.storage.tigris.dev/source-bucket/source-directory")
+		t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://source-key:source-secret@fly.storage.tigris.dev/source-bucket/source-directory")
 
 		if err := writeS3Credentials(context.TODO(), authDir); err != nil {
 			t.Fatalf("unexpected error: %v", err)
