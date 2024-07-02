@@ -62,7 +62,7 @@ func main() {
 		}
 
 		// Backup scheduler
-\		go monitorBackupSchedule(ctx, barman)
+		go monitorBackupSchedule(ctx, barman)
 
 		// Backup retention monitor
 		go monitorBackupRetention(ctx, barman)
