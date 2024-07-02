@@ -28,7 +28,8 @@ const (
 )
 
 func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
-	barman, err := NewBarman(configURL, RestoreAuthProfile)
+	// We only need access to the barman endpoints
+	barman, err := NewBarman(nil, configURL, RestoreAuthProfile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create barman client: %s", err)
 	}

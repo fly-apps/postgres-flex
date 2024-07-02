@@ -16,6 +16,7 @@ const (
 	pgInternalConfigFilePath = "./test_results/postgresql.internal.conf"
 	pgUserConfigFilePath     = "./test_results/postgresql.user.conf"
 	pgPasswordFilePath       = "./test_results/default_password"
+	barmanConfigDir          = "./test_results/barman"
 
 	pgHBAFilePath = "./test_results/pg_hba.conf"
 )
@@ -33,6 +34,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		InternalConfigFilePath: pgInternalConfigFilePath,
 		UserConfigFilePath:     pgUserConfigFilePath,
 		passwordFilePath:       pgPasswordFilePath,
+		barmanConfigPath:       barmanConfigDir,
 	}
 
 	if err := stubPGConfigFile(); err != nil {
@@ -118,7 +120,6 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("BARMAN_ENABLED", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		store, _ := state.NewStore()
-
 		if err := pgConf.initialize(store); err != nil {
 			t.Fatal(err)
 		}
@@ -132,10 +133,15 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 		}
 
-		barman, err := NewBarman(os.Getenv("BARMAN_ENABLED"), "barman")
+		barman, err := NewBarman(store, os.Getenv("BARMAN_ENABLED"), DefaultAuthProfile)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+			t.Fatal(err)
+		}
+
 		expected := fmt.Sprintf("'%s'", barman.walArchiveCommand())
 		if cfg["archive_command"] != expected {
 			t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])

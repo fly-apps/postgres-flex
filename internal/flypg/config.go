@@ -63,6 +63,7 @@ func SyncUserConfig(c Config, consul *state.Store) error {
 	if cfg == nil {
 		return nil
 	}
+
 	c.SetUserConfig(cfg)
 
 	if err := writeUserConfigFile(c); err != nil {
@@ -134,7 +135,7 @@ func ReadFromFile(path string) (ConfigMap, error) {
 		conf[key] = value
 	}
 
-	return conf, file.Sync()
+	return conf, nil
 }
 
 func writeInternalConfigFile(c Config) error {
@@ -157,6 +158,10 @@ func writeInternalConfigFile(c Config) error {
 		return fmt.Errorf("failed to sync file: %s", err)
 	} else if err := file.Close(); err != nil {
 		return fmt.Errorf("failed to close file: %s", err)
+	}
+
+	if os.Getenv("UNIT_TESTING") != "" {
+		return nil
 	}
 
 	if err := utils.SetFileOwnership(c.InternalConfigFile(), "postgres"); err != nil {
@@ -184,6 +189,10 @@ func writeUserConfigFile(c Config) error {
 		return fmt.Errorf("failed to sync file: %s", err)
 	} else if err := file.Close(); err != nil {
 		return fmt.Errorf("failed to close file: %s", err)
+	}
+
+	if os.Getenv("UNIT_TESTING") != "" {
+		return nil
 	}
 
 	if err := utils.SetFileOwnership(c.UserConfigFile(), "postgres"); err != nil {

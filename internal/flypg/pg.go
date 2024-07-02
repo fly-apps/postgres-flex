@@ -26,6 +26,8 @@ type PGConfig struct {
 	Port                   int
 	DataDir                string
 
+	barmanConfigPath string
+
 	passwordFilePath string
 	repmgrUsername   string
 	repmgrDatabase   string
@@ -111,7 +113,7 @@ func (c *PGConfig) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-func (c *PGConfig) SetDefaults() error {
+func (c *PGConfig) SetDefaults(store *state.Store) error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
@@ -174,20 +176,19 @@ func (c *PGConfig) SetDefaults() error {
 	}
 
 	if os.Getenv("BARMAN_ENABLED") != "" {
-		configURL := os.Getenv("BARMAN_ENABLED")
-
-		barman, err := NewBarman(configURL, "barman")
-		switch {
-		case err != nil:
-			log.Printf("[WARN] Failed to initialize barman: %s", err)
-		default:
-			c.internalConfig["archive_mode"] = "on"
-			c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
-			// This controls the minimum frequency WAL files are archived to barman
-			// in the event there is database activity.
-			// TODO - Make this configurable
-			c.internalConfig["archive_timeout"] = "60s"
+		barman, err := NewBarman(store, os.Getenv("BARMAN_ENABLED"), DefaultAuthProfile)
+		if err != nil {
+			return fmt.Errorf("failed to initialize barman instance: %s", err)
 		}
+
+		if err := barman.LoadConfig(c.barmanConfigPath); err != nil {
+			return err
+		}
+
+		c.internalConfig["archive_mode"] = "on"
+		c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
+		c.internalConfig["archive_timeout"] = barman.Settings.ArchiveTimeout
+
 	} else {
 		c.internalConfig["archive_mode"] = "off"
 	}
@@ -198,6 +199,7 @@ func (c *PGConfig) SetDefaults() error {
 			return err
 		}
 
+		// Set restore command and associated recovery target settings
 		c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
 		c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
 
@@ -271,7 +273,7 @@ func (c *PGConfig) initialize(store *state.Store) error {
 		}
 	}
 
-	if err := c.SetDefaults(); err != nil {
+	if err := c.SetDefaults(store); err != nil {
 		return fmt.Errorf("failed to set pg defaults: %s", err)
 	}
 

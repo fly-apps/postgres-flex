@@ -3,15 +3,32 @@ package flypg
 import (
 	"os"
 	"testing"
+
+	"github.com/fly-apps/postgres-flex/internal/flypg/state"
+)
+
+const (
+	testBarmanConfigDir = "./test_results/barman"
 )
 
 func TestNewBarman(t *testing.T) {
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
+	// defer cleanup()
+
+	store, _ := state.NewStore()
+
 	t.Run("defaults", func(t *testing.T) {
 		setDefaultEnv(t)
 
 		configURL := os.Getenv("BARMAN_ENABLED")
-		barman, err := NewBarman(configURL, "barman")
+		barman, err := NewBarman(store, configURL, DefaultAuthProfile)
 		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -40,27 +57,22 @@ func TestNewBarman(t *testing.T) {
 		}
 
 		// Defaults
-		if barman.minimumRedundancy != "3" {
-			t.Fatalf("expected minimumRedundancy to be 3, but got %s", barman.minimumRedundancy)
+		if barman.Settings.MinimumRedundancy != "3" {
+			t.Fatalf("expected minimumRedundancy to be 3, but got %s", barman.Settings.MinimumRedundancy)
 		}
 
-		if barman.retentionDays != "7" {
-			t.Fatalf("expected retentionDays to be 7, but got %s", barman.retentionDays)
+		if barman.Settings.RecoveryWindow != "RECOVERY WINDOW OF 7 DAYS" {
+			t.Fatalf("expected recovery_window to be 'RECOVERY WINDOW OF 7 DAYS', but got %s", barman.Settings.RecoveryWindow)
+		}
+
+		if barman.Settings.FullBackupFrequency != "24" {
+			t.Fatalf("expected fullBackupFrequency to be 24, but got %s", barman.Settings.FullBackupFrequency)
+		}
+
+		if barman.Settings.ArchiveTimeout != "60s" {
+			t.Fatalf("expected archiveTimeout to be 60s, but got %s", barman.Settings.ArchiveTimeout)
 		}
 	})
-}
-
-func TestBarmanRetentionPolicy(t *testing.T) {
-	setDefaultEnv(t)
-	configURL := os.Getenv("BARMAN_ENABLED")
-	barman, err := NewBarman(configURL, DefaultAuthProfile)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if barman.RetentionPolicy() != "'RECOVERY WINDOW OF 7 days'" {
-		t.Fatalf("expected retention policy to be 'RECOVERY WINDOW OF 7 days', but got %s", barman.RetentionPolicy())
-	}
 }
 
 func setDefaultEnv(t *testing.T) {

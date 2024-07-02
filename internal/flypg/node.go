@@ -32,6 +32,7 @@ type Node struct {
 	PGConfig  PGConfig
 	RepMgr    RepMgr
 	FlyConfig FlyPGConfig
+	Barman    Barman
 }
 
 func NewNode() (*Node, error) {
@@ -107,6 +108,11 @@ func NewNode() (*Node, error) {
 		passwordFilePath: "/data/.default_password",
 		repmgrUsername:   node.RepMgr.Credentials.Username,
 		repmgrDatabase:   node.RepMgr.DatabaseName,
+	}
+
+	if os.Getenv("BARMAN_ENABLED") != "" {
+		// Specific PG configuration is injected when Barman is enabled.
+		node.PGConfig.barmanConfigPath = DefaultBarmanConfigDir
 	}
 
 	node.FlyConfig = FlyPGConfig{

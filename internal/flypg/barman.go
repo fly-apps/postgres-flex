@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
@@ -28,10 +28,9 @@ type Barman struct {
 	bucket          string
 	bucketDirectory string
 	authProfile     string
+	store           *state.Store
 
-	// TODO - Make these configurable
-	retentionDays     string
-	minimumRedundancy string
+	*BarmanConfig
 }
 
 type Backup struct {
@@ -49,7 +48,7 @@ type BackupList struct {
 // NewBarman creates a new Barman instance.
 // The configURL is expected to be in the format:
 // https://s3-access-key:s3-secret-key@s3-endpoint/bucket/bucket-directory
-func NewBarman(configURL, authProfile string) (*Barman, error) {
+func NewBarman(store *state.Store, configURL, authProfile string) (*Barman, error) {
 	parsedURL, err := url.Parse(configURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid credential url: %w", err)
@@ -86,11 +85,19 @@ func NewBarman(configURL, authProfile string) (*Barman, error) {
 		bucket:          pathSlice[0],
 		bucketDirectory: pathSlice[1],
 		authProfile:     authProfile,
-
-		retentionDays:     "7",
-		minimumRedundancy: "3",
+		store:           store,
 	}, nil
+}
 
+func (b *Barman) LoadConfig(configDir string) error {
+	barCfg, err := NewBarmanConfig(b.store, configDir)
+	if err != nil {
+		return err
+	}
+
+	b.BarmanConfig = barCfg
+
+	return nil
 }
 
 func (b *Barman) BucketURL() string {
@@ -155,8 +162,8 @@ func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
 		"--profile", b.authProfile,
-		"--retention", b.RetentionPolicy(),
-		"--minimum-redundancy", b.minimumRedundancy,
+		"--retention", b.Settings.RecoveryWindow,
+		"--minimum-redundancy", b.Settings.MinimumRedundancy,
 		b.BucketURL(),
 		b.bucketDirectory,
 	}
@@ -192,18 +199,6 @@ func (b *Barman) LastBackupTaken(ctx context.Context) (time.Time, error) {
 	}
 
 	return latestBackupTime, nil
-}
-
-func (b *Barman) PrintRetentionPolicy() {
-	log.Printf(`
-Retention Policy
------------------
-RECOVERY WINDOW:  %s DAYS
-MINIMUM BACKUP REDUNDANCY: %s`, b.retentionDays, b.minimumRedundancy)
-}
-
-func (b *Barman) RetentionPolicy() string {
-	return fmt.Sprintf("'RECOVERY WINDOW OF %s days'", b.retentionDays)
 }
 
 func (b *Barman) walArchiveCommand() string {

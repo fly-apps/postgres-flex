@@ -148,6 +148,11 @@ func TestNewBarmanRestore(t *testing.T) {
 }
 
 func TestWALRestoreCommand(t *testing.T) {
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
 	setRestoreDefaultEnv(t)
 	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
 	if err != nil {
@@ -162,6 +167,11 @@ func TestWALRestoreCommand(t *testing.T) {
 }
 
 func TestParseBackups(t *testing.T) {
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
 	t.Run("parseBackups", func(t *testing.T) {
 		setRestoreDefaultEnv(t)
 
@@ -209,6 +219,11 @@ func TestParseBackups(t *testing.T) {
 }
 
 func TestResolveBackupTarget(t *testing.T) {
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
 	setRestoreDefaultEnv(t)
 
 	restore, err := NewBarmanRestore(os.Getenv("BARMAN_REMOTE_RESTORE"))
