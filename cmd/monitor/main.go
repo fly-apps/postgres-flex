@@ -38,6 +38,7 @@ func main() {
 	// Wait for postgres to boot and become accessible.
 	log.Println("Waiting for Postgres to be ready...")
 	waitOnPostgres(ctx, node)
+	log.Println("Postgres is ready to accept connections. Starting monitor...")
 
 	// Dead member monitor
 	go func() {
