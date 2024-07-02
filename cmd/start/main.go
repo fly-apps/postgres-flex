@@ -55,6 +55,14 @@ func main() {
 		return
 	}
 
+	// TODO - Find a better way to handle this
+	if os.Getenv("BARMAN_ENABLED") != "" || os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
+		if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
+			panicHandler(err)
+			return
+		}
+	}
+
 	node, err := flypg.NewNode()
 	if err != nil {
 		panicHandler(err)
