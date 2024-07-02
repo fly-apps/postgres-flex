@@ -70,7 +70,6 @@ func RunCommand(cmdStr, usr string) ([]byte, error) {
 	}
 
 	return stdoutBuf.Bytes(), err
-
 }
 
 func SetFileOwnership(pathToFile, owner string) error {

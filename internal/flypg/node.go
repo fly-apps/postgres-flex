@@ -145,6 +145,10 @@ func (n *Node) Init(ctx context.Context) error {
 		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
 			return fmt.Errorf("failed to write s3 credentials: %s", err)
 		}
+
+		if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
+			return fmt.Errorf("failed to set aws credentials path: %s", err)
+		}
 	}
 
 	store, err := state.NewStore()

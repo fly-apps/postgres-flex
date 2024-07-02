@@ -55,11 +55,6 @@ func main() {
 		return
 	}
 
-	// TODO - We need to find a better way to do this.
-	if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
-		panicHandler(err)
-	}
-
 	node, err := flypg.NewNode()
 	if err != nil {
 		panicHandler(err)

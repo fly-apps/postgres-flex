@@ -180,7 +180,7 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 		}
 
 		if err := barman.LoadConfig(c.barmanConfigPath); err != nil {
-			return err
+			return fmt.Errorf("failed to load barman config: %s", err)
 		}
 
 		c.internalConfig["archive_mode"] = "on"
