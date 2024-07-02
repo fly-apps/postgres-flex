@@ -95,18 +95,13 @@ func (c *BarmanConfig) ParseSettings() (BarmanSettings, error) {
 		return BarmanSettings{}, fmt.Errorf("failed to read current config: %s", err)
 	}
 
-	backupFrequency, err := time.ParseDuration(cfg["full_backup_frequency"].(string))
-	if err != nil {
-		return BarmanSettings{}, fmt.Errorf("failed to parse full backup frequency: %s", err)
-	}
-
 	recoveryWindow := fmt.Sprintf("RECOVERY WINDOW OF %s",
 		convertRecoveryWindowDuration(cfg["recovery_window"].(string)))
 
 	return BarmanSettings{
 		ArchiveTimeout:      cfg["archive_timeout"].(string),
 		RecoveryWindow:      recoveryWindow,
-		FullBackupFrequency: fmt.Sprint(backupFrequency.Hours()),
+		FullBackupFrequency: cfg["full_backup_frequency"].(string),
 		MinimumRedundancy:   cfg["minimum_redundancy"].(string),
 	}, nil
 }
@@ -163,7 +158,7 @@ func (c *BarmanConfig) Validate(requestedChanges map[string]interface{}) error {
 
 func (c *BarmanConfig) initialize(store *state.Store, configDir string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0600); err != nil {
 		return fmt.Errorf("failed to create barman config directory: %s", err)
 	}
 

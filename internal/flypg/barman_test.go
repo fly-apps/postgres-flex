@@ -65,7 +65,7 @@ func TestNewBarman(t *testing.T) {
 			t.Fatalf("expected recovery_window to be 'RECOVERY WINDOW OF 7 DAYS', but got %s", barman.Settings.RecoveryWindow)
 		}
 
-		if barman.Settings.FullBackupFrequency != "24" {
+		if barman.Settings.FullBackupFrequency != "24h" {
 			t.Fatalf("expected fullBackupFrequency to be 24, but got %s", barman.Settings.FullBackupFrequency)
 		}
 

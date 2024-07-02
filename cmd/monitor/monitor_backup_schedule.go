@@ -16,20 +16,35 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 		log.Printf("Failed to resolve the last backup taken: %s", err)
 	}
 
+	fullBackupSchedule := defaultFullBackupSchedule
+
+	// Set the full backup schedule if it is defined in the configuration.
+	if barman.Settings.FullBackupFrequency != "" {
+		fullBackupDur, err := time.ParseDuration(barman.Settings.FullBackupFrequency)
+		switch {
+		case err != nil:
+			log.Printf("Failed to parse full backup frequency: %s", err)
+		default:
+			fullBackupSchedule = fullBackupDur
+		}
+	}
+
 	// Ensure we have a least one backup before proceeding.
 	if lastBackupTime.IsZero() {
 		log.Println("No backups found! Performing the initial base backup.")
 
 		if err := performInitialBaseBackup(ctx, barman); err != nil {
 			log.Printf("Failed to perform the initial full backup: %s", err)
-			log.Printf("Backup scheduler will reattempt in 24 hours.")
+			log.Printf("Backup scheduler will re-attempt in %s.", fullBackupSchedule)
 		}
 
 		lastBackupTime = time.Now()
 	}
 
+	log.Printf("Full backup schedule set to: %s", fullBackupSchedule)
+
 	// Calculate the time until the next backup is due.
-	timeUntilNextBackup := time.Until(lastBackupTime.Add(defaultFullBackupSchedule))
+	timeUntilNextBackup := time.Until(lastBackupTime.Add(fullBackupSchedule))
 
 	// Perform backup immediately if the time until the next backup is negative.
 	if timeUntilNextBackup < 0 {
@@ -39,7 +54,7 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 			log.Printf("Full backup failed with: %s", err)
 		}
 
-		timeUntilNextBackup = defaultFullBackupSchedule
+		timeUntilNextBackup = fullBackupSchedule
 	}
 
 	log.Printf("Next full backup due in: %s", timeUntilNextBackup)
@@ -69,7 +84,7 @@ func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 			}
 
 			log.Printf("Full backup completed successfully")
-			ticker.Reset(defaultFullBackupSchedule)
+			ticker.Reset(fullBackupSchedule)
 		}
 	}
 }

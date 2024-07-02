@@ -76,5 +76,29 @@ func TestValidateBarmanConfig(t *testing.T) {
 			t.Fatalf("expected error, got nil")
 		}
 	})
+}
 
+func TestBarmanConfigSettings(t *testing.T) {
+	if err := setup(t); err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	store, _ := state.NewStore()
+
+	t.Run("defaults", func(t *testing.T) {
+		b, err := NewBarmanConfig(store, barmanConfigTestDir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if b.Settings.MinimumRedundancy != "3" {
+			t.Fatalf("expected minimumRedundancy to be 3, but got %s", b.Settings.MinimumRedundancy)
+		}
+
+		if b.Settings.FullBackupFrequency != "24h" {
+			t.Fatalf("expected fullBackupFrequency to be 24h, but got %s", b.Settings.FullBackupFrequency)
+		}
+
+	})
 }
