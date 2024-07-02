@@ -60,7 +60,11 @@ func Handler() http.Handler {
 		r.Get("/role", handleRole)
 		r.Get("/settings/view/postgres", handleViewPostgresSettings)
 		r.Get("/settings/view/repmgr", handleViewRepmgrSettings)
+		r.Get("/settings/view/barman", handleViewBarmanSettings)
+
 		r.Post("/settings/update/postgres", handleUpdatePostgresSettings)
+		r.Post("/settings/update/barman", handleUpdateBarmanSettings)
+
 		r.Post("/settings/apply", handleApplyConfig)
 	})
 
