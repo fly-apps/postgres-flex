@@ -19,7 +19,6 @@ import (
 )
 
 type PGConfig struct {
-	AppName                string
 	ConfigFilePath         string
 	InternalConfigFilePath string
 	UserConfigFilePath     string
@@ -160,7 +159,6 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 	}
 
 	c.internalConfig = ConfigMap{
-		"cluster_name":             c.AppName,
 		"random_page_cost":         "1.1",
 		"port":                     c.Port,
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),

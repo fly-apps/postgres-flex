@@ -350,7 +350,6 @@ func TestPGDefaultPassword(t *testing.T) {
 	defer cleanup()
 
 	pgConf := &PGConfig{
-		AppName:                "my-app",
 		DataDir:                pgTestDirectory,
 		Port:                   5433,
 		ConfigFilePath:         pgConfigFilePath,
@@ -405,7 +404,6 @@ func TestValidateCompatibility(t *testing.T) {
 	defer cleanup()
 
 	pgConf := &PGConfig{
-		AppName:                "my-app",
 		DataDir:                pgTestDirectory,
 		Port:                   5433,
 		ConfigFilePath:         pgConfigFilePath,

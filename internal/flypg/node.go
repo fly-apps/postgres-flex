@@ -32,7 +32,6 @@ type Node struct {
 	PGConfig  PGConfig
 	RepMgr    RepMgr
 	FlyConfig FlyPGConfig
-	Barman    Barman
 }
 
 func NewNode() (*Node, error) {
@@ -98,7 +97,6 @@ func NewNode() (*Node, error) {
 	node.RepMgr.Witness = present
 
 	node.PGConfig = PGConfig{
-		AppName:                node.AppName,
 		DataDir:                node.DataDir,
 		Port:                   node.Port,
 		ConfigFilePath:         fmt.Sprintf("%s/postgresql.conf", node.DataDir),
@@ -143,15 +141,15 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	store, err := state.NewStore()
-	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store: %s", err)
-	}
-
 	if os.Getenv("BARMAN_ENABLED") != "" || os.Getenv("BARMAN_REMOTE_RESTORE") != "" {
 		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
 			return fmt.Errorf("failed to write s3 credentials: %s", err)
 		}
+	}
+
+	store, err := state.NewStore()
+	if err != nil {
+		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
 	// Remote point-in-time restore.
