@@ -34,6 +34,7 @@ type Barman struct {
 }
 
 type Backup struct {
+	Status    string `json:"status"`
 	BackupID  string `json:"backup_id"`
 	StartTime string `json:"begin_time"`
 	EndTime   string `json:"end_time"`
@@ -171,8 +172,25 @@ func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-delete", args...)
 }
 
-func (b *Barman) LastBackupTaken(ctx context.Context) (time.Time, error) {
+func (b *Barman) ListCompletedBackups(ctx context.Context) (BackupList, error) {
 	backups, err := b.ListBackups(ctx)
+	if err != nil {
+		return BackupList{}, fmt.Errorf("failed to list backups: %s", err)
+	}
+
+	var completedBackups BackupList
+
+	for _, backup := range backups.Backups {
+		if backup.Status == "DONE" {
+			completedBackups.Backups = append(completedBackups.Backups, backup)
+		}
+	}
+
+	return completedBackups, nil
+}
+
+func (b *Barman) LastCompletedBackup(ctx context.Context) (time.Time, error) {
+	backups, err := b.ListCompletedBackups(ctx)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to list backups: %s", err)
 	}

@@ -11,7 +11,7 @@ import (
 
 func monitorBackupSchedule(ctx context.Context, barman *flypg.Barman) {
 	// Determine when the last backup was taken.
-	lastBackupTime, err := barman.LastBackupTaken(ctx)
+	lastBackupTime, err := barman.LastCompletedBackup(ctx)
 	if err != nil {
 		log.Printf("Failed to resolve the last backup taken: %s", err)
 	}

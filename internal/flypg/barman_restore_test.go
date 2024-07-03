@@ -8,6 +8,39 @@ import (
 
 const backupsResponse = `{
     "backups_list": [
+		{
+            "backup_label": null,
+            "begin_offset": 216,
+            "begin_time": "Tue Jun 24 19:44:20 2024",
+            "begin_wal": "00000005000000000000002A",
+            "begin_xlog": "0/2A0000D8",
+            "compression": null,
+            "config_file": "/data/postgresql/postgresql.conf",
+            "copy_stats": null,
+            "deduplicated_size": null,
+            "end_offset": null,
+            "end_time": null,
+            "end_wal": null,
+            "end_xlog": null,
+            "error": "failure uploading data (connection already closed)",
+            "hba_file": "/data/postgresql/pg_hba.conf",
+            "ident_file": "/data/postgresql/pg_ident.conf",
+            "included_files": [
+                "/data/postgresql/postgresql.auto.conf",
+                "/data/postgresql/postgresql.internal.conf"
+            ],
+            "mode": null,
+            "pgdata": "/data/postgresql",
+            "server_name": "cloud",
+            "size": null,
+            "status": "FAILED",
+            "systemid": "7332222271544570189",
+            "tablespaces": null,
+            "timeline": 5,
+            "version": 150006,
+            "xlog_segment_size": 16777216,
+            "backup_id": "20240702T210544"
+        },
         {
             "backup_label": "'START WAL LOCATION: 0/8000028 (file 000000010000000000000008)\\nCHECKPOINT LOCATION: 0/8000098\\nBACKUP METHOD: streamed\\nBACKUP FROM: primary\\nSTART TIME: 2024-06-25 19:44:13 UTC\\nLABEL: Barman backup cloud 20240625T194412\\nSTART TIMELINE: 1\\n'",
             "backup_name": "test-backup-2",
@@ -185,24 +218,28 @@ func TestParseBackups(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if len(list.Backups) != 2 {
+		if len(list.Backups) != 3 {
 			t.Fatalf("expected 2 backups, got %d", len(list.Backups))
 		}
 
 		firstBackup := list.Backups[0]
-		if firstBackup.BackupID != "20240625T194412" {
+		if firstBackup.BackupID != "20240702T210544" {
 			t.Fatalf("expected backup ID to be 20240625T194412, got %s", firstBackup.BackupID)
 		}
 
-		if firstBackup.StartTime != "Tue Jun 25 19:44:12 2024" {
-			t.Fatalf("expected start time to be Tue Jun 25 19:44:12 2024, got %s", firstBackup.StartTime)
+		if firstBackup.StartTime != "Tue Jun 24 19:44:20 2024" {
+			t.Fatalf("expected start time to be Tue Jun 24 19:44:20 2024, got %s", firstBackup.StartTime)
 		}
 
-		if firstBackup.EndTime != "Tue Jun 25 19:44:18 2024" {
-			t.Fatalf("expected end time to be Tue Jun 25 19:44:18 2024, got %s", firstBackup.EndTime)
+		if firstBackup.EndTime != "" {
+			t.Fatalf("expected end time to be empty, but got %s", firstBackup.EndTime)
 		}
 
-		secondBackup := list.Backups[1]
+		if firstBackup.Status != "FAILED" {
+			t.Fatalf("expected status to be FAILED, got %s", firstBackup.Status)
+		}
+
+		secondBackup := list.Backups[2]
 
 		if secondBackup.BackupID != "20240626T172443" {
 			t.Fatalf("expected backup ID to be 20240626T172443, got %s", secondBackup.BackupID)
@@ -258,8 +295,6 @@ func TestResolveBackupTarget(t *testing.T) {
 		}
 	})
 
-	// "begin_time": "Tue Jun 25 19:44:12 2024"
-	// "end_time": "Tue Jun 25 19:44:18 2024",
 	t.Run("resolve-backup-within-first-window", func(t *testing.T) {
 		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:15-00:00")
 		if err != nil {
@@ -271,8 +306,6 @@ func TestResolveBackupTarget(t *testing.T) {
 		}
 	})
 
-	// "begin_time": "Wed Jun 26 17:24:43 2024",
-	// "end_time": "Wed Jun 26 17:27:02 2024",
 	t.Run("resolve-backup-within-second-window", func(t *testing.T) {
 		backupID, err := restore.resolveBackupFromTime(list, "2024-06-26T17:25:15-00:00")
 		if err != nil {

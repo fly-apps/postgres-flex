@@ -141,8 +141,7 @@ func (*BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
 }
 
 func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
-	// Query available backups from object storage
-	backups, err := b.ListBackups(ctx)
+	backups, err := b.ListCompletedBackups(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list backups: %s", err)
 	}
@@ -159,22 +158,21 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by time: %s", err)
 		}
+	case b.recoveryTargetTime != "":
+		backupID, err = b.resolveBackupFromTime(backups, b.recoveryTargetTime)
+		if err != nil {
+			return fmt.Errorf("failed to resolve backup target by time: %s", err)
+		}
 	case b.recoveryTargetName != "":
 		// Resolve the target base backup
 		backupID, err = b.resolveBackupFromID(backups, b.recoveryTargetName)
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by id: %s", err)
 		}
-	case b.recoveryTargetTime != "":
-		backupID, err = b.resolveBackupFromTime(backups, b.recoveryTargetTime)
-		if err != nil {
-			return fmt.Errorf("failed to resolve backup target by time: %s", err)
-		}
 	default:
 		return fmt.Errorf("restore target not specified")
 	}
 
-	// TODO - Consider just using the last available backup if the target is not found
 	if backupID == "" {
 		return fmt.Errorf("no backup found")
 	}
@@ -234,6 +232,12 @@ func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr st
 	layout := "Mon Jan 2 15:04:05 2006"
 
 	for _, backup := range backupList.Backups {
+		// Skip backups that that failed or are in progress
+		// TODO - This shouldn't be needed, but will keep it around until we can improve tests.
+		if backup.Status != "DONE" {
+			continue
+		}
+
 		// Parse the backup start time
 		startTime, err := time.Parse(layout, backup.StartTime)
 		if err != nil {
