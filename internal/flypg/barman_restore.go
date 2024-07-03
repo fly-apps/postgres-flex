@@ -24,8 +24,6 @@ type BarmanRestore struct {
 
 const (
 	defaultRestoreDir = "/data/postgresql"
-	// ISO8601 is the format required for the barman restore targets.
-	ISO8601 = "2006-01-02T15:04:05-07:00"
 )
 
 func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
@@ -57,11 +55,11 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		case "targetAction":
 			restore.recoveryTargetAction = v
 		case "targetTime":
-			ts, err := time.Parse(ISO8601, v)
+			ts, err := time.Parse(time.RFC3339, v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse target time: %s", err)
 			}
-			restore.recoveryTargetTime = ts.Format(ISO8601)
+			restore.recoveryTargetTime = ts.Format(time.RFC3339)
 		case "targetTimeline":
 			restore.recoveryTargetTimeline = v
 		default:
@@ -157,7 +155,7 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 
 	switch {
 	case b.recoveryTarget != "":
-		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(ISO8601))
+		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(time.RFC3339))
 		if err != nil {
 			return fmt.Errorf("failed to resolve backup target by time: %s", err)
 		}
@@ -215,7 +213,7 @@ func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr st
 	var restoreTime time.Time
 
 	// Parse the restore string
-	restoreTime, err := time.Parse(ISO8601, restoreStr)
+	restoreTime, err := time.Parse(time.RFC3339, restoreStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse restore time: %s", err)
 	}
