@@ -49,6 +49,7 @@ func NewNode() (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed getting private ip: %s", err)
 	}
+
 	node.PrivateIP = ipv6.String()
 
 	node.PrimaryRegion = os.Getenv("PRIMARY_REGION")
@@ -127,6 +128,11 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
+	store, err := state.NewStore()
+	if err != nil {
+		return fmt.Errorf("failed initialize cluster state store: %s", err)
+	}
+
 	// Snapshot restore
 	if os.Getenv("FLY_RESTORED_FROM") != "" {
 		active, err := isRestoreActive()
@@ -141,26 +147,16 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
+	// Ensure we have the necessary credentials to access S3 when Barman is enabled.
 	if os.Getenv("S3_ARCHIVE_CONFIG") != "" || os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
 		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
 			return fmt.Errorf("failed to write s3 credentials: %s", err)
 		}
 	}
 
-	store, err := state.NewStore()
-	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store: %s", err)
-	}
-
-	// Remote point-in-time restore.
+	// Remote PITR
 	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
-		// TODO - Probably not safe to use the same lock as the snapshot restore.
-		active, err := isRestoreActive()
-		if err != nil {
-			return fmt.Errorf("failed to verify active restore: %s", err)
-		}
-
-		if active {
+		if !n.PGConfig.isInitialized() {
 			configURL := os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG")
 			restore, err := NewBarmanRestore(configURL)
 			if err != nil {
@@ -179,11 +175,8 @@ func (n *Node) Init(ctx context.Context) error {
 			if err := restore.walReplayAndReset(ctx, n); err != nil {
 				return fmt.Errorf("failed to replay WAL: %s", err)
 			}
-
-			// Set the lock file so the init process knows not to restart the restore process.
-			if err := setRestoreLock(); err != nil {
-				return fmt.Errorf("failed to set restore lock: %s", err)
-			}
+		} else {
+			log.Println("[WARN] Postgres directory present, ignoring `S3_ARCHIVE_REMOTE_RESTORE_CONFIG` ")
 		}
 	}
 
