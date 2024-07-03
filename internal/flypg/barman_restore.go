@@ -212,14 +212,9 @@ func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr st
 	var restoreTime time.Time
 
 	// Parse the restore string
-	if restoreStr == "latest" {
-		restoreTime = time.Now()
-	} else {
-		var err error
-		restoreTime, err = time.Parse(ISO8601, restoreStr)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse restore time: %s", err)
-		}
+	restoreTime, err := time.Parse(ISO8601, restoreStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse restore time: %s", err)
 	}
 
 	latestBackupID := ""

@@ -273,17 +273,6 @@ func TestResolveBackupTarget(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	t.Run("resolve-latest-backup-target", func(t *testing.T) {
-		backupID, err := restore.resolveBackupFromTime(list, "latest")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if backupID != "20240626T172443" {
-			t.Fatalf("expected backup ID to be 20240626T172443, got %s", backupID)
-		}
-	})
-
 	t.Run("resolve-earliest-backup-target", func(t *testing.T) {
 		backupID, err := restore.resolveBackupFromTime(list, "2024-06-25T19:44:12-00:00")
 		if err != nil {
