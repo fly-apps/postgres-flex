@@ -65,6 +65,14 @@ func TestValidateBarmanConfig(t *testing.T) {
 		if err := b.Validate(conf); err == nil {
 			t.Fatalf("expected error, got nil")
 		}
+
+		conf = ConfigMap{
+			"full_backup_frequency": "1m",
+		}
+
+		if err := b.Validate(conf); err == nil {
+			t.Fatalf("expected error, got nil")
+		}
 	})
 
 	t.Run("invalid-minimum-redundancy", func(t *testing.T) {
