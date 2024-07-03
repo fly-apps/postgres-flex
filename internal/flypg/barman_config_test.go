@@ -55,6 +55,21 @@ func TestValidateBarmanConfig(t *testing.T) {
 		if err := b.Validate(conf); err == nil {
 			t.Fatalf("expected error, got nil")
 		}
+
+		conf = ConfigMap{
+			"recovery_window": "1m",
+		}
+
+		if err := b.Validate(conf); err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+
+		conf = ConfigMap{
+			"recovery_window": "0w",
+		}
+		if err := b.Validate(conf); err == nil {
+			t.Fatalf("expected error, got nil")
+		}
 	})
 
 	t.Run("invalid-full-backup-frequency", func(t *testing.T) {
@@ -72,6 +87,13 @@ func TestValidateBarmanConfig(t *testing.T) {
 
 		if err := b.Validate(conf); err == nil {
 			t.Fatalf("expected error, got nil")
+		}
+
+		conf = ConfigMap{
+			"full_backup_frequency": "0w",
+		}
+		if err := b.Validate(conf); err == nil {
+			t.Fatalf("expected invalid value for recovery_window (expected to be >= 1, got, got 1")
 		}
 	})
 
