@@ -236,7 +236,7 @@ func TestPGConfigInitialization(t *testing.T) {
 	})
 
 	t.Run("barman-restore-from-target-time-non-inclusive", func(t *testing.T) {
-		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00&targetInclusive=false")
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00Z&targetInclusive=false")
 		store, _ := state.NewStore()
 
 		if err := pgConf.initialize(store); err != nil {
@@ -248,8 +248,8 @@ func TestPGConfigInitialization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if cfg["recovery_target_time"] != "'2024-06-30T11:15:00-06:00'" {
-			t.Fatalf("expected recovery_target_time to be 2024-06-30T11:15:00-06:00, got %v", cfg["recovery_target_time"])
+		if cfg["recovery_target_time"] != "'2024-06-30T11:15:00+00:00'" {
+			t.Fatalf("expected recovery_target_time to be 2024-06-30T11:15:00+00:00, got %v", cfg["recovery_target_time"])
 		}
 
 		if cfg["recovery_target_inclusive"] != "false" {

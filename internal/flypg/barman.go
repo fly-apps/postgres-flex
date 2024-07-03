@@ -251,3 +251,15 @@ func (*Barman) parseBackups(backupBytes []byte) (BackupList, error) {
 
 	return backupList, nil
 }
+
+func formatTimestamp(timestamp string) (string, error) {
+	if strings.HasSuffix(timestamp, "Z") {
+		timestamp = strings.TrimSuffix(timestamp, "Z") + "+00:00"
+	}
+	parsedTime, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse timestamp: %s", err)
+	}
+
+	return parsedTime.Format("2006-01-02T15:04:05-07:00"), nil
+}

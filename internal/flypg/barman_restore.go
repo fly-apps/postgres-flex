@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/supervisor"
@@ -56,14 +55,11 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		case "targetAction":
 			restore.recoveryTargetAction = v
 		case "targetTime":
-			if strings.HasSuffix(v, "Z") {
-				v = strings.TrimSuffix(v, "Z") + "-00:00"
-			}
-			ts, err := time.Parse(time.RFC3339, v)
+			ts, err := formatTimestamp(v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse target time: %s", err)
 			}
-			restore.recoveryTargetTime = ts.Format(time.RFC3339)
+			restore.recoveryTargetTime = ts
 		case "targetTimeline":
 			restore.recoveryTargetTimeline = v
 		default:

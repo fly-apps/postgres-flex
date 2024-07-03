@@ -75,6 +75,33 @@ func TestNewBarman(t *testing.T) {
 	})
 }
 
+func TestFormatTimestamp(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		ts, err := formatTimestamp("2024-07-03T17:55:22Z")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts != "2024-07-03T17:55:22+00:00" {
+			t.Fatalf("expected timestamp to be 2024-07-03T17:55:22+00:00, but got %s", ts)
+		}
+
+		ts, err = formatTimestamp("2024-07-03T17:55:22-07:00")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts != "2024-07-03T17:55:22-07:00" {
+			t.Fatalf("expected timestamp to be 2024-07-03T17:55:22-07:00, but got %s", ts)
+		}
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		_, err := formatTimestamp("2024-07-03T17:55:22Z07:00")
+		if err == nil {
+			t.Fatalf("unexpected error, but not nil")
+		}
+	})
+}
+
 func setDefaultEnv(t *testing.T) {
 	t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")

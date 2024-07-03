@@ -157,6 +157,8 @@ func (n *Node) Init(ctx context.Context) error {
 	// Remote PITR
 	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
 		if !n.PGConfig.isInitialized() {
+			log.Println("[INFO] Postgres directory not present, proceeding with remote restore.")
+
 			configURL := os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG")
 			restore, err := NewBarmanRestore(configURL)
 			if err != nil {

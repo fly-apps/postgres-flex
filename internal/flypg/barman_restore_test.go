@@ -175,8 +175,8 @@ func TestNewBarmanRestore(t *testing.T) {
 		t.Fatalf("expected recovery target name to be empty, got %s", restore.recoveryTargetName)
 	}
 
-	if restore.recoveryTargetTime != "2024-07-03T17:55:22Z" {
-		t.Fatalf("expected recovery target time to be 2024-07-03T17:55:22-00:00, got %s", restore.recoveryTargetTime)
+	if restore.recoveryTargetTime != "2024-07-03T17:55:22+00:00" {
+		t.Fatalf("expected recovery target time to be 2024-07-03T17:55:22+00:00, got %s", restore.recoveryTargetTime)
 	}
 
 	if restore.recoveryTargetTimeline != "2" {
