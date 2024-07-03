@@ -159,8 +159,7 @@ func restoreHBAFile() error {
 	defer func() { _ = file.Close() }()
 
 	// revert back to our original config
-	_, err = file.Write(data)
-	if err != nil {
+	if _, err = file.Write(data); err != nil {
 		return err
 	}
 
@@ -179,8 +178,7 @@ func setRestoreLock() error {
 	}
 	defer func() { _ = file.Close() }()
 
-	_, err = file.WriteString(os.Getenv("FLY_APP_NAME"))
-	if err != nil {
+	if _, err = file.WriteString(os.Getenv("FLY_APP_NAME")); err != nil {
 		return err
 	}
 

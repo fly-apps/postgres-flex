@@ -44,21 +44,23 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 	}
 
 	for key, value := range url.Query() {
+		v := value[0]
+
 		switch key {
 		case "target":
-			restore.recoveryTarget = value[0]
+			restore.recoveryTarget = v
 		case "targetName":
-			restore.recoveryTargetName = value[0]
+			restore.recoveryTargetName = v
+		case "targetInclusive":
+			restore.recoveryTargetInclusive = v
+		case "targetAction":
+			restore.recoveryTargetAction = v
 		case "targetTime":
-			ts, err := time.Parse(ISO8601, value[0])
+			ts, err := time.Parse(ISO8601, v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse target time: %s", err)
 			}
 			restore.recoveryTargetTime = ts.Format(ISO8601)
-		case "targetInclusive":
-			restore.recoveryTargetInclusive = value[0]
-		case "targetAction":
-			restore.recoveryTargetAction = value[0]
 		default:
 			return nil, fmt.Errorf("unknown query parameter: %s", key)
 		}
@@ -113,8 +115,7 @@ func (*BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
 	defer func() { _ = conn.Close(ctx) }()
 
 	// Drop repmgr database to clear any metadata that belonged to the old cluster.
-	_, err = conn.Exec(ctx, "DROP DATABASE repmgr;")
-	if err != nil {
+	if _, err = conn.Exec(ctx, "DROP DATABASE repmgr;"); err != nil {
 		return fmt.Errorf("failed to drop repmgr database: %s", err)
 	}
 

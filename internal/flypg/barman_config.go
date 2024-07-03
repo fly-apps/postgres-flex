@@ -129,14 +129,9 @@ func (c *BarmanConfig) Validate(requestedChanges map[string]interface{}) error {
 				return fmt.Errorf("invalid value for recovery_window: %v", v)
 			}
 
-			fmt.Println(matches)
-			log.Printf("matches: %v\n", matches)
-
-			_, err := strconv.Atoi(matches[1])
-			if err != nil {
+			if _, err := strconv.Atoi(matches[1]); err != nil {
 				return fmt.Errorf("failed to parse recovery_window: %w", err)
 			}
-
 		case "full_backup_frequency":
 			if _, err := time.ParseDuration(v.(string)); err != nil {
 				return fmt.Errorf("invalid value for full_backup_frequency: %v", v)
