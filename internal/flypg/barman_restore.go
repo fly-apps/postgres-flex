@@ -17,6 +17,7 @@ type BarmanRestore struct {
 	recoveryTarget          string
 	recoveryTargetName      string
 	recoveryTargetTime      string
+	recoveryTargetTimeline  string
 	recoveryTargetAction    string
 	recoveryTargetInclusive string
 }
@@ -61,6 +62,8 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 				return nil, fmt.Errorf("failed to parse target time: %s", err)
 			}
 			restore.recoveryTargetTime = ts.Format(ISO8601)
+		case "targetTimeline":
+			restore.recoveryTargetTimeline = v
 		default:
 			return nil, fmt.Errorf("unknown query parameter: %s", key)
 		}

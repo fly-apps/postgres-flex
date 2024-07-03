@@ -220,6 +220,10 @@ func (c *PGConfig) setRecoveryTargetConfig(configURL string) error {
 	c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
 	c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
 
+	if barmanRestore.recoveryTargetTimeline != "" {
+		c.internalConfig["recovery_target_timeline"] = barmanRestore.recoveryTargetTimeline
+	}
+
 	if barmanRestore.recoveryTargetInclusive != "" {
 		c.internalConfig["recovery_target_inclusive"] = barmanRestore.recoveryTargetInclusive
 	}

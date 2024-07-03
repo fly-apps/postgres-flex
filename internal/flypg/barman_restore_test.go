@@ -178,6 +178,18 @@ func TestNewBarmanRestore(t *testing.T) {
 	if restore.recoveryTargetTime != "2024-06-30T11:15:00-06:00" {
 		t.Fatalf("expected recovery target time to be 2024-06-30T11:15:00-06:00, got %s", restore.recoveryTargetTime)
 	}
+
+	if restore.recoveryTargetTimeline != "2" {
+		t.Fatalf("expected recovery target timeline to be 2, got %s", restore.recoveryTargetTimeline)
+	}
+
+	if restore.recoveryTargetInclusive != "false" {
+		t.Fatalf("expected recovery target inclusive to be false, got %s", restore.recoveryTargetInclusive)
+	}
+
+	if restore.recoveryTargetAction != "shutdown" {
+		t.Fatalf("expected recovery target action to be shutdown, got %s", restore.recoveryTargetAction)
+	}
 }
 
 func TestWALRestoreCommand(t *testing.T) {
@@ -308,6 +320,6 @@ func TestResolveBackupTarget(t *testing.T) {
 }
 
 func setRestoreDefaultEnv(t *testing.T) {
-	t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
+	t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00&targetTimeline=2&targetInclusive=false&targetAction=shutdown")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 }
