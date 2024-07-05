@@ -14,16 +14,21 @@ import (
 type BarmanRestore struct {
 	*Barman
 
-	recoveryTarget          string
-	recoveryTargetName      string
-	recoveryTargetTime      string
+	// Target parameters
+	// For more information on these parameters, see:
+	// https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET
+	recoveryTarget     string
+	recoveryTargetName string
+	recoveryTargetTime string
+
 	recoveryTargetTimeline  string
 	recoveryTargetAction    string
 	recoveryTargetInclusive string
 }
 
 const (
-	defaultRestoreDir = "/data/postgresql"
+	defaultRestoreDir     = "/data/postgresql"
+	waitOnRecoveryTimeout = 10 * time.Minute
 )
 
 func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
@@ -38,9 +43,7 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		return nil, fmt.Errorf("invalid restore config url: %w", err)
 	}
 
-	restore := &BarmanRestore{
-		Barman: barman,
-	}
+	restore := &BarmanRestore{Barman: barman}
 
 	for key, value := range url.Query() {
 		v := value[0]
@@ -63,7 +66,7 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		case "targetTimeline":
 			restore.recoveryTargetTimeline = v
 		default:
-			return nil, fmt.Errorf("unknown query parameter: %s", key)
+			log.Printf("[WARN] unknown query parameter: %s. ignoring.", key)
 		}
 	}
 
@@ -134,7 +137,6 @@ func (*BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
 	}
 
 	return nil
-
 }
 
 func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
@@ -277,7 +279,7 @@ func waitOnRecovery(ctx context.Context, privateIP string) error {
 	defer func() { _ = conn.Close(ctx) }()
 
 	// TODO - Figure out a more reasonable timeout to use here.
-	timeout := time.After(10 * time.Minute)
+	timeout := time.After(waitOnRecoveryTimeout)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 

@@ -173,24 +173,26 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
-	if err := c.setArchiveConfig(os.Getenv("S3_ARCHIVE_CONFIG"), store); err != nil {
+	// Set WAL Archive specific settings
+	if err := c.setArchiveConfig(store); err != nil {
 		return fmt.Errorf("failed to set archive config: %s", err)
 	}
 
-	if err := c.setRecoveryTargetConfig(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG")); err != nil {
+	// Set recovery target settings
+	if err := c.setRecoveryTargetConfig(); err != nil {
 		return fmt.Errorf("failed to set recovery target config: %s", err)
 	}
 
 	return nil
 }
 
-func (c *PGConfig) setArchiveConfig(configURL string, store *state.Store) error {
-	if configURL == "" {
+func (c *PGConfig) setArchiveConfig(store *state.Store) error {
+	if os.Getenv("S3_ARCHIVE_CONFIG") == "" {
 		c.internalConfig["archive_mode"] = "off"
 		return nil
 	}
 
-	barman, err := NewBarman(store, configURL, DefaultAuthProfile)
+	barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
 	if err != nil {
 		return fmt.Errorf("failed to initialize barman instance: %s", err)
 	}
@@ -206,12 +208,12 @@ func (c *PGConfig) setArchiveConfig(configURL string, store *state.Store) error 
 	return nil
 }
 
-func (c *PGConfig) setRecoveryTargetConfig(configURL string) error {
-	if configURL == "" {
+func (c *PGConfig) setRecoveryTargetConfig() error {
+	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") == "" {
 		return nil
 	}
 
-	barmanRestore, err := NewBarmanRestore(configURL)
+	barmanRestore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
 	if err != nil {
 		return err
 	}

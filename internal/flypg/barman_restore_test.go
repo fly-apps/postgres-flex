@@ -141,55 +141,98 @@ const backupsResponse = `{
 
 func TestNewBarmanRestore(t *testing.T) {
 	setRestoreDefaultEnv(t)
+	t.Run("defaults", func(t *testing.T) {
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			t.Fatalf("NewBarmanRestore failed with: %v", err)
+		}
 
-	restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
-	if err != nil {
-		t.Fatalf("NewBarmanRestore failed with: %v", err)
-	}
+		if restore.bucket != "my-bucket" {
+			t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
+		}
 
-	if restore.bucket != "my-bucket" {
-		t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
-	}
+		if restore.BucketURL() != "s3://my-bucket" {
+			t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
+		}
 
-	if restore.BucketURL() != "s3://my-bucket" {
-		t.Fatalf("expected bucket to be my-bucket, got %s", restore.bucket)
-	}
+		if restore.bucketDirectory != "my-directory" {
+			t.Fatalf("expected bucket directory to be my-directory, got %s", restore.bucketDirectory)
+		}
 
-	if restore.bucketDirectory != "my-directory" {
-		t.Fatalf("expected bucket directory to be my-directory, got %s", restore.bucketDirectory)
-	}
+		if restore.appName != "postgres-flex" {
+			t.Fatalf("expected app name to be postgres-flex, got %s", restore.appName)
+		}
 
-	if restore.appName != "postgres-flex" {
-		t.Fatalf("expected app name to be postgres-flex, got %s", restore.appName)
-	}
+		if restore.provider != "aws-s3" {
+			t.Fatalf("expected provider to be aws-s3, got %s", restore.provider)
+		}
 
-	if restore.provider != "aws-s3" {
-		t.Fatalf("expected provider to be aws-s3, got %s", restore.provider)
-	}
+		if restore.endpoint != "https://fly.storage.tigris.dev" {
+			t.Fatalf("expected endpoint to be https://fly.storage.tigris.dev, got %s", restore.endpoint)
+		}
 
-	if restore.endpoint != "https://fly.storage.tigris.dev" {
-		t.Fatalf("expected endpoint to be https://fly.storage.tigris.dev, got %s", restore.endpoint)
-	}
+	})
 
-	if restore.recoveryTargetName != "" {
-		t.Fatalf("expected recovery target name to be empty, got %s", restore.recoveryTargetName)
-	}
+	t.Run("target", func(t *testing.T) {
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?target=immediate")
 
-	if restore.recoveryTargetTime != "2024-07-03T17:55:22+00:00" {
-		t.Fatalf("expected recovery target time to be 2024-07-03T17:55:22+00:00, got %s", restore.recoveryTargetTime)
-	}
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			t.Fatalf("NewBarmanRestore failed with: %v", err)
+		}
 
-	if restore.recoveryTargetTimeline != "2" {
-		t.Fatalf("expected recovery target timeline to be 2, got %s", restore.recoveryTargetTimeline)
-	}
+		if restore.recoveryTarget != "immediate" {
+			t.Fatalf("expected recovery target to be 'immediate', got %s", restore.recoveryTarget)
+		}
+	})
 
-	if restore.recoveryTargetInclusive != "false" {
-		t.Fatalf("expected recovery target inclusive to be false, got %s", restore.recoveryTargetInclusive)
-	}
+	t.Run("target-time", func(t *testing.T) {
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-07-03T17:55:22Z")
 
-	if restore.recoveryTargetAction != "shutdown" {
-		t.Fatalf("expected recovery target action to be shutdown, got %s", restore.recoveryTargetAction)
-	}
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			t.Fatalf("NewBarmanRestore failed with: %v", err)
+		}
+
+		if restore.recoveryTargetTime != "2024-07-03T17:55:22+00:00" {
+			t.Fatalf("expected recovery target time to be 2024-07-03T17:55:22+00:00, got %s", restore.recoveryTargetTime)
+		}
+	})
+
+	t.Run("target-name", func(t *testing.T) {
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240705T051010")
+
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			t.Fatalf("NewBarmanRestore failed with: %v", err)
+		}
+
+		if restore.recoveryTargetName != "20240705T051010" {
+			t.Fatalf("expected recovery target name to be 20240705T051010, got %s", restore.recoveryTargetName)
+		}
+	})
+
+	t.Run("target-name-with-options", func(t *testing.T) {
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240705T051010&targetAction=shutdown&targetTimeline=2&targetInclusive=false")
+
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			t.Fatalf("NewBarmanRestore failed with: %v", err)
+		}
+
+		if restore.recoveryTargetName != "20240705T051010" {
+			t.Fatalf("expected recovery target name to be 20240705T051010, got %s", restore.recoveryTargetName)
+		}
+
+		if restore.recoveryTargetAction != "shutdown" {
+			t.Fatalf("expected recovery target action to be shutdown, got %s", restore.recoveryTargetAction)
+		}
+
+		if restore.recoveryTargetTimeline != "2" {
+			t.Fatalf("expected recovery target timeline to be 2, got %s", restore.recoveryTargetTimeline)
+		}
+
+	})
 }
 
 func TestWALRestoreCommand(t *testing.T) {
@@ -320,6 +363,6 @@ func TestResolveBackupTarget(t *testing.T) {
 }
 
 func setRestoreDefaultEnv(t *testing.T) {
-	t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-07-03T17:55:22Z&targetTimeline=2&targetInclusive=false&targetAction=shutdown")
+	t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
 }
