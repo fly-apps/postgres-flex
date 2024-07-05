@@ -71,10 +71,6 @@ func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
 		restore.recoveryTargetAction = "promote"
 	}
 
-	if restore.recoveryTargetName == "" && restore.recoveryTargetTime == "" && restore.recoveryTarget == "" {
-		return nil, fmt.Errorf("no restore target specified")
-	}
-
 	return restore, nil
 }
 
@@ -171,7 +167,10 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 			return fmt.Errorf("failed to resolve backup target by id: %s", err)
 		}
 	default:
-		return fmt.Errorf("restore target not specified")
+		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(time.RFC3339))
+		if err != nil {
+			return fmt.Errorf("failed to resolve backup target by time: %s", err)
+		}
 	}
 
 	if backupID == "" {

@@ -235,8 +235,6 @@ func (c *PGConfig) setRecoveryTargetConfig(configURL string) error {
 		c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
 	case barmanRestore.recoveryTargetTime != "":
 		c.internalConfig["recovery_target_time"] = fmt.Sprintf("'%s'", barmanRestore.recoveryTargetTime)
-	default:
-		return fmt.Errorf("recovery target name or time must be specified")
 	}
 
 	return nil
