@@ -37,8 +37,6 @@ func monitorDeadMembers(ctx context.Context, node *flypg.Node) error {
 	ticker := time.NewTicker(deadMemberMonitorFrequency)
 	defer ticker.Stop()
 
-	log.Printf("Pruning every %s...\n", removalThreshold)
-
 	for range ticker.C {
 		err := deadMemberMonitorTick(ctx, node, seenAt, removalThreshold)
 		if err != nil {

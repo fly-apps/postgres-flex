@@ -17,7 +17,12 @@ const (
 	restoreLockFile = "/data/restore.lock"
 )
 
-func Restore(ctx context.Context, node *Node) error {
+// prepareRemoteRestore will reset the environment to a state where it can be restored
+// from a remote backup. This process includes:
+// * Clearing any locks that may have been set on the original cluster.
+// * Dropping the repmgr database to clear any metadata that belonged to the old cluster.
+// * Ensuring the internal user credentials match the environment.
+func prepareRemoteRestore(ctx context.Context, node *Node) error {
 	// Clear any locks that may have been set on the original cluster
 	if err := clearLocks(); err != nil {
 		return fmt.Errorf("failed to clear locks: %s", err)
@@ -56,15 +61,14 @@ func Restore(ctx context.Context, node *Node) error {
 		}
 	}()
 
-	conn, err := openConn(ctx, node)
+	conn, err := openConn(ctx, node.PrivateIP)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to local node: %s", err)
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
 	// Drop repmgr database to clear any metadata that belonged to the old cluster.
-	sql := "DROP DATABASE repmgr;"
-	_, err = conn.Exec(ctx, sql)
+	_, err = conn.Exec(ctx, "DROP DATABASE repmgr;")
 	if err != nil {
 		return fmt.Errorf("failed to drop repmgr database: %s", err)
 	}
@@ -155,8 +159,7 @@ func restoreHBAFile() error {
 	defer func() { _ = file.Close() }()
 
 	// revert back to our original config
-	_, err = file.Write(data)
-	if err != nil {
+	if _, err = file.Write(data); err != nil {
 		return err
 	}
 
@@ -175,24 +178,24 @@ func setRestoreLock() error {
 	}
 	defer func() { _ = file.Close() }()
 
-	_, err = file.WriteString(os.Getenv("FLY_APP_NAME"))
-	if err != nil {
+	if _, err = file.WriteString(os.Getenv("FLY_APP_NAME")); err != nil {
 		return err
 	}
 
 	return file.Sync()
 }
 
-func openConn(ctx context.Context, n *Node) (*pgx.Conn, error) {
-	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=any", n.PrivateIP)
+func openConn(ctx context.Context, privateIP string) (*pgx.Conn, error) {
+	url := fmt.Sprintf("postgres://[%s]:5433?target_session_attrs=any", privateIP)
+
 	conf, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, err
 	}
 	conf.User = "postgres"
 
-	// Allow up to 30 seconds for PG to boot and accept connections.
-	timeout := time.After(30 * time.Second)
+	// Allow up to 60 seconds for PG to boot and accept connections.
+	timeout := time.After(60 * time.Second)
 	tick := time.NewTicker(1 * time.Second)
 	defer tick.Stop()
 	for {

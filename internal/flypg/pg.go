@@ -25,6 +25,8 @@ type PGConfig struct {
 	Port                   int
 	DataDir                string
 
+	barmanConfigPath string
+
 	passwordFilePath string
 	repmgrUsername   string
 	repmgrDatabase   string
@@ -110,7 +112,7 @@ func (c *PGConfig) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-func (c *PGConfig) SetDefaults() error {
+func (c *PGConfig) SetDefaults(store *state.Store) error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
@@ -171,6 +173,72 @@ func (c *PGConfig) SetDefaults() error {
 		"shared_preload_libraries": fmt.Sprintf("'%s'", strings.Join(sharedPreloadLibraries, ",")),
 	}
 
+	// Set WAL Archive specific settings
+	if err := c.setArchiveConfig(store); err != nil {
+		return fmt.Errorf("failed to set archive config: %s", err)
+	}
+
+	// Set recovery target settings
+	if err := c.setRecoveryTargetConfig(); err != nil {
+		return fmt.Errorf("failed to set recovery target config: %s", err)
+	}
+
+	return nil
+}
+
+func (c *PGConfig) setArchiveConfig(store *state.Store) error {
+	if os.Getenv("S3_ARCHIVE_CONFIG") == "" {
+		c.internalConfig["archive_mode"] = "off"
+		return nil
+	}
+
+	barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+	if err != nil {
+		return fmt.Errorf("failed to initialize barman instance: %s", err)
+	}
+
+	if err := barman.LoadConfig(c.barmanConfigPath); err != nil {
+		return fmt.Errorf("failed to load barman config: %s", err)
+	}
+
+	c.internalConfig["archive_mode"] = "on"
+	c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
+	c.internalConfig["archive_timeout"] = barman.Settings.ArchiveTimeout
+
+	return nil
+}
+
+func (c *PGConfig) setRecoveryTargetConfig() error {
+	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") == "" {
+		return nil
+	}
+
+	barmanRestore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+	if err != nil {
+		return err
+	}
+
+	// Set restore command and associated recovery target settings
+	c.internalConfig["restore_command"] = fmt.Sprintf("'%s'", barmanRestore.walRestoreCommand())
+	c.internalConfig["recovery_target_action"] = barmanRestore.recoveryTargetAction
+
+	if barmanRestore.recoveryTargetTimeline != "" {
+		c.internalConfig["recovery_target_timeline"] = barmanRestore.recoveryTargetTimeline
+	}
+
+	if barmanRestore.recoveryTargetInclusive != "" {
+		c.internalConfig["recovery_target_inclusive"] = barmanRestore.recoveryTargetInclusive
+	}
+
+	switch {
+	case barmanRestore.recoveryTarget != "":
+		c.internalConfig["recovery_target"] = barmanRestore.recoveryTarget
+	case barmanRestore.recoveryTargetName != "":
+		c.internalConfig["recovery_target_name"] = fmt.Sprintf("barman_%s", barmanRestore.recoveryTargetName)
+	case barmanRestore.recoveryTargetTime != "":
+		c.internalConfig["recovery_target_time"] = fmt.Sprintf("'%s'", barmanRestore.recoveryTargetTime)
+	}
+
 	return nil
 }
 
@@ -225,7 +293,7 @@ func (c *PGConfig) initialize(store *state.Store) error {
 		}
 	}
 
-	if err := c.SetDefaults(); err != nil {
+	if err := c.SetDefaults(store); err != nil {
 		return fmt.Errorf("failed to set pg defaults: %s", err)
 	}
 

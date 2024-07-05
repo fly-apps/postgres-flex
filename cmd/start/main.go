@@ -23,6 +23,7 @@ func main() {
 		}
 	}
 
+	// Deprecated - We are moving away from having a separate barman Machine
 	if os.Getenv("IS_BARMAN") != "" {
 		node, err := flybarman.NewNode()
 		if err != nil {
@@ -52,6 +53,14 @@ func main() {
 		}
 
 		return
+	}
+
+	// TODO - Find a better way to handle this
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" || os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
+		if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/data/.aws/credentials"); err != nil {
+			panicHandler(err)
+			return
+		}
 	}
 
 	node, err := flypg.NewNode()

@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +49,7 @@ func NewNode() (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed getting private ip: %s", err)
 	}
+
 	node.PrivateIP = ipv6.String()
 
 	node.PrimaryRegion = os.Getenv("PRIMARY_REGION")
@@ -109,6 +109,11 @@ func NewNode() (*Node, error) {
 		repmgrDatabase:   node.RepMgr.DatabaseName,
 	}
 
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
+		// Specific PG configuration is injected when Barman is enabled.
+		node.PGConfig.barmanConfigPath = DefaultBarmanConfigDir
+	}
+
 	node.FlyConfig = FlyPGConfig{
 		internalConfigFilePath: "/data/flypg.internal.conf",
 		userConfigFilePath:     "/data/flypg.user.conf",
@@ -119,21 +124,24 @@ func NewNode() (*Node, error) {
 
 func (n *Node) Init(ctx context.Context) error {
 	// Ensure directory and files have proper permissions
-	if err := setDirOwnership(); err != nil {
+	if err := setDirOwnership(ctx, "/data"); err != nil {
 		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
-	// Check to see if we were just restored
-	if os.Getenv("FLY_RESTORED_FROM") != "" {
-		active, err := isRestoreActive()
-		if err != nil {
-			return fmt.Errorf("failed to verify active restore: %s", err)
-		}
+	store, err := state.NewStore()
+	if err != nil {
+		return fmt.Errorf("failed initialize cluster state store: %s", err)
+	}
 
-		if active {
-			if err := Restore(ctx, n); err != nil {
-				return fmt.Errorf("failed to issue restore: %s", err)
-			}
+	// Determine if we are performing a remote restore.
+	if err := n.handleRemoteRestore(ctx, store); err != nil {
+		return fmt.Errorf("failed to handle remote restore: %s", err)
+	}
+
+	// Ensure we have the required s3 credentials set.
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" || os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
+		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
+			return fmt.Errorf("failed to write s3 credentials: %s", err)
 		}
 	}
 
@@ -144,14 +152,8 @@ func (n *Node) Init(ctx context.Context) error {
 		}
 	}
 
-	err := WriteSSHKey()
-	if err != nil {
+	if err = WriteSSHKey(); err != nil {
 		return fmt.Errorf("failed write ssh keys: %s", err)
-	}
-
-	store, err := state.NewStore()
-	if err != nil {
-		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
 	if err := n.RepMgr.initialize(); err != nil {
@@ -211,7 +213,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize pg config: %s", err)
 	}
 
-	if err := setDirOwnership(); err != nil {
+	if err := setDirOwnership(ctx, "/data"); err != nil {
 		return fmt.Errorf("failed to set directory ownership: %s", err)
 	}
 
@@ -457,16 +459,67 @@ func openConnection(parentCtx context.Context, host string, database string, cre
 	return pgx.ConnectConfig(ctx, conf)
 }
 
-func setDirOwnership() error {
+func setDirOwnership(ctx context.Context, pathToDir string) error {
+	if os.Getenv("UNIT_TESTING") == "true" {
+		return nil
+	}
+
 	pgUID, pgGID, err := utils.SystemUserIDs("postgres")
 	if err != nil {
 		return fmt.Errorf("failed to find postgres user ids: %s", err)
 	}
 
-	cmdStr := fmt.Sprintf("chown -R %d:%d %s", pgUID, pgGID, "/data")
-	cmd := exec.Command("sh", "-c", cmdStr)
-	if _, err = cmd.Output(); err != nil {
-		return err
+	args := []string{"-R", fmt.Sprintf("%d:%d", pgUID, pgGID), pathToDir}
+
+	if _, err := utils.RunCmd(ctx, "root", "chown", args...); err != nil {
+		return fmt.Errorf("failed to set directory ownership: %s", err)
+	}
+
+	return nil
+}
+
+func (n *Node) handleRemoteRestore(ctx context.Context, store *state.Store) error {
+	// Handle snapshot restore
+	if os.Getenv("FLY_RESTORED_FROM") != "" {
+		active, err := isRestoreActive()
+		if err != nil {
+			return fmt.Errorf("failed to verify active restore: %s", err)
+		}
+
+		if !active {
+			return nil
+		}
+
+		return prepareRemoteRestore(ctx, n)
+	}
+
+	// WAL-based Restore
+	if os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
+		if n.PGConfig.isInitialized() {
+			log.Println("[INFO] Postgres directory present, ignoring `S3_ARCHIVE_REMOTE_RESTORE_CONFIG` ")
+			return nil
+		}
+
+		log.Println("[INFO] Postgres directory not present, proceeding with remote restore.")
+
+		// Initialize barman restore
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			return fmt.Errorf("failed to initialize barman restore: %s", err)
+		}
+
+		// Restore base backup
+		if err := restore.restoreFromBackup(ctx); err != nil {
+			return fmt.Errorf("failed to restore base backup: %s", err)
+		}
+
+		// Set restore configuration
+		if err := n.PGConfig.initialize(store); err != nil {
+			return fmt.Errorf("failed to initialize pg config: %s", err)
+		}
+
+		// Replay WAL and reset the cluster
+		return restore.walReplayAndReset(ctx, n)
 	}
 
 	return nil

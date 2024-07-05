@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
@@ -297,4 +298,101 @@ func handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
 
 	resp := &Response{Result: out}
 	renderJSON(w, resp, http.StatusOK)
+}
+
+func handleViewBarmanSettings(w http.ResponseWriter, _ *http.Request) {
+	if os.Getenv("S3_ARCHIVE_CONFIG") == "" {
+		renderErr(w, fmt.Errorf("barman is not enabled"))
+		return
+	}
+
+	store, err := state.NewStore()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	barman, err := flypg.NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), flypg.DefaultAuthProfile)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	if err := barman.LoadConfig(flypg.DefaultBarmanConfigDir); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	all, err := barman.CurrentConfig()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	resp := &Response{Result: all}
+	renderJSON(w, resp, http.StatusOK)
+}
+
+func handleUpdateBarmanSettings(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("S3_ARCHIVE_CONFIG") == "" {
+		renderErr(w, fmt.Errorf("barman is not enabled"))
+		return
+	}
+
+	store, err := state.NewStore()
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	barman, err := flypg.NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), flypg.DefaultAuthProfile)
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	if err := barman.LoadConfig(flypg.DefaultBarmanConfigDir); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	cfg, err := flypg.ReadFromFile(barman.UserConfigFile())
+	if err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	var requestedChanges map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&requestedChanges); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	if err := barman.Validate(requestedChanges); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	for k, v := range requestedChanges {
+		cfg[k] = v
+	}
+
+	barman.SetUserConfig(cfg)
+
+	if err := flypg.PushUserConfig(barman, store); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	if err := flypg.SyncUserConfig(barman, store); err != nil {
+		renderErr(w, err)
+		return
+	}
+
+	res := &Response{Result: SettingsUpdate{
+		Message:         "Updated",
+		RestartRequired: true,
+	}}
+
+	renderJSON(w, res, http.StatusOK)
 }
