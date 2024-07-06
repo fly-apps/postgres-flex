@@ -211,64 +211,43 @@ func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr st
 		return "", fmt.Errorf("no backups found")
 	}
 
-	var restoreTime time.Time
-
 	// Parse the restore string
 	restoreTime, err := time.Parse(time.RFC3339, restoreStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse restore time: %s", err)
 	}
 
-	latestBackupID := ""
-	latestStartTime := time.Time{}
-
-	earliestBackupID := ""
-	earliestEndTime := time.Time{}
+	var lastBackupID string
+	var lastBackupTime time.Time
 
 	// This is the layout presented by barman
 	layout := "Mon Jan 2 15:04:05 2006"
 
 	for _, backup := range backupList.Backups {
-		// Skip backups that that failed or are in progress
 		// TODO - This shouldn't be needed, but will keep it around until we can improve tests.
 		if backup.Status != "DONE" {
 			continue
 		}
 
-		// Parse the backup start time
-		startTime, err := time.Parse(layout, backup.StartTime)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse backup start time: %s", err)
-		}
-		// Parse the backup start time
+		// Parse the backup end time
 		endTime, err := time.Parse(layout, backup.EndTime)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse backup end time: %s", err)
 		}
-		// Check if the restore time falls within the backup window
-		if restoreTime.After(startTime) && restoreTime.Before(endTime) {
-			return backup.BackupID, nil
+
+		// If the last backup ID is empty or the restore time is after the last backup time, update the last backup ID.
+		if lastBackupID == "" || restoreTime.After(endTime) {
+			lastBackupID = backup.BackupID
+			lastBackupTime = endTime
 		}
 
-		// Track the latest and earliest backups in case the restore time is outside
-		// the available backup windows
-		if latestBackupID == "" || startTime.After(latestStartTime) {
-			latestBackupID = backup.BackupID
-			latestStartTime = startTime
-		}
-
-		if earliestBackupID == "" || endTime.Before(earliestEndTime) {
-			earliestBackupID = backup.BackupID
-			earliestEndTime = endTime
+		// If the restore time is after the backup end time, we can short-circuit and return the last backup.
+		if endTime.After(lastBackupTime) {
+			return lastBackupID, nil
 		}
 	}
 
-	// if the restore time is before the earliest backup, restore the earliest backup
-	if restoreTime.Before(earliestEndTime) {
-		return earliestBackupID, nil
-	}
-
-	return latestBackupID, nil
+	return lastBackupID, nil
 }
 
 func waitOnRecovery(ctx context.Context, privateIP string) error {
