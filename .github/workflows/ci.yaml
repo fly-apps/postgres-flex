@@ -7,8 +7,7 @@ jobs:
   release:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
-    # env:
-    #   DOCKER_BUILDKIT: 0
+
     steps:
       -
         name: Set up QEMU
@@ -41,7 +40,7 @@ jobs:
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
-          file: ./Dockerfile
+          file: ./pg15/Dockerfile
           push: true
           tags: |
             flyio/postgres-flex:15
@@ -56,14 +55,52 @@ jobs:
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
-          file: ./Dockerfile-timescaledb
+          file: ./pg15/Dockerfile-timescaledb
           push: true
           tags: |
             flyio/postgres-flex-timescaledb:15
             flyio/postgres-flex-timescaledb:15.6
+
+      -
+        name: Build and push Postgres 16
+        id: docker_build_16
+        uses: docker/build-push-action@v3
+        with:
+          build-args: |
+            PG_VERSION=16.3
+            PG_MAJOR_VERSION=16
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./pg16/Dockerfile
+          push: true
+          tags: |
+            flyio/postgres-flex:16
+            flyio/postgres-flex:16.3
+      -
+        name: Build and push Postgres 16 Timescale DB
+        id: docker_build_16_timescaledb
+        uses: docker/build-push-action@v3
+        with:
+          build-args: |
+            PG_VERSION=16.3
+            PG_MAJOR_VERSION=16
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./pg16/Dockerfile-timescaledb
+          push: true
+          tags: |
+            flyio/postgres-flex-timescaledb:16
+            flyio/postgres-flex-timescaledb:16.3
       -
         name: Postgres 15 Image digest
         run: echo ${{ steps.docker_build_15.outputs.digest }}
       -
         name: Postgres 15 TimescaleDB Image digest
         run: echo ${{ steps.docker_build_15_timescaledb.outputs.digest }}
+      -
+        name: Postgres 16 Image digest
+        run: echo ${{ steps.docker_build_16.outputs.digest }}
+      -
+        name: Postgres 16 TimescaleDB Image digest
+        run: echo ${{ steps.docker_build_16_timescaledb.outputs.digest }}
+
