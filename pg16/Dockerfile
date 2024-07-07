@@ -17,14 +17,14 @@ RUN CGO_ENABLED=0 GOOS=linux \
 
 COPY ./bin/* /fly/bin/
 
-FROM ubuntu:24.10
+FROM ubuntu:24.04
 
 ENV PGDATA=/data/postgresql
 ENV PGPASSFILE=/data/.pgpass
 ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG POSTGIS_MAJOR=3
-ARG HAPROXY_VERSION=2.9
+ARG HAPROXY_VERSION=2.8
 ARG REPMGR_VERSION=5.4.1-1build2
 
 LABEL fly.app_role=postgres_cluster
