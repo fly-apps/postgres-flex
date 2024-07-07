@@ -11,7 +11,7 @@ This repo contains all the code and configuration necessary to run a [highly ava
 fly version update
 
 # Provision a 3 member cluster
-fly pg create --name <app-name> --initial-cluster-size 3 --region ord --flex
+fly pg create --name <app-name> --initial-cluster-size 3 --region ord
 ```
 
 ## High Availability
