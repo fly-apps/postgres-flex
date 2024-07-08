@@ -29,10 +29,10 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 		log.Printf("[WARN] Failed to resolve primary status: %s", err)
 	}
 
-	// Perform the initial base backup if we are the primary and no backups have been taken.
+	// Perform the initial base backup if we are the primary and either no backups have been taken
+	// or the next scheduled backup time is less than 0.
 	if primary {
 		if nextScheduledBackup < 0 {
-			log.Println("[INFO] No backups found! Performing the initial base backup.")
 			err := performBaseBackup(ctx, barman, true)
 			switch {
 			case err != nil:
@@ -49,6 +49,7 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 		}
 		log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
 	} else {
+		// Ensure the ticker has a valid duration if we are not the primary.
 		if nextScheduledBackup < 0 {
 			nextScheduledBackup = backupFrequency(barman)
 		}
@@ -87,9 +88,9 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 
 			// Perform a full backup if the next scheduled backup time is less than 0.
 			if nextScheduledBackup < 0 {
-				log.Println("[INFO] Performing full backup now")
+				log.Println("[INFO] Performing full backup...")
 				if err := performBaseBackup(ctx, barman, false); err != nil {
-					log.Printf("[WARN] Failed to perform full backup: %s", err)
+					log.Printf("[WARN] Failed to perform full backup: %v", err)
 				}
 
 				// TODO - We should consider retrying at a shorter interval in the event of a failure.
