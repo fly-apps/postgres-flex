@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -62,8 +63,32 @@ func TestCalculateNextBackupTime(t *testing.T) {
 	t.Run("no backups", func(t *testing.T) {
 		nextBackupTime := calculateNextBackupTime(barman, time.Time{})
 
-		if nextBackupTime.Hours() > 0 {
-			t.Fatalf("expected next backup time duration to be less than 0, but got %s", nextBackupTime)
+		expected := 0.0
+		val := math.Round(nextBackupTime.Hours())
+		if expected != val {
+			t.Fatalf("expected next backup time duration to be %f, but got %f", expected, val)
+		}
+	})
+
+	t.Run("backup-reset", func(t *testing.T) {
+		nextBackupTime := calculateNextBackupTime(barman, time.Now())
+
+		expected := 24.0
+		val := math.Round(nextBackupTime.Hours())
+		if val != expected {
+			t.Fatalf("expected next backup duration to be %f, but got %f", expected, val)
+		}
+	})
+
+	t.Run("backup-delay", func(t *testing.T) {
+		delay := time.Now().Add(-backupFrequency(barman) + time.Minute*30)
+
+		nextBackupTime := calculateNextBackupTime(barman, delay)
+
+		expected := 30.0
+		val := math.Round(nextBackupTime.Minutes())
+		if val != expected {
+			t.Fatalf("expected next backup duration to be %f, but got %f", expected, val)
 		}
 	})
 
@@ -72,9 +97,10 @@ func TestCalculateNextBackupTime(t *testing.T) {
 
 		nextBackupTime := calculateNextBackupTime(barman, lastBackup)
 
-		expected := 22.0
-		if nextBackupTime.Hours() == expected {
-			t.Fatalf("expected next backup time duration to be %f, but got %f", expected, nextBackupTime.Hours())
+		expected := 23.0
+		val := math.Round(nextBackupTime.Hours())
+		if val != expected {
+			t.Fatalf("expected next backup time duration to be %f, but got %f", expected, val)
 		}
 	})
 
@@ -84,8 +110,9 @@ func TestCalculateNextBackupTime(t *testing.T) {
 		nextBackupTime := calculateNextBackupTime(barman, lastBackup)
 
 		expected := -1.0
-		if nextBackupTime.Hours() == -1.0 {
-			t.Fatalf("expected next backup time duration to be %f, but got %f", expected, nextBackupTime.Hours())
+		val := math.Round(nextBackupTime.Hours())
+		if val != expected {
+			t.Fatalf("expected next backup time duration to be %f, but got %f", expected, val)
 		}
 	})
 

@@ -14,20 +14,22 @@ const (
 )
 
 func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.Barman) {
+	// Determine when the last backup was taken.
 	lastBackupTime, err := barman.LastCompletedBackup(ctx)
 	if err != nil {
-		log.Printf("[WARN] Failed to resolve the last backup taken: %s", err)
+		log.Printf("[WARN] %s", err)
 	}
 
-	// Calculate when the next backup is due.
+	// Calculate the next scheduled backup time.
 	nextScheduledBackup := calculateNextBackupTime(barman, lastBackupTime)
 
-	// Determine if the node is the primary.
+	// Check to see if we are the Primary.
 	primary, err := isPrimary(ctx, node)
 	if err != nil {
 		log.Printf("[WARN] Failed to resolve primary status: %s", err)
 	}
 
+	// Perform the initial base backup if we are the primary and no backups have been taken.
 	if primary {
 		if nextScheduledBackup < 0 {
 			log.Println("[INFO] No backups found! Performing the initial base backup.")
@@ -35,7 +37,8 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			switch {
 			case err != nil:
 				log.Printf("[WARN] Failed to perform initial base backup: %s", err)
-				lastBackupTime = time.Now().Add(-backupFrequency(barman) + time.Hour)
+				log.Printf("[INFO] Retrying in 10 minutes...")
+				lastBackupTime = time.Now().Add(-backupFrequency(barman) + 10*time.Minute)
 			default:
 				log.Println("[INFO] Initial base backup completed successfully")
 				lastBackupTime = time.Now()
@@ -44,8 +47,12 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			// Recalculate the next scheduled backup time after the initial backup.
 			nextScheduledBackup = calculateNextBackupTime(barman, lastBackupTime)
 		}
-
 		log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
+	} else {
+
+		if nextScheduledBackup < 0 {
+			nextScheduledBackup = backupFrequency(barman)
+		}
 	}
 
 	// Monitor the backup schedule even if we are not the primary. This is to ensure backups will
@@ -59,13 +66,12 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			log.Println("[WARN] Shutting down backup schedule monitor...")
 			return
 		case <-ticker.C:
-			// Check to see if we are the Primary.
+			// Check to see if we are the Primary. This is necessary given failovers can occur at runtime.
 			primary, err := isPrimary(ctx, node)
 			if err != nil {
 				log.Printf("[WARN] Failed to resolve primary status: %s", err)
 			}
 
-			// Noop if we are not the primary.
 			if !primary {
 				continue
 			}
@@ -78,22 +84,18 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			// Recalculate the next scheduled backup time.
 			nextScheduledBackup = calculateNextBackupTime(barman, lastBackupTime)
 
-			log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
-
 			// Perform a full backup if the next scheduled backup time is less than 0.
 			if nextScheduledBackup < 0 {
 				log.Println("[INFO] Performing full backup now")
-				err := performBaseBackup(ctx, barman, false)
-				switch {
-				case err != nil:
+				if err := performBaseBackup(ctx, barman, false); err != nil {
 					log.Printf("[WARN] Failed to perform full backup: %s", err)
-					// Retry the backup in 1 hour.
-					nextScheduledBackup = time.Hour
-				default:
-					log.Println("[INFO] Full backup completed successfully")
-					nextScheduledBackup = backupFrequency(barman)
 				}
+
+				// TODO - We should consider retrying at a shorter interval in the event of a failure.
+				nextScheduledBackup = backupFrequency(barman)
 			}
+
+			log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
 
 			// Reset the ticker frequency in case the backup frequency has changed.
 			ticker.Reset(nextScheduledBackup)
