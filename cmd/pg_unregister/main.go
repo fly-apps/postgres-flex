@@ -44,7 +44,7 @@ func processUnregistration(ctx context.Context) error {
 		return fmt.Errorf("failed to resolve member: %s", err)
 	}
 
-	if err := node.RepMgr.UnregisterMember(*member); err != nil {
+	if err := node.RepMgr.UnregisterMember(ctx, *member); err != nil {
 		return fmt.Errorf("failed to unregister member: %v", err)
 	}
 

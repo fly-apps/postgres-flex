@@ -174,7 +174,7 @@ func (n *Node) Init(ctx context.Context) error {
 					return fmt.Errorf("failed to write pg password file: %s", err)
 				}
 
-				if err := n.PGConfig.initdb(); err != nil {
+				if err := n.PGConfig.initdb(ctx); err != nil {
 					return fmt.Errorf("failed to initialize postgres %s", err)
 				}
 			} else {
@@ -184,7 +184,7 @@ func (n *Node) Init(ctx context.Context) error {
 					return fmt.Errorf("failed to resolve member over dns: %s", err)
 				}
 
-				if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
+				if err := n.RepMgr.clonePrimary(ctx, cloneTarget.Hostname); err != nil {
 					// Clean-up the directory so it can be retried.
 					if rErr := os.Remove(n.DataDir); rErr != nil {
 						log.Printf("[ERROR] failed to cleanup postgresql dir after clone error: %s\n", rErr)
@@ -199,7 +199,7 @@ func (n *Node) Init(ctx context.Context) error {
 				return fmt.Errorf("failed to write pg password file: %s", err)
 			}
 
-			if err := n.PGConfig.initdb(); err != nil {
+			if err := n.PGConfig.initdb(ctx); err != nil {
 				return fmt.Errorf("failed to initialize postgres %s", err)
 			}
 		}
@@ -297,7 +297,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Re-register primary to apply any configuration changes.
-			if err := n.RepMgr.registerPrimary(daemonRestartRequired); err != nil {
+			if err := n.RepMgr.registerPrimary(ctx, daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to re-register existing primary: %s", err)
 			}
 
@@ -309,7 +309,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 		case StandbyRoleName:
 			// Register existing standby to apply any configuration changes.
-			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
+			if err := n.RepMgr.registerStandby(ctx, daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)
 			}
 		case WitnessRoleName:
@@ -319,7 +319,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Register existing witness to apply any configuration changes.
-			if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
+			if err := n.RepMgr.registerWitness(ctx, primary.Hostname); err != nil {
 				return fmt.Errorf("failed to register existing witness: %s", err)
 			}
 		default:
@@ -368,7 +368,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Register ourself as the primary
-			if err := n.RepMgr.registerPrimary(false); err != nil {
+			if err := n.RepMgr.registerPrimary(ctx, false); err != nil {
 				return fmt.Errorf("failed to register repmgr primary: %s", err)
 			}
 
@@ -401,12 +401,12 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to resolve primary member: %s", err)
 				}
 
-				if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
+				if err := n.RepMgr.registerWitness(ctx, primary.Hostname); err != nil {
 					return fmt.Errorf("failed to register witness: %s", err)
 				}
 			} else {
 				log.Println("Registering standby")
-				if err := n.RepMgr.registerStandby(false); err != nil {
+				if err := n.RepMgr.registerStandby(ctx, false); err != nil {
 					return fmt.Errorf("failed to register new standby: %s", err)
 				}
 			}

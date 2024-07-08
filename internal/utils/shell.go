@@ -43,35 +43,6 @@ func RunCmd(ctx context.Context, usr string, name string, args ...string) ([]byt
 	return cmd.Output()
 }
 
-// Deprecated, use RunCmd instead
-func RunCommand(cmdStr, usr string) ([]byte, error) {
-	uid, gid, err := SystemUserIDs(usr)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.Command("sh", "-c", cmdStr)
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-
-	if os.Getenv("DEBUG") != "" {
-		log.Printf("> Running command as %s: %s\n", usr, cmdStr)
-	}
-
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
-
-	err = cmd.Run()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			ee.Stderr = stderrBuf.Bytes()
-		}
-	}
-
-	return stdoutBuf.Bytes(), err
-}
-
 func SetFileOwnership(pathToFile, owner string) error {
 	if os.Getenv("UNIT_TESTING") != "" {
 		return nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"net"
@@ -219,14 +218,20 @@ func (r *RepMgr) resolveNodeID() (string, error) {
 	return nodeID, nil
 }
 
-func (r *RepMgr) registerPrimary(restartDaemon bool) error {
-	cmdStr := fmt.Sprintf("repmgr primary register -f %s -F", r.ConfigPath)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+func (r *RepMgr) registerPrimary(ctx context.Context, restartDaemon bool) error {
+	args := []string{
+		"primary",
+		"register",
+		"-f", r.ConfigPath,
+		"-F",
+	}
+
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
 		return fmt.Errorf("failed to register primary: %s", err)
 	}
 
 	if restartDaemon {
-		if err := r.restartDaemon(); err != nil {
+		if err := r.restartDaemon(ctx); err != nil {
 			return fmt.Errorf("failed to restart repmgr daemon: %s", err)
 		}
 	}
@@ -234,14 +239,20 @@ func (r *RepMgr) registerPrimary(restartDaemon bool) error {
 	return nil
 }
 
-func (r *RepMgr) registerStandby(restartDaemon bool) error {
-	cmdStr := fmt.Sprintf("repmgr standby register -f %s -F", r.ConfigPath)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+func (r *RepMgr) registerStandby(ctx context.Context, restartDaemon bool) error {
+	args := []string{
+		"standby",
+		"register",
+		"-f", r.ConfigPath,
+		"-F",
+	}
+
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
 		return fmt.Errorf("failed to register standby: %s", err)
 	}
 
 	if restartDaemon {
-		if err := r.restartDaemon(); err != nil {
+		if err := r.restartDaemon(ctx); err != nil {
 			return fmt.Errorf("failed to restart repmgr daemon: %s", err)
 		}
 	}
@@ -249,73 +260,116 @@ func (r *RepMgr) registerStandby(restartDaemon bool) error {
 	return nil
 }
 
-func (r *RepMgr) registerWitness(primaryHostname string) error {
-	cmdStr := fmt.Sprintf("repmgr witness register -f %s -h %s -F", r.ConfigPath, primaryHostname)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+func (r *RepMgr) registerWitness(ctx context.Context, primaryHostname string) error {
+	args := []string{
+		"witness",
+		"register",
+		"-f", r.ConfigPath,
+		"-h", primaryHostname,
+		"-F",
+	}
 
-	return err
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
+		return fmt.Errorf("failed to register witness: %s", err)
+	}
+
+	return nil
 }
 
-func (r *RepMgr) unregisterPrimary(id int) error {
-	cmdStr := fmt.Sprintf("repmgr primary unregister -f %s --node-id=%d", r.ConfigPath, id)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+func (r *RepMgr) unregisterPrimary(ctx context.Context, id int) error {
+	args := []string{
+		"primary",
+		"unregister",
+		"-f", r.ConfigPath,
+		"--node-id", fmt.Sprint(id),
+	}
 
-	return err
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
+		return fmt.Errorf("failed to unregister primary: %s", err)
+	}
+
+	return nil
 }
 
-func (r *RepMgr) unregisterStandby(id int) error {
-	cmdStr := fmt.Sprintf("repmgr standby unregister -f %s --node-id=%d", r.ConfigPath, id)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+func (r *RepMgr) unregisterStandby(ctx context.Context, id int) error {
+	args := []string{
+		"standby",
+		"unregister",
+		"-f", r.ConfigPath,
+		"--node-id", fmt.Sprint(id),
+	}
 
-	return err
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
+		return fmt.Errorf("failed to unregister standby: %s", err)
+	}
+
+	return nil
 }
 
-func (*RepMgr) restartDaemon() error {
-	_, err := utils.RunCommand("restart-repmgrd", "postgres")
-	return err
+func (*RepMgr) restartDaemon(ctx context.Context) error {
+	if _, err := utils.RunCmd(ctx, "postgres", "restart-repmgrd"); err != nil {
+		return fmt.Errorf("failed to restart repmgr daemon: %s", err)
+	}
+
+	return nil
 }
 
 func (r *RepMgr) daemonRestartRequired(m *Member) bool {
 	return m.Hostname != r.PrivateIP
 }
 
-func (r *RepMgr) unregisterWitness(id int) error {
-	cmdStr := fmt.Sprintf("repmgr witness unregister -f %s --node-id=%d", r.ConfigPath, id)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+func (r *RepMgr) unregisterWitness(ctx context.Context, id int) error {
+	args := []string{
+		"witness",
+		"unregister",
+		"-f", r.ConfigPath,
+		"--node-id", fmt.Sprint(id),
+	}
 
-	return err
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
+		return fmt.Errorf("failed to unregister witness: %s", err)
+	}
+
+	return nil
 }
 
-func (r *RepMgr) rejoinCluster(hostname string) error {
-	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
-		r.ConfigPath,
-		hostname,
-		r.Port,
-		r.Credentials.Username,
-		r.DatabaseName,
-	)
+func (r *RepMgr) rejoinCluster(ctx context.Context, hostname string) error {
+	args := []string{
+		"node",
+		"rejoin",
+		"-f", r.ConfigPath,
+		"-h", hostname,
+		"-U", r.Credentials.Username,
+		"-d", r.DatabaseName,
+		"--force-rewind",
+		"--no-wait",
+	}
 
-	log.Println(cmdStr)
-	_, err := utils.RunCommand(cmdStr, "postgres")
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
+		return fmt.Errorf("failed to rejoin cluster: %s", err)
+	}
 
-	return err
+	return nil
 }
 
-func (r *RepMgr) clonePrimary(ipStr string) error {
-	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+func (r *RepMgr) clonePrimary(ctx context.Context, ipStr string) error {
+	if err := os.MkdirAll(r.DataDir, 0700); err != nil {
 		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
-	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -c -F",
-		ipStr,
-		r.Port,
-		r.DatabaseName,
-		r.Credentials.Username,
-		r.ConfigPath)
+	args := []string{
+		"-h", ipStr,
+		"-p", fmt.Sprint(r.Port),
+		"-d", r.DatabaseName,
+		"-U", r.Credentials.Username,
+		"-f", r.ConfigPath,
+		"standby",
+		"clone",
+		"-c",
+		"-F",
+	}
 
-	log.Println(cmdStr)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+	if _, err := utils.RunCmd(ctx, "postgres", "repmgr", args...); err != nil {
 		return fmt.Errorf("failed to clone primary: %s", err)
 	}
 
@@ -483,18 +537,18 @@ func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error
 	return false, nil
 }
 
-func (r *RepMgr) UnregisterMember(member Member) error {
+func (r *RepMgr) UnregisterMember(ctx context.Context, member Member) error {
 	switch member.Role {
 	case PrimaryRoleName:
-		if err := r.unregisterPrimary(member.ID); err != nil {
+		if err := r.unregisterPrimary(ctx, member.ID); err != nil {
 			return fmt.Errorf("failed to unregister member %d: %s", member.ID, err)
 		}
 	case StandbyRoleName:
-		if err := r.unregisterStandby(member.ID); err != nil {
+		if err := r.unregisterStandby(ctx, member.ID); err != nil {
 			return fmt.Errorf("failed to unregister standby %d: %s", member.ID, err)
 		}
 	case WitnessRoleName:
-		if err := r.unregisterWitness(member.ID); err != nil {
+		if err := r.unregisterWitness(ctx, member.ID); err != nil {
 			return fmt.Errorf("failed to unregister witness %d: %s", member.ID, err)
 		}
 	}

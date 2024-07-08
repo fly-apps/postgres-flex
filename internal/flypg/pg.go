@@ -252,10 +252,26 @@ func (c *PGConfig) RuntimeApply(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-func (c *PGConfig) initdb() error {
-	cmdStr := fmt.Sprintf("initdb --pgdata=%s --pwfile=%s", c.DataDir, c.passwordFilePath)
-	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
+func (c *PGConfig) initdb(ctx context.Context) error {
+	args := []string{
+		"--pgdata", c.DataDir,
+		"--pwfile", c.passwordFilePath,
+	}
+	if _, err := utils.RunCmd(ctx, "postgres", "initdb", args...); err != nil {
 		return fmt.Errorf("failed to init postgres: %s", err)
+	}
+
+	return nil
+}
+
+func (c *PGConfig) stopInstance(ctx context.Context) error {
+	args := []string{
+		"-D", c.DataDir,
+		"stop",
+	}
+
+	if _, err := utils.RunCmd(ctx, "postgres", "pg_ctl", args...); err != nil {
+		return fmt.Errorf("failed to stop postgres: %s", err)
 	}
 
 	return nil

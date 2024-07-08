@@ -231,7 +231,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 			return ErrZombieLockRegionMismatch
 		}
 
-		if err := n.RepMgr.rejoinCluster(primary.Hostname); err != nil {
+		if err := n.RepMgr.rejoinCluster(ctx, primary.Hostname); err != nil {
 			return fmt.Errorf("failed to rejoin cluster: %s", err)
 		}
 
@@ -242,9 +242,8 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		}
 
 		// Ensure the single instance created with the --force-rewind process is cleaned up properly.
-		_, err = utils.RunCommand("pg_ctl -D /data/postgresql/ stop", "postgres")
-		if err != nil {
-			return fmt.Errorf("failed to stop postgres: %s", err)
+		if err := n.PGConfig.stopInstance(ctx); err != nil {
+			return fmt.Errorf("failed to stop instance: %s", err)
 		}
 	} else {
 		// TODO - Provide link to documentation on how to address this
