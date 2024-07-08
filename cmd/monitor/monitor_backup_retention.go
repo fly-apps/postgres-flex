@@ -18,14 +18,20 @@ func monitorBackupRetention(ctx context.Context, node *flypg.Node, barman *flypg
 			log.Println("Shutting down backup retention monitor")
 			return
 		case <-ticker.C:
-			result, err := barman.WALArchiveDelete(ctx)
+			primary, err := isPrimary(ctx, node)
 			if err != nil {
-				log.Printf("Backup retention failed with: %s", err)
+				log.Printf("Failed to resolve primary when evaluating retention: %s", err)
+				continue
 			}
 
-			if len(result) > 0 {
-				log.Printf("Backup retention response: %s", result)
+			if !primary {
+				continue
 			}
+
+			if _, err := barman.WALArchiveDelete(ctx); err != nil {
+				log.Printf("WAL archive retention failed with: %s", err)
+			}
+
 		}
 	}
 }

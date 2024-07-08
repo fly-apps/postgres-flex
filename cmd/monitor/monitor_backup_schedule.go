@@ -10,26 +10,37 @@ import (
 )
 
 func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.Barman) {
-	nextScheduledBackup, err := calculateNextBackupTime(ctx, barman)
+	lastBackupTime, err := barman.LastCompletedBackup(ctx)
+	if err != nil {
+		log.Printf("Failed to resolve the last backup taken: %s", err)
+	}
+
+	// Calculate when the next backup is due.
+	nextScheduledBackup, err := calculateNextBackupTime(barman, lastBackupTime)
 	if err != nil {
 		log.Printf("Failed to calculate the next scheduled backup time: %s", err)
 	}
 
+	// Determine if the node is the primary.
 	primary, err := isPrimary(ctx, node)
 	if err != nil {
 		log.Printf("Failed to resolve primary status: %s", err)
 	}
 
 	if primary {
-
 		if nextScheduledBackup < 0 {
 			log.Println("No backups found! Performing the initial base backup.")
-			if err := performBaseBackup(ctx, barman, true); err != nil {
-				log.Printf("Failed to perform full backup: %s", err)
+			err := performBaseBackup(ctx, barman, true)
+			switch {
+			case err != nil:
+				log.Printf("Failed to perform initial base backup: %s", err)
+			default:
+				log.Println("Initial base backup completed successfully")
+				lastBackupTime = time.Now()
 			}
 
 			// Recalculate the next scheduled backup time after the initial backup.
-			nextScheduledBackup, err = calculateNextBackupTime(ctx, barman)
+			nextScheduledBackup, err = calculateNextBackupTime(barman, lastBackupTime)
 			if err != nil {
 				log.Printf("Failed to calculate the next scheduled backup time: %s", err)
 			}
@@ -41,105 +52,61 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 	ticker := time.NewTicker(nextScheduledBackup)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		primary, err := isPrimary(ctx, node)
-		if err != nil {
-			log.Printf("Failed to resolve primary status: %s", err)
-		}
+	// Monitor the backup schedule even if we are not the primary. This is to ensure backups will
+	// continue to be taken in the event of a failover.
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Shutting down backup schedule monitor")
+			return
+		case <-ticker.C:
+			// Check to see if we are the Primary.
+			primary, err := isPrimary(ctx, node)
+			if err != nil {
+				log.Printf("Failed to resolve primary status: %s", err)
+			}
 
-		// Short-circuit if the node is not the primary.
-		if !primary {
-			continue
-		}
+			// Noop if we are not the primary.
+			if !primary {
+				continue
+			}
 
-		// Calculate when the next backup is due. This needs to be calculated per-tick
-		// in case the backup frequency has changed or the primary status has changed.
-		nextScheduledBackup, err := calculateNextBackupTime(ctx, barman)
-		if err != nil {
-			log.Printf("Failed to calculate the next scheduled backup time: %s", err)
-		}
+			lastBackupTime, err := barman.LastCompletedBackup(ctx)
+			if err != nil {
+				log.Printf("Failed to resolve the last backup taken: %s", err)
+			}
 
-		if err := monitorBackupScheduleTick(ctx, node, barman); err != nil {
-			log.Printf("monitorBackupScheduleTick failed with: %s", err)
-		}
+			// Recalculate the next scheduled backup time.
+			nextScheduledBackup, err := calculateNextBackupTime(barman, lastBackupTime)
+			if err != nil {
+				log.Printf("Failed to calculate the next scheduled backup time: %s", err)
+			}
 
-		// Reset the ticker frequency in case the backup frequency has changed.
-		ticker.Reset(backupFrequency(barman))
+			log.Printf("Next full backup due in: %s", nextScheduledBackup)
+
+			// Perform a full backup if the next scheduled backup time is less than 0.
+			if nextScheduledBackup < 0 {
+				log.Println("Performing full backup now")
+				if err := performBaseBackup(ctx, barman, false); err != nil {
+					log.Printf("Failed to perform full backup: %s", err)
+				}
+
+				nextScheduledBackup = backupFrequency(barman)
+			}
+
+			// Reset the ticker frequency in case the backup frequency has changed.
+			ticker.Reset(nextScheduledBackup)
+		}
 	}
 }
 
-// func performInitialBackup(ctx context.Context, node *flypg.Node, barman *flypg.Barman) error {
-// 	primary, err := isPrimary(ctx, node)
-// 	if err != nil {
-// 		log.Printf("Failed to resolve primary status: %s", err)
-// 	}
-
-// 	// Short-circuit if the node is not the primary.
-// 	if !primary {
-// 		return nil
-// 	}
-
-// 	// Determine when the last backup was taken.
-// 	lastBackupTime, err := barman.LastCompletedBackup(ctx)
-// 	if err != nil {
-// 		log.Printf("Failed to resolve the last backup taken: %s", err)
-// 	}
-
-// 	// Perform the initial backup if the node is the primary.
-// 	if lastBackupTime.IsZero() {
-// 		log.Println("No backups found! Performing the initial base backup.")
-
-// 		if err := performBaseBackup(ctx, barman); err != nil {
-// 			log.Printf("Failed to perform the initial full backup: %s", err)
-// 			log.Printf("Backup scheduler will re-attempt in %s.", backupFrequency(barman))
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-func monitorBackupScheduleTick(ctx context.Context, node *flypg.Node, barman *flypg.Barman) error {
-	primary, err := isPrimary(ctx, node)
-	if err != nil {
-		return fmt.Errorf("failed to resolve primary status: %s", err)
-	}
-
-	// Short-circuit if the node is not the primary.
-	if !primary {
-		return nil
-	}
-
-	timeUntilNextBackup, err := calculateNextBackupTime(ctx, barman)
-	if err != nil {
-		return fmt.Errorf("failed to calculate the next scheduled backup time: %s", err)
-	}
-
-	// Perform backup immediately if the time until the next backup is negative.
-	if timeUntilNextBackup < 0 {
-		log.Println("Performing full backup now")
-		if err := performBaseBackup(ctx, barman); err != nil {
-			return fmt.Errorf("failed to perform full backup: %s", err)
-		}
-	}
-
-	log.Printf("Next full backup due in: %s", timeUntilNextBackup)
-
-}
-
-func calculateNextBackupTime(ctx context.Context, barman *flypg.Barman) (time.Duration, error) {
-	frequency := backupFrequency(barman)
-
-	lastBackupTime, err := barman.LastCompletedBackup(ctx)
-	if err != nil {
-		log.Printf("Failed to resolve the last backup taken: %s", err)
-	}
-
+func calculateNextBackupTime(barman *flypg.Barman, lastBackupTime time.Time) (time.Duration, error) {
+	// If there was no backup, return a negative duration to trigger an immediate backup.
 	if lastBackupTime.IsZero() {
-		lastBackupTime = time.Now()
+		return -1, nil
 	}
 
-	// Calculate the time until the next backup is due.
-	return time.Until(lastBackupTime.Add(frequency)), nil
+	return time.Until(lastBackupTime.Add(backupFrequency(barman))), nil
 }
 
 func isPrimary(ctx context.Context, node *flypg.Node) (bool, error) {
@@ -175,10 +142,9 @@ func performBaseBackup(ctx context.Context, barman *flypg.Barman, immediateCheck
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		default:
-			_, err := barman.Backup(ctx, immediateCheckpoint)
-			if err != nil {
+			if _, err := barman.Backup(ctx, immediateCheckpoint); err != nil {
 				log.Printf("failed to perform full backup: %s. Retrying in 30 seconds.", err)
 
 				// If we've exceeded the maximum number of retries, we should return an error.
