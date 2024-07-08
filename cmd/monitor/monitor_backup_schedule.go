@@ -49,7 +49,6 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 		}
 		log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
 	} else {
-
 		if nextScheduledBackup < 0 {
 			nextScheduledBackup = backupFrequency(barman)
 		}
@@ -70,6 +69,7 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			primary, err := isPrimary(ctx, node)
 			if err != nil {
 				log.Printf("[WARN] Failed to resolve primary status: %s", err)
+				continue
 			}
 
 			if !primary {
@@ -79,6 +79,7 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			lastBackupTime, err := barman.LastCompletedBackup(ctx)
 			if err != nil {
 				log.Printf("[WARN] Failed to determine when the last backup was taken: %s", err)
+				continue
 			}
 
 			// Recalculate the next scheduled backup time.
