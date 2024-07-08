@@ -133,16 +133,16 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	// Determine if we are performing a remote restore.
-	if err := n.handleRemoteRestore(ctx, store); err != nil {
-		return fmt.Errorf("failed to handle remote restore: %s", err)
-	}
-
 	// Ensure we have the required s3 credentials set.
 	if os.Getenv("S3_ARCHIVE_CONFIG") != "" || os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG") != "" {
 		if err := writeS3Credentials(ctx, s3AuthDir); err != nil {
 			return fmt.Errorf("failed to write s3 credentials: %s", err)
 		}
+	}
+
+	// Determine if we are performing a remote restore.
+	if err := n.handleRemoteRestore(ctx, store); err != nil {
+		return fmt.Errorf("failed to handle remote restore: %s", err)
 	}
 
 	// Verify whether we are a booting zombie.
