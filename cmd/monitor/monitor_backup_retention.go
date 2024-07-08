@@ -8,7 +8,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 )
 
-func monitorBackupRetention(ctx context.Context, barman *flypg.Barman) {
+func monitorBackupRetention(ctx context.Context, node *flypg.Node, barman *flypg.Barman) {
 	ticker := time.NewTicker(defaultBackupRetentionEvalFrequency)
 	defer ticker.Stop()
 

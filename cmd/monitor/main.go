@@ -63,10 +63,10 @@ func main() {
 		}
 
 		// Backup scheduler
-		go monitorBackupSchedule(ctx, barman)
+		go monitorBackupSchedule(ctx, node, barman)
 
 		// Backup retention monitor
-		go monitorBackupRetention(ctx, barman)
+		go monitorBackupRetention(ctx, node, barman)
 	}
 
 	// Readonly monitor

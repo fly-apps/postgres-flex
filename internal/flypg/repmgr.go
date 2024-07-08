@@ -382,6 +382,15 @@ func (*RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error)
 	return &member, nil
 }
 
+func (r *RepMgr) IsPrimary(ctx context.Context, pg *pgx.Conn) (bool, error) {
+	member, err := r.Member(ctx, pg)
+	if err != nil {
+		return false, err
+	}
+
+	return member.Role == PrimaryRoleName, nil
+}
+
 func (r *RepMgr) VotingMembers(ctx context.Context, conn *pgx.Conn) ([]Member, error) {
 	members, err := r.Members(ctx, conn)
 	if err != nil {
