@@ -60,10 +60,7 @@ func TestCalculateNextBackupTime(t *testing.T) {
 	}
 
 	t.Run("no backups", func(t *testing.T) {
-		nextBackupTime, err := calculateNextBackupTime(barman, time.Time{})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		nextBackupTime := calculateNextBackupTime(barman, time.Time{})
 
 		if nextBackupTime.Hours() > 0 {
 			t.Fatalf("expected next backup time duration to be less than 0, but got %s", nextBackupTime)
@@ -73,10 +70,7 @@ func TestCalculateNextBackupTime(t *testing.T) {
 	t.Run("recent backup", func(t *testing.T) {
 		lastBackup := time.Now().Add(-1 * time.Hour)
 
-		nextBackupTime, err := calculateNextBackupTime(barman, lastBackup)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		nextBackupTime := calculateNextBackupTime(barman, lastBackup)
 
 		expected := 22.0
 		if nextBackupTime.Hours() == expected {
@@ -87,10 +81,7 @@ func TestCalculateNextBackupTime(t *testing.T) {
 	t.Run("old backup", func(t *testing.T) {
 		lastBackup := time.Now().Add(-25 * time.Hour)
 
-		nextBackupTime, err := calculateNextBackupTime(barman, lastBackup)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		nextBackupTime := calculateNextBackupTime(barman, lastBackup)
 
 		expected := -1.0
 		if nextBackupTime.Hours() == -1.0 {
