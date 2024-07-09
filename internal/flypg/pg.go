@@ -201,9 +201,14 @@ func (c *PGConfig) setArchiveConfig(store *state.Store) error {
 		return fmt.Errorf("failed to load barman config: %s", err)
 	}
 
+	archiveTimeout, err := convertToPostgresUnits(barman.Settings.ArchiveTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to convert archive_timeout to postgres units: %s", err)
+	}
+
 	c.internalConfig["archive_mode"] = "on"
 	c.internalConfig["archive_command"] = fmt.Sprintf("'%s'", barman.walArchiveCommand())
-	c.internalConfig["archive_timeout"] = barman.Settings.ArchiveTimeout
+	c.internalConfig["archive_timeout"] = archiveTimeout
 
 	return nil
 }

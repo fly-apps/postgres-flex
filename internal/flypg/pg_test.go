@@ -16,9 +16,7 @@ const (
 	pgInternalConfigFilePath = "./test_results/postgresql.internal.conf"
 	pgUserConfigFilePath     = "./test_results/postgresql.user.conf"
 	pgPasswordFilePath       = "./test_results/default_password"
-	barmanConfigDir          = "./test_results/barman"
-
-	pgHBAFilePath = "./test_results/pg_hba.conf"
+	pgHBAFilePath            = "./test_results/pg_hba.conf"
 )
 
 func TestPGConfigInitialization(t *testing.T) {
@@ -34,7 +32,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		InternalConfigFilePath: pgInternalConfigFilePath,
 		UserConfigFilePath:     pgUserConfigFilePath,
 		passwordFilePath:       pgPasswordFilePath,
-		barmanConfigPath:       barmanConfigDir,
+		barmanConfigPath:       testBarmanConfigDir,
 	}
 
 	if err := stubPGConfigFile(); err != nil {
@@ -116,36 +114,163 @@ func TestPGConfigInitialization(t *testing.T) {
 		}
 	})
 
-	t.Run("barman-enabled", func(t *testing.T) {
+	t.Run("archive-enabled", func(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 
 		store, _ := state.NewStore()
-		if err := pgConf.initialize(store); err != nil {
-			t.Fatal(err)
-		}
 
-		cfg, err := pgConf.CurrentConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("defaults", func(t *testing.T) {
+			if err := pgConf.initialize(store); err != nil {
+				t.Fatal(err)
+			}
 
-		if cfg["archive_mode"] != "on" {
-			t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
-		}
+			cfg, err := pgConf.CurrentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
+			if cfg["archive_mode"] != "on" {
+				t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
+			}
 
-		if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
-			t.Fatal(err)
-		}
+			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		expected := fmt.Sprintf("'%s'", barman.walArchiveCommand())
-		if cfg["archive_command"] != expected {
-			t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])
-		}
+			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+				t.Fatal(err)
+			}
+
+			expected := fmt.Sprintf("'%s'", barman.walArchiveCommand())
+			if cfg["archive_command"] != expected {
+				t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])
+			}
+
+			if cfg["archive_timeout"] != "60s" {
+				t.Fatalf("expected 60s, got %s", cfg["archive_timeout"])
+			}
+		})
+
+		t.Run("custom-archive-timeout-with-m", func(t *testing.T) {
+			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+				t.Fatal(err)
+			}
+
+			barman.SetUserConfig(ConfigMap{"archive_timeout": "60m"})
+
+			if err := writeUserConfigFile(barman); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := pgConf.initialize(store); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := pgConf.CurrentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cfg["archive_timeout"] != "60min" {
+				t.Fatalf("expected 60min, got %s", cfg["archive_timeout"])
+			}
+		})
+
+		t.Run("custom-archive-timeout-with-min", func(t *testing.T) {
+			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+				t.Fatal(err)
+			}
+
+			barman.SetUserConfig(ConfigMap{"archive_timeout": "60min"})
+
+			if err := writeUserConfigFile(barman); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := pgConf.initialize(store); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := pgConf.CurrentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cfg["archive_timeout"] != "60min" {
+				t.Fatalf("expected 60min, got %s", cfg["archive_timeout"])
+			}
+		})
+
+		t.Run("custom-archive-timeout-with-s", func(t *testing.T) {
+			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+				t.Fatal(err)
+			}
+
+			barman.SetUserConfig(ConfigMap{"archive_timeout": "60s"})
+
+			if err := writeUserConfigFile(barman); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := pgConf.initialize(store); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := pgConf.CurrentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cfg["archive_timeout"] != "60s" {
+				t.Fatalf("expected 60s, got %s", cfg["archive_timeout"])
+			}
+		})
+
+		t.Run("custom-archive-timeout-w", func(t *testing.T) {
+			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+				t.Fatal(err)
+			}
+
+			barman.SetUserConfig(ConfigMap{"archive_timeout": "24h"})
+
+			if err := writeUserConfigFile(barman); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := pgConf.initialize(store); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := pgConf.CurrentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cfg["archive_timeout"] != "24h" {
+				t.Fatalf("expected 24h, got %s", cfg["archive_timeout"])
+			}
+		})
 	})
 
 	t.Run("barman-disabled", func(t *testing.T) {
@@ -409,6 +534,16 @@ func setup(t *testing.T) error {
 	if _, err := os.Stat(pgTestDirectory); err != nil {
 		if os.IsNotExist(err) {
 			if err := os.Mkdir(pgTestDirectory, 0750); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	if _, err := os.Stat(testBarmanConfigDir); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.Mkdir(testBarmanConfigDir, 0750); err != nil {
 				return err
 			}
 		} else {
