@@ -149,7 +149,8 @@ func performBaseBackup(ctx context.Context, barman *flypg.Barman, immediateCheck
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			if _, err := barman.Backup(ctx, immediateCheckpoint); err != nil {
+			cfg := flypg.BackupConfig{ImmediateCheckpoint: immediateCheckpoint}
+			if _, err := barman.Backup(ctx, cfg); err != nil {
 				log.Printf("[WARN] Failed to perform full backup: %s. Retrying in 30 seconds.", err)
 
 				// If we've exceeded the maximum number of retries, we should return an error.

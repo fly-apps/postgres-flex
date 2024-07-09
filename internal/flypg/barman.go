@@ -34,8 +34,9 @@ type Barman struct {
 }
 
 type Backup struct {
-	Status    string `json:"status"`
 	BackupID  string `json:"backup_id"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
 	StartTime string `json:"begin_time"`
 	EndTime   string `json:"end_time"`
 	BeginWal  string `json:"begin_wal"`
@@ -105,9 +106,12 @@ func (b *Barman) BucketURL() string {
 	return fmt.Sprintf("s3://%s", b.bucket)
 }
 
-// Backup performs a base backup of the database.
-// immediateCheckpoint - forces the initial checkpoint to be done as quickly as possible.
-func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, error) {
+type BackupConfig struct {
+	Name                string // A customized name for the backup.
+	ImmediateCheckpoint bool   // Force an immediate checkpoint.
+}
+
+func (b *Barman) Backup(ctx context.Context, cfg BackupConfig) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
@@ -118,8 +122,12 @@ func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, 
 		b.bucketDirectory,
 	}
 
-	if immediateCheckpoint {
+	if cfg.ImmediateCheckpoint {
 		args = append(args, "--immediate-checkpoint")
+	}
+
+	if cfg.Name != "" {
+		args = append(args, "-n", cfg.Name)
 	}
 
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup", args...)
@@ -156,6 +164,33 @@ func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 	}
 
 	return b.parseBackups(backupsBytes)
+}
+
+// ListRawBackups returns the raw output of the backups list command.
+func (b *Barman) ListRawBackups(ctx context.Context) ([]byte, error) {
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
+		"--format", "json",
+		b.BucketURL(),
+		b.bucketDirectory,
+	}
+
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-list", args...)
+}
+
+func (b *Barman) BackupDetails(ctx context.Context, id string) ([]byte, error) {
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
+		b.BucketURL(),
+		b.bucketDirectory,
+		id,
+	}
+
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-show", args...)
 }
 
 func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
