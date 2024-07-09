@@ -119,6 +119,15 @@ func TestPGConfigInitialization(t *testing.T) {
 
 		store, _ := state.NewStore()
 
+		barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
+			t.Fatal(err)
+		}
+
 		t.Run("defaults", func(t *testing.T) {
 			if err := pgConf.initialize(store); err != nil {
 				t.Fatal(err)
@@ -133,15 +142,6 @@ func TestPGConfigInitialization(t *testing.T) {
 				t.Fatalf("expected archive_mode to be on, got %v", cfg["archive_mode"])
 			}
 
-			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
-				t.Fatal(err)
-			}
-
 			expected := fmt.Sprintf("'%s'", barman.walArchiveCommand())
 			if cfg["archive_command"] != expected {
 				t.Fatalf("expected %s, got %s", expected, cfg["archive_command"])
@@ -153,14 +153,6 @@ func TestPGConfigInitialization(t *testing.T) {
 		})
 
 		t.Run("custom-archive-timeout-with-m", func(t *testing.T) {
-			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
-				t.Fatal(err)
-			}
 
 			barman.SetUserConfig(ConfigMap{"archive_timeout": "60m"})
 
@@ -183,15 +175,6 @@ func TestPGConfigInitialization(t *testing.T) {
 		})
 
 		t.Run("custom-archive-timeout-with-min", func(t *testing.T) {
-			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
-				t.Fatal(err)
-			}
-
 			barman.SetUserConfig(ConfigMap{"archive_timeout": "60min"})
 
 			if err := writeUserConfigFile(barman); err != nil {
@@ -213,15 +196,6 @@ func TestPGConfigInitialization(t *testing.T) {
 		})
 
 		t.Run("custom-archive-timeout-with-s", func(t *testing.T) {
-			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
-				t.Fatal(err)
-			}
-
 			barman.SetUserConfig(ConfigMap{"archive_timeout": "60s"})
 
 			if err := writeUserConfigFile(barman); err != nil {
@@ -243,15 +217,6 @@ func TestPGConfigInitialization(t *testing.T) {
 		})
 
 		t.Run("custom-archive-timeout-w", func(t *testing.T) {
-			barman, err := NewBarman(store, os.Getenv("S3_ARCHIVE_CONFIG"), DefaultAuthProfile)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := barman.LoadConfig(testBarmanConfigDir); err != nil {
-				t.Fatal(err)
-			}
-
 			barman.SetUserConfig(ConfigMap{"archive_timeout": "24h"})
 
 			if err := writeUserConfigFile(barman); err != nil {
