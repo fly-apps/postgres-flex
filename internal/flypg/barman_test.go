@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	testBarmanConfigDir = "./test_results/barman"
+	testBarmanConfigDir = "./test_results/barman/"
 )
 
 func TestNewBarman(t *testing.T) {

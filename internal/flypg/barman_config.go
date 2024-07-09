@@ -98,8 +98,13 @@ func (c *BarmanConfig) ParseSettings() (BarmanSettings, error) {
 	recoveryWindow := fmt.Sprintf("RECOVERY WINDOW OF %s",
 		convertRecoveryWindowDuration(cfg["recovery_window"].(string)))
 
+	archiveTimeout, err := convertToPostgresUnits(cfg["archive_timeout"].(string))
+	if err != nil {
+		return BarmanSettings{}, fmt.Errorf("failed to convert archive_timeout to postgres units: %s", err)
+	}
+
 	return BarmanSettings{
-		ArchiveTimeout:      cfg["archive_timeout"].(string),
+		ArchiveTimeout:      archiveTimeout,
 		RecoveryWindow:      recoveryWindow,
 		FullBackupFrequency: cfg["full_backup_frequency"].(string),
 		MinimumRedundancy:   cfg["minimum_redundancy"].(string),
@@ -117,10 +122,11 @@ func (c *BarmanConfig) Validate(requestedChanges map[string]interface{}) error {
 	for k, v := range requestedChanges {
 		switch k {
 		case "archive_timeout":
-			// Ensure that the value is a valid duration
-			if _, err := time.ParseDuration(v.(string)); err != nil {
-				return fmt.Errorf("invalid value for archive_timeout: %v", v)
+			// Ensure it can be converted to a Postgres duration
+			if _, err := convertToPostgresUnits(v.(string)); err != nil {
+				return fmt.Errorf("invalid value for archive_timeout: %v", err)
 			}
+
 		case "recovery_window":
 			// Ensure that the value is a valid duration
 			re := regexp.MustCompile(`^(\d+)([dwy])$`)
@@ -170,17 +176,24 @@ func (c *BarmanConfig) initialize(store *state.Store, configDir string) error {
 
 	c.SetDefaults()
 
+	// Sync the user config from consul
 	if err := SyncUserConfig(c, store); err != nil {
 		log.Printf("[WARN] Failed to sync user config from consul for barman: %s\n", err.Error())
-		if err := writeInternalConfigFile(c); err != nil {
-			return fmt.Errorf("failed to write barman config files: %s", err)
-		}
-	} else {
-		if err := WriteConfigFiles(c); err != nil {
-			return fmt.Errorf("failed to write barman config files: %s", err)
+	}
+
+	// Write the internal defaults
+	if err := writeInternalConfigFile(c); err != nil {
+		return fmt.Errorf("failed to write barman config files: %s", err)
+	}
+
+	// Create the user config file if it doesn't exist
+	if _, err := os.Stat(c.UserConfigFile()); os.IsNotExist(err) {
+		if _, err := os.Create(c.UserConfigFile()); err != nil {
+			return fmt.Errorf("failed to stub user config file: %s", err)
 		}
 	}
 
+	// Load the settings
 	settings, err := c.ParseSettings()
 	if err != nil {
 		return fmt.Errorf("failed to parse barman config: %w", err)
@@ -203,4 +216,40 @@ func convertRecoveryWindowDuration(durationStr string) string {
 		}
 	}
 	return durationStr
+}
+
+func convertToPostgresUnits(dStr string) (string, error) {
+	// Use regex to split the numeric part and the unit
+	re := regexp.MustCompile(`(\d+)([a-z]+)`)
+	matches := re.FindStringSubmatch(dStr)
+	if len(matches) != 3 {
+		return "", fmt.Errorf("invalid duration format: %s", dStr)
+	}
+
+	// Parse the numeric value
+	num, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return "", err
+	}
+
+	// Map the Go units to Postgres units
+	var postgresUnit string
+	switch matches[2] {
+	case "us":
+		postgresUnit = "us"
+	case "ms":
+		postgresUnit = "ms"
+	case "s":
+		postgresUnit = "s"
+	case "min", "m":
+		postgresUnit = "min"
+	case "h":
+		postgresUnit = "h"
+	case "d":
+		postgresUnit = "d"
+	default:
+		return "", fmt.Errorf("unsupported postgres unit: %s", matches[2])
+	}
+
+	return fmt.Sprintf("%d%s", num, postgresUnit), nil
 }
