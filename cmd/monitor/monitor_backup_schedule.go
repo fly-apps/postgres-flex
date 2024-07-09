@@ -47,14 +47,14 @@ func monitorBackupSchedule(ctx context.Context, node *flypg.Node, barman *flypg.
 			// Recalculate the next scheduled backup time after the initial backup.
 			nextScheduledBackup = calculateNextBackupTime(barman, lastBackupTime)
 		}
+
+		log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
 	}
 
 	// Safety net in case ticker does not have a valid duration.
 	if nextScheduledBackup < 0 {
 		nextScheduledBackup = backupFrequency(barman)
 	}
-
-	log.Printf("[INFO] Next full backup due in: %s", nextScheduledBackup)
 
 	// Monitor the backup schedule even if we are not the primary. This is to ensure backups will
 	// continue to be taken in the event of a failover.
