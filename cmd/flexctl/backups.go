@@ -16,17 +16,12 @@ var backupListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Lists all backups",
 	Long:  `Lists all available backups created.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if !backupsEnabled() {
-			fmt.Fprintln(os.Stderr, "Backups are not enabled.")
-			os.Exit(1)
+			return fmt.Errorf("backups are not enabled")
 		}
 
-		if err := listBackups(cmd); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		}
-
-		os.Exit(0)
+		return listBackups(cmd)
 	},
 	Args: cobra.NoArgs,
 }
@@ -35,20 +30,18 @@ var backupCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Creates a new backup",
 	Long:  `Creates a new backup.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if !backupsEnabled() {
-			fmt.Fprintln(os.Stderr, "Backups are not enabled.")
-			os.Exit(1)
+			return fmt.Errorf("backups are not enabled")
 		}
 
 		if err := createBackup(cmd); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			return err
 		}
 
 		fmt.Println("Backup completed successfully!")
 
-		os.Exit(0)
+		return nil
 	},
 	Args: cobra.NoArgs,
 }
@@ -57,18 +50,11 @@ var backupShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Shows details about a specific backup",
 	Long:  `Shows details about a specific backup.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if !backupsEnabled() {
-			fmt.Fprintln(os.Stderr, "Backups are not enabled.")
-			os.Exit(1)
+			return fmt.Errorf("backups are not enabled")
 		}
-
-		if err := showBackup(cmd, args); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-
-		os.Exit(0)
+		return showBackup(cmd, args)
 	},
 	Args: cobra.ExactArgs(1),
 }
@@ -106,6 +92,26 @@ func showBackup(cmd *cobra.Command, args []string) error {
 func createBackup(cmd *cobra.Command) error {
 	ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
 	defer cancel()
+
+	n, err := flypg.NewNode()
+	if err != nil {
+		return fmt.Errorf("failed to initialize node: %v", err)
+	}
+
+	conn, err := n.RepMgr.NewLocalConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to connect to local db: %v", err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	isPrimary, err := n.RepMgr.IsPrimary(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to determine if node is primary: %v", err)
+	}
+
+	if !isPrimary {
+		return fmt.Errorf("backups can only be performed against the primary node")
+	}
 
 	store, err := state.NewStore()
 	if err != nil {
