@@ -98,8 +98,13 @@ func (c *BarmanConfig) ParseSettings() (BarmanSettings, error) {
 	recoveryWindow := fmt.Sprintf("RECOVERY WINDOW OF %s",
 		convertRecoveryWindowDuration(cfg["recovery_window"].(string)))
 
+	archiveTimeout, err := convertToPostgresUnits(cfg["archive_timeout"].(string))
+	if err != nil {
+		return BarmanSettings{}, fmt.Errorf("failed to convert archive_timeout to postgres units: %s", err)
+	}
+
 	return BarmanSettings{
-		ArchiveTimeout:      cfg["archive_timeout"].(string),
+		ArchiveTimeout:      archiveTimeout,
 		RecoveryWindow:      recoveryWindow,
 		FullBackupFrequency: cfg["full_backup_frequency"].(string),
 		MinimumRedundancy:   cfg["minimum_redundancy"].(string),
@@ -117,9 +122,8 @@ func (c *BarmanConfig) Validate(requestedChanges map[string]interface{}) error {
 	for k, v := range requestedChanges {
 		switch k {
 		case "archive_timeout":
-			val := v.(string)
 			// Ensure it can be converted to a Postgres duration
-			if _, err := convertToPostgresUnits(val); err != nil {
+			if _, err := convertToPostgresUnits(v.(string)); err != nil {
 				return fmt.Errorf("invalid value for archive_timeout: %v", err)
 			}
 
