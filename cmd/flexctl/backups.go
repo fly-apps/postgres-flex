@@ -36,7 +36,7 @@ var backupCreateCmd = &cobra.Command{
 		}
 
 		if err := createBackup(cmd); err != nil {
-			return err
+			return fmt.Errorf("failed to create backup: %v", err)
 		}
 
 		fmt.Println("Backup completed successfully!")
@@ -47,7 +47,7 @@ var backupCreateCmd = &cobra.Command{
 }
 
 var backupShowCmd = &cobra.Command{
-	Use:   "show",
+	Use:   "show <backup-id>",
 	Short: "Shows details about a specific backup",
 	Long:  `Shows details about a specific backup.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -137,7 +137,7 @@ func createBackup(cmd *cobra.Command) error {
 	fmt.Println("Performing backup...")
 
 	if _, err := barman.Backup(ctx, cfg); err != nil {
-		return fmt.Errorf("failed to create backup: %v", err)
+		return err
 	}
 
 	return nil
@@ -190,7 +190,7 @@ func listBackups(cmd *cobra.Command) error {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"ID", "Name", "Status", "End time", "Begin WAL"})
+	table.SetHeader([]string{"ID/Name", "Alias", "Status", "End time", "Begin WAL"})
 
 	// Set table alignment, borders, padding, etc. as needed
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
