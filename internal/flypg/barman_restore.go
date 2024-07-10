@@ -164,9 +164,9 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 		}
 	case b.recoveryTargetName != "":
 		// Resolve the target base backup
-		backupID, err = b.resolveBackupFromID(backups, b.recoveryTargetName)
+		backupID, err = b.resolveBackupFromName(backups, b.recoveryTargetName)
 		if err != nil {
-			return fmt.Errorf("failed to resolve backup target by id: %s", err)
+			return fmt.Errorf("failed to resolve backup target by id/name: %s", err)
 		}
 	default:
 		backupID, err = b.resolveBackupFromTime(backups, time.Now().Format(time.RFC3339))
@@ -192,18 +192,19 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 	return nil
 }
 
-func (*BarmanRestore) resolveBackupFromID(backupList BackupList, id string) (string, error) {
+func (*BarmanRestore) resolveBackupFromName(backupList BackupList, name string) (string, error) {
 	if len(backupList.Backups) == 0 {
 		return "", fmt.Errorf("no backups found")
 	}
 
 	for _, backup := range backupList.Backups {
-		if backup.ID == id {
+		// Allow for either the backup ID or the backup name to be used.
+		if backup.ID == name || backup.Name == name {
 			return backup.ID, nil
 		}
 	}
 
-	return "", fmt.Errorf("no backup found with id %s", id)
+	return "", fmt.Errorf("no backup found with id/name %s", name)
 }
 
 func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr string) (string, error) {

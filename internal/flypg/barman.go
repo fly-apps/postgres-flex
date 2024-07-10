@@ -127,6 +127,10 @@ func (b *Barman) Backup(ctx context.Context, cfg BackupConfig) ([]byte, error) {
 	}
 
 	if cfg.Name != "" {
+		// Ensure the alias is unique, otherwise we won't be able to restore using it.
+		if err := b.validateBackupName(ctx, cfg.Name); err != nil {
+			return nil, err
+		}
 		args = append(args, "-n", cfg.Name)
 	}
 
@@ -134,14 +138,14 @@ func (b *Barman) Backup(ctx context.Context, cfg BackupConfig) ([]byte, error) {
 }
 
 // RestoreBackup returns the command string used to restore a base backup.
-func (b *Barman) RestoreBackup(ctx context.Context, backupID string) ([]byte, error) {
+func (b *Barman) RestoreBackup(ctx context.Context, name string) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
 		"--profile", b.authProfile,
 		b.BucketURL(),
 		b.bucketDirectory,
-		backupID,
+		name,
 		defaultRestoreDir,
 	}
 
@@ -285,6 +289,21 @@ func (*Barman) parseBackups(backupBytes []byte) (BackupList, error) {
 	}
 
 	return backupList, nil
+}
+
+func (b *Barman) validateBackupName(ctx context.Context, name string) error {
+	backupList, err := b.ListBackups(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list backups: %s", err)
+	}
+
+	for _, backup := range backupList.Backups {
+		if backup.Name == name {
+			return fmt.Errorf("backup name '%s' already exists", name)
+		}
+	}
+
+	return nil
 }
 
 func formatTimestamp(timestamp string) (string, error) {
