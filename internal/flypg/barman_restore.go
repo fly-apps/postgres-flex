@@ -198,8 +198,8 @@ func (*BarmanRestore) resolveBackupFromID(backupList BackupList, id string) (str
 	}
 
 	for _, backup := range backupList.Backups {
-		if backup.BackupID == id {
-			return backup.BackupID, nil
+		if backup.ID == id {
+			return backup.ID, nil
 		}
 	}
 
@@ -237,7 +237,7 @@ func (*BarmanRestore) resolveBackupFromTime(backupList BackupList, restoreStr st
 
 		// If the last backup ID is empty or the restore time is after the last backup time, update the last backup ID.
 		if lastBackupID == "" || restoreTime.After(endTime) {
-			lastBackupID = backup.BackupID
+			lastBackupID = backup.ID
 			lastBackupTime = endTime
 		}
 

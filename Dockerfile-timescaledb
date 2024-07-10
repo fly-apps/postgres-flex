@@ -12,6 +12,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/failover_validation ./cmd/f
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/pg_unregister ./cmd/pg_unregister
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start_monitor ./cmd/monitor
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start_admin_server ./cmd/admin_server
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/flexctl ./cmd/flexctl
+
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
 
 COPY ./bin/* /fly/bin/
@@ -21,6 +23,8 @@ FROM wrouesnel/postgres_exporter:latest AS postgres_exporter
 FROM postgres:${PG_VERSION}
 ENV PGDATA=/data/postgresql
 ENV PGPASSFILE=/data/.pgpass
+ENV AWS_SHARED_CREDENTIALS_FILE=/data/.aws/credentials
+
 ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG POSTGIS_MAJOR=3

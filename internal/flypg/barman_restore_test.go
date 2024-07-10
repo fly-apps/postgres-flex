@@ -278,8 +278,8 @@ func TestParseBackups(t *testing.T) {
 		}
 
 		firstBackup := list.Backups[0]
-		if firstBackup.BackupID != "20240702T210544" {
-			t.Fatalf("expected backup ID to be 20240625T194412, got %s", firstBackup.BackupID)
+		if firstBackup.ID != "20240702T210544" {
+			t.Fatalf("expected backup ID to be 20240625T194412, got %s", firstBackup.ID)
 		}
 
 		if firstBackup.StartTime != "Tue Jun 24 19:44:20 2024" {
@@ -296,8 +296,8 @@ func TestParseBackups(t *testing.T) {
 
 		secondBackup := list.Backups[2]
 
-		if secondBackup.BackupID != "20240626T172443" {
-			t.Fatalf("expected backup ID to be 20240626T172443, got %s", secondBackup.BackupID)
+		if secondBackup.ID != "20240626T172443" {
+			t.Fatalf("expected backup ID to be 20240626T172443, got %s", secondBackup.ID)
 		}
 
 		if secondBackup.StartTime != "Wed Jun 26 17:24:43 2024" {
