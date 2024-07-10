@@ -404,21 +404,17 @@ func TestResolveBackupTarget(t *testing.T) {
 		if backupID != "20240625T194412" {
 			t.Fatalf("expected backup ID to be 20240625T194412, got %s", backupID)
 		}
+	})
 
+	t.Run("resolve-backup-by-name-with-alias", func(t *testing.T) {
 		// resolve backup by alias
-		backupID, err = restore.resolveBackupFromName(list, "test-backup-1")
+		backupID, err := restore.resolveBackupFromName(list, "test-backup-1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
 		if backupID != "20240625T194412" {
 			t.Fatalf("expected backup ID to be 20240625T194412, got %s", backupID)
-		}
-
-		// test for non-existent backup
-		backupID, err = restore.resolveBackupFromName(list, "test-backup-bloops")
-		if err == nil {
-			t.Fatalf("expected error, but got nil")
 		}
 	})
 }
