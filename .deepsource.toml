@@ -1,5 +1,7 @@
 version = 1
 
+# Ignore all test files in any directory
+
 [[analyzers]]
 name = "shell"
 
@@ -8,3 +10,7 @@ name = "go"
 
   [analyzers.meta]
   import_root = "github.com/fly-apps/postgres-flex"
+
+[[suppressions]]
+rule_id = "GO-R1005"
+files = ["**/*_test.go"]
