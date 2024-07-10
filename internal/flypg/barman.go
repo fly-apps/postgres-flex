@@ -180,7 +180,7 @@ func (b *Barman) ListRawBackups(ctx context.Context) ([]byte, error) {
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-list", args...)
 }
 
-func (b *Barman) BackupDetails(ctx context.Context, id string) ([]byte, error) {
+func (b *Barman) ShowBackup(ctx context.Context, id string) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,

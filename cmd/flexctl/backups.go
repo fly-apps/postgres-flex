@@ -62,10 +62,6 @@ var backupShowCmd = &cobra.Command{
 func showBackup(cmd *cobra.Command, args []string) error {
 	id := args[0]
 
-	if id == "" {
-		return fmt.Errorf("backup ID is required")
-	}
-
 	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
 	defer cancel()
 
@@ -79,7 +75,7 @@ func showBackup(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize barman: %v", err)
 	}
 
-	backupDetails, err := barman.BackupDetails(ctx, id)
+	backupDetails, err := barman.ShowBackup(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get backup details: %v", err)
 	}
