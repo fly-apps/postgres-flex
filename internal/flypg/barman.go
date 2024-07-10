@@ -34,8 +34,8 @@ type Barman struct {
 }
 
 type Backup struct {
-	BackupID  string `json:"backup_id"`
-	Name      string `json:"name"`
+	ID        string `json:"backup_id"`
+	Name      string `json:"backup_name"`
 	Status    string `json:"status"`
 	StartTime string `json:"begin_time"`
 	EndTime   string `json:"end_time"`

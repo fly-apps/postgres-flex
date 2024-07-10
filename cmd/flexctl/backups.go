@@ -212,7 +212,7 @@ func listBackups(cmd *cobra.Command) error {
 		}
 
 		table.Append([]string{
-			b.BackupID,
+			b.ID,
 			b.Name,
 			b.Status,
 			b.EndTime,
