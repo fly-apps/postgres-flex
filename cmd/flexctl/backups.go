@@ -253,7 +253,6 @@ func newConfigShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 
 			var rv configShowResult
 			err = json.NewDecoder(resp.Body).Decode(&rv)
@@ -304,7 +303,6 @@ func newConfigUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 
 			var rv configUpdateResult
 			err = json.NewDecoder(resp.Body).Decode(&rv)
