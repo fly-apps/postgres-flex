@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -272,14 +273,81 @@ func newConfigShowCmd() *cobra.Command {
 	return configShowCmd
 }
 
+type successfulUpdateResult struct {
+	Message         string `json:"message,omitempty"`
+	RestartRequired bool   `json:"restart_required"`
+}
+
+type configUpdateResult struct {
+	Result successfulUpdateResult `json:"result,omitempty"`
+	Error  string                 `json:"error,omitempty"`
+}
+
 func newConfigUpdateCmd() *cobra.Command {
 	var configUpdateCmd = &cobra.Command{
 		Use:   "update",
 		Short: "Update configuration",
-		Run: func(cmd *cobra.Command, args []string) {
-			// Add your logic here for updating the configuration
-			fmt.Println("Updating configuration...")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			update := flypg.BarmanSettings{
+				ArchiveTimeout:      cmd.Flag("archive-timeout").Value.String(),
+				RecoveryWindow:      cmd.Flag("recovery-window").Value.String(),
+				FullBackupFrequency: cmd.Flag("full-backup-frequency").Value.String(),
+				MinimumRedundancy:   cmd.Flag("minimum-redundancy").Value.String(),
+			}
+
+			jsonBody, err := json.Marshal(update)
+			if err != nil {
+				return err
+			}
+
+			resp, err := http.Post("http://localhost:5500/commands/admin/settings/update/barman", "application/json", bytes.NewBuffer(jsonBody))
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+
+			var rv configUpdateResult
+			err = json.NewDecoder(resp.Body).Decode(&rv)
+			if err != nil {
+				return err
+			}
+
+			if rv.Error != "" {
+				return fmt.Errorf("error updating configuration: %s", rv.Error)
+			}
+
+			if rv.Result.Message != "" {
+				fmt.Println(rv.Result.Message)
+			}
+			
+			if rv.Result.RestartRequired {
+				fmt.Println("A restart is required for these changes to take effect.")
+			}
+
+			return nil
 		},
+	}
+
+	configUpdateCmd.Flags().StringP("archive-timeout", "", "", "Archive timeout")
+	configUpdateCmd.Flags().StringP("recovery-window", "", "", "Recovery window")
+	configUpdateCmd.Flags().StringP("full-backup-frequency", "", "", "Full backup frequency")
+	configUpdateCmd.Flags().StringP("minimum-redundancy", "", "", "Minimum redundancy")
+
+	configUpdateCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		requiredFlags := []string{"archive-timeout", "recovery-window", "full-backup-frequency", "minimum-redundancy"}
+		providedFlags := 0
+
+		for _, flag := range requiredFlags {
+			if cmd.Flag(flag).Changed {
+				providedFlags++
+			}
+		}
+
+		if providedFlags < 1 {
+			return fmt.Errorf("At least one flag must be specified.")
+		}
+
+		return nil
 	}
 
 	return configUpdateCmd
