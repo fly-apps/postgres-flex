@@ -255,8 +255,7 @@ func newConfigShowCmd() *cobra.Command {
 			}
 
 			var rv configShowResult
-			err = json.NewDecoder(resp.Body).Decode(&rv)
-			if err != nil {
+			if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {
 				return err
 			}
 
@@ -328,8 +327,7 @@ func newConfigUpdateCmd() *cobra.Command {
 		}
 
 		var rv configUpdateResult
-		err = json.NewDecoder(resp.Body).Decode(&rv)
-		if err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {
 			return err
 		}
 
