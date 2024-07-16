@@ -319,7 +319,7 @@ func newConfigUpdateCmd() *cobra.Command {
 			if rv.Result.Message != "" {
 				fmt.Println(rv.Result.Message)
 			}
-			
+
 			if rv.Result.RestartRequired {
 				fmt.Println("A restart is required for these changes to take effect.")
 			}
