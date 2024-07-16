@@ -283,55 +283,77 @@ type configUpdateResult struct {
 }
 
 func newConfigUpdateCmd() *cobra.Command {
-	var configUpdateCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "update",
 		Short: "Update configuration",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			update := flypg.BarmanSettings{
-				ArchiveTimeout:      cmd.Flag("archive-timeout").Value.String(),
-				RecoveryWindow:      cmd.Flag("recovery-window").Value.String(),
-				FullBackupFrequency: cmd.Flag("full-backup-frequency").Value.String(),
-				MinimumRedundancy:   cmd.Flag("minimum-redundancy").Value.String(),
-			}
-
-			jsonBody, err := json.Marshal(update)
-			if err != nil {
-				return err
-			}
-
-			resp, err := http.Post("http://localhost:5500/commands/admin/settings/update/barman", "application/json", bytes.NewBuffer(jsonBody))
-			if err != nil {
-				return err
-			}
-
-			var rv configUpdateResult
-			err = json.NewDecoder(resp.Body).Decode(&rv)
-			if err != nil {
-				return err
-			}
-
-			if rv.Error != "" {
-				return fmt.Errorf("error updating configuration: %s", rv.Error)
-			}
-
-			if rv.Result.Message != "" {
-				fmt.Println(rv.Result.Message)
-			}
-
-			if rv.Result.RestartRequired {
-				fmt.Println("A restart is required for these changes to take effect.")
-			}
-
-			return nil
-		},
 	}
 
-	configUpdateCmd.Flags().StringP("archive-timeout", "", "", "Archive timeout")
-	configUpdateCmd.Flags().StringP("recovery-window", "", "", "Recovery window")
-	configUpdateCmd.Flags().StringP("full-backup-frequency", "", "", "Full backup frequency")
-	configUpdateCmd.Flags().StringP("minimum-redundancy", "", "", "Minimum redundancy")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 
-	configUpdateCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		archiveTimeout, err := cmd.Flags().GetString("archive-timeout")
+		if err != nil {
+			return err
+		}
+
+		recoveryWindow, err := cmd.Flags().GetString("recovery-window")
+		if err != nil {
+			return err
+		}
+
+		fullBackupFrequency, err := cmd.Flags().GetString("full-backup-frequency")
+		if err != nil {
+			return err
+		}
+
+		minimumRedundancy, err := cmd.Flags().GetString("minimum-redundancy")
+		if err != nil {
+			return err
+		}
+
+		update := flypg.BarmanSettings{
+			ArchiveTimeout:      archiveTimeout,
+			RecoveryWindow:      recoveryWindow,
+			FullBackupFrequency: fullBackupFrequency,
+			MinimumRedundancy:   minimumRedundancy,
+		}
+
+		jsonBody, err := json.Marshal(update)
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.Post("http://localhost:5500/commands/admin/settings/update/barman", "application/json", bytes.NewBuffer(jsonBody))
+		if err != nil {
+			return err
+		}
+
+		var rv configUpdateResult
+		err = json.NewDecoder(resp.Body).Decode(&rv)
+		if err != nil {
+			return err
+		}
+
+		if rv.Error != "" {
+			return fmt.Errorf("error updating configuration: %s", rv.Error)
+		}
+
+		if rv.Result.Message != "" {
+			fmt.Println(rv.Result.Message)
+		}
+
+		if rv.Result.RestartRequired {
+			fmt.Println("A restart is required for these changes to take effect.")
+		}
+
+		return nil
+	}
+
+	cmd.Flags().StringP("archive-timeout", "", "", "Archive timeout")
+	cmd.Flags().StringP("recovery-window", "", "", "Recovery window")
+	cmd.Flags().StringP("full-backup-frequency", "", "", "Full backup frequency")
+	cmd.Flags().StringP("minimum-redundancy", "", "", "Minimum redundancy")
+
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
 		requiredFlags := []string{"archive-timeout", "recovery-window", "full-backup-frequency", "minimum-redundancy"}
 		providedFlags := 0
 
@@ -348,5 +370,5 @@ func newConfigUpdateCmd() *cobra.Command {
 		return nil
 	}
 
-	return configUpdateCmd
+	return cmd
 }
