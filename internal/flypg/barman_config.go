@@ -13,10 +13,10 @@ import (
 )
 
 type BarmanSettings struct {
-	ArchiveTimeout      string
-	RecoveryWindow      string
-	FullBackupFrequency string
-	MinimumRedundancy   string
+	ArchiveTimeout      string `json:"archive_timeout"`
+	RecoveryWindow      string `json:"recovery_window"`
+	FullBackupFrequency string `json:"full_backup_frequency"`
+	MinimumRedundancy   string `json:"minimum_redundancy"`
 }
 
 type BarmanConfig struct {

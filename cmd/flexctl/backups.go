@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -223,4 +225,62 @@ func listBackups(cmd *cobra.Command) error {
 
 func backupsEnabled() bool {
 	return os.Getenv("S3_ARCHIVE_CONFIG") != ""
+}
+
+func newBackupConfigCmd() *cobra.Command {
+	var configCmd = &cobra.Command{
+		Use:   "config",
+		Short: "Manage backup configuration",
+	}
+
+	configCmd.AddCommand(newConfigShowCmd())
+	configCmd.AddCommand(newConfigUpdateCmd())
+
+	return configCmd
+}
+
+type configShowResult struct {
+	Result flypg.BarmanSettings `json:"result"`
+}
+
+func newConfigShowCmd() *cobra.Command {
+	var configShowCmd = &cobra.Command{
+		Use:   "show",
+		Short: "Show current configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			resp, err := http.Get("http://localhost:5500/commands/admin/settings/view/barman")
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+
+			var rv configShowResult
+			err = json.NewDecoder(resp.Body).Decode(&rv)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("  ArchiveTimeout = %s\n", rv.Result.ArchiveTimeout)
+			fmt.Printf("  RecoveryWindow = %s\n", rv.Result.RecoveryWindow)
+			fmt.Printf("  FullBackupFrequency = %s\n", rv.Result.FullBackupFrequency)
+			fmt.Printf("  MinimumRedundancy = %s\n", rv.Result.MinimumRedundancy)
+
+			return nil
+		},
+	}
+
+	return configShowCmd
+}
+
+func newConfigUpdateCmd() *cobra.Command {
+	var configUpdateCmd = &cobra.Command{
+		Use:   "update",
+		Short: "Update configuration",
+		Run: func(cmd *cobra.Command, args []string) {
+			// Add your logic here for updating the configuration
+			fmt.Println("Updating configuration...")
+		},
+	}
+
+	return configUpdateCmd
 }
