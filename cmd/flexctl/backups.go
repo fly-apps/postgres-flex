@@ -344,7 +344,7 @@ func newConfigUpdateCmd() *cobra.Command {
 		}
 
 		if providedFlags < 1 {
-			return fmt.Errorf("At least one flag must be specified.")
+			return fmt.Errorf("at least one flag must be specified")
 		}
 
 		return nil
