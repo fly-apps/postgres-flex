@@ -21,7 +21,7 @@ func main() {
 	backupCmd.AddCommand(backupListCmd)
 	backupCmd.AddCommand(backupShowCmd)
 	backupCmd.AddCommand(backupCreateCmd)
-	backupCmd.AddCommand(newBackupConfigCmd())
+	backupCmd.AddCommand(newBackupConfig())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

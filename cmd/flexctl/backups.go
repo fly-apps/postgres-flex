@@ -228,14 +228,13 @@ func backupsEnabled() bool {
 	return os.Getenv("S3_ARCHIVE_CONFIG") != ""
 }
 
-func newBackupConfigCmd() *cobra.Command {
+func newBackupConfig() *cobra.Command {
 	var configCmd = &cobra.Command{
 		Use:   "config",
 		Short: "Manage backup configuration",
 	}
 
-	configCmd.AddCommand(newConfigShowCmd())
-	configCmd.AddCommand(newConfigUpdateCmd())
+	configCmd.AddCommand(newConfigShow(), newConfigUpdate())
 
 	return configCmd
 }
@@ -253,7 +252,7 @@ func getApiUrl() (string, error) {
 	return url, nil
 }
 
-func newConfigShowCmd() *cobra.Command {
+func newConfigShow() *cobra.Command {
 	var configShowCmd = &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
@@ -296,7 +295,7 @@ type configUpdateResult struct {
 	Error  string                 `json:"error,omitempty"`
 }
 
-func newConfigUpdateCmd() *cobra.Command {
+func newConfigUpdate() *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   "update",
 		Short: "Update configuration",
