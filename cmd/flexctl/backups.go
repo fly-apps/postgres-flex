@@ -243,10 +243,18 @@ type configShowResult struct {
 	Result flypg.BarmanSettings `json:"result"`
 }
 
-func getApiUrl() (string, error) {
-	hostname := os.Getenv("FLY_APP_NAME")
-	if hostname == "" {
+func getAppName() (string, error) {
+	name := os.Getenv("FLY_APP_NAME")
+	if name == "" {
 		return "", fmt.Errorf("FLY_APP_NAME is not set")
+	}
+	return name, nil
+}
+
+func getApiUrl() (string, error) {
+	hostname, err := getAppName()
+	if err != nil {
+		return "", err
 	}
 	url := fmt.Sprintf("http://%s.internal:5500", hostname)
 	return url, nil
@@ -360,7 +368,11 @@ func newConfigUpdate() *cobra.Command {
 		}
 
 		if rv.Result.RestartRequired {
-			fmt.Println("A restart is required for these changes to take effect.")
+			appName, err := getAppName()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("A restart is required for these changes to take effect. Run `fly app restart %s` to restart.)", appName)
 		}
 
 		return nil
