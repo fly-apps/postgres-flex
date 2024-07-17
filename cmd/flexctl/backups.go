@@ -265,6 +265,10 @@ func newConfigShow() *cobra.Command {
 		Use:   "show",
 		Short: "Show current configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !backupsEnabled() {
+				return fmt.Errorf("backups are not enabled")
+			}
+
 			url, err := getApiUrl()
 			if err != nil {
 				return err
@@ -310,6 +314,9 @@ func newConfigUpdate() *cobra.Command {
 	}
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if !backupsEnabled() {
+			return fmt.Errorf("backups are not enabled")
+		}
 
 		archiveTimeout, err := cmd.Flags().GetString("archive-timeout")
 		if err != nil {
