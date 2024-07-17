@@ -244,12 +244,27 @@ type configShowResult struct {
 	Result flypg.BarmanSettings `json:"result"`
 }
 
+func getApiUrl() (string, error) {
+	hostname := os.Getenv("FLY_APP_NAME")
+	if hostname == "" {
+		return "", fmt.Errorf("FLY_APP_NAME is not set")
+	}
+	url := fmt.Sprintf("http://%s.internal:5500", hostname)
+	return url, nil
+}
+
 func newConfigShowCmd() *cobra.Command {
 	var configShowCmd = &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := http.Get("http://localhost:5500/commands/admin/settings/view/barman")
+			url, err := getApiUrl()
+			if err != nil {
+				return err
+			}
+
+			url = fmt.Sprintf("%s/commands/admin/settings/view/barman", url)
+			resp, err := http.Get(url)
 			if err != nil {
 				return err
 			}
@@ -321,7 +336,13 @@ func newConfigUpdateCmd() *cobra.Command {
 			return err
 		}
 
-		resp, err := http.Post("http://localhost:5500/commands/admin/settings/update/barman", "application/json", bytes.NewBuffer(jsonBody))
+		url, err := getApiUrl()
+		if err != nil {
+			return err
+		}
+
+		url = fmt.Sprintf("%s/commands/admin/settings/update/barman", url)
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
 		if err != nil {
 			return err
 		}
