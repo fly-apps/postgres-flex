@@ -229,14 +229,14 @@ func backupsEnabled() bool {
 }
 
 func newBackupConfig() *cobra.Command {
-	var configCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "config",
 		Short: "Manage backup configuration",
 	}
 
-	configCmd.AddCommand(newConfigShow(), newConfigUpdate())
+	cmd.AddCommand(newConfigShow(), newConfigUpdate())
 
-	return configCmd
+	return cmd
 }
 
 type configShowResult struct {
@@ -261,7 +261,7 @@ func getApiUrl() (string, error) {
 }
 
 func newConfigShow() *cobra.Command {
-	var configShowCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -290,7 +290,7 @@ func newConfigShow() *cobra.Command {
 		},
 	}
 
-	return configShowCmd
+	return cmd
 }
 
 type successfulUpdateResult struct {
