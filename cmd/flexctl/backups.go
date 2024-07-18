@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -223,4 +226,186 @@ func listBackups(cmd *cobra.Command) error {
 
 func backupsEnabled() bool {
 	return os.Getenv("S3_ARCHIVE_CONFIG") != ""
+}
+
+func newBackupConfig() *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   "config",
+		Short: "Manage backup configuration",
+	}
+
+	cmd.AddCommand(newConfigShow(), newConfigUpdate())
+
+	return cmd
+}
+
+type configShowResult struct {
+	Result flypg.BarmanSettings `json:"result"`
+}
+
+func getAppName() (string, error) {
+	name := os.Getenv("FLY_APP_NAME")
+	if name == "" {
+		return "", fmt.Errorf("FLY_APP_NAME is not set")
+	}
+	return name, nil
+}
+
+func getApiUrl() (string, error) {
+	hostname, err := getAppName()
+	if err != nil {
+		return "", err
+	}
+	url := fmt.Sprintf("http://%s.internal:5500", hostname)
+	return url, nil
+}
+
+func newConfigShow() *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   "show",
+		Short: "Show current configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !backupsEnabled() {
+				return fmt.Errorf("backups are not enabled")
+			}
+
+			url, err := getApiUrl()
+			if err != nil {
+				return err
+			}
+
+			url = fmt.Sprintf("%s/commands/admin/settings/view/barman", url)
+			resp, err := http.Get(url)
+			if err != nil {
+				return err
+			}
+
+			var rv configShowResult
+			if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {
+				return err
+			}
+
+			fmt.Printf("  ArchiveTimeout = %s\n", rv.Result.ArchiveTimeout)
+			fmt.Printf("  RecoveryWindow = %s\n", rv.Result.RecoveryWindow)
+			fmt.Printf("  FullBackupFrequency = %s\n", rv.Result.FullBackupFrequency)
+			fmt.Printf("  MinimumRedundancy = %s\n", rv.Result.MinimumRedundancy)
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+type successfulUpdateResult struct {
+	Message         string `json:"message,omitempty"`
+	RestartRequired bool   `json:"restart_required"`
+}
+
+type configUpdateResult struct {
+	Result successfulUpdateResult `json:"result,omitempty"`
+	Error  string                 `json:"error,omitempty"`
+}
+
+func newConfigUpdate() *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   "update",
+		Short: "Update configuration",
+	}
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if !backupsEnabled() {
+			return fmt.Errorf("backups are not enabled")
+		}
+
+		archiveTimeout, err := cmd.Flags().GetString("archive-timeout")
+		if err != nil {
+			return err
+		}
+
+		recoveryWindow, err := cmd.Flags().GetString("recovery-window")
+		if err != nil {
+			return err
+		}
+
+		fullBackupFrequency, err := cmd.Flags().GetString("full-backup-frequency")
+		if err != nil {
+			return err
+		}
+
+		minimumRedundancy, err := cmd.Flags().GetString("minimum-redundancy")
+		if err != nil {
+			return err
+		}
+
+		update := flypg.BarmanSettings{
+			ArchiveTimeout:      archiveTimeout,
+			RecoveryWindow:      recoveryWindow,
+			FullBackupFrequency: fullBackupFrequency,
+			MinimumRedundancy:   minimumRedundancy,
+		}
+
+		jsonBody, err := json.Marshal(update)
+		if err != nil {
+			return err
+		}
+
+		url, err := getApiUrl()
+		if err != nil {
+			return err
+		}
+
+		url = fmt.Sprintf("%s/commands/admin/settings/update/barman", url)
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+		if err != nil {
+			return err
+		}
+
+		var rv configUpdateResult
+		if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {
+			return err
+		}
+
+		if rv.Error != "" {
+			return fmt.Errorf("error updating configuration: %s", rv.Error)
+		}
+
+		if rv.Result.Message != "" {
+			fmt.Println(rv.Result.Message)
+		}
+
+		if rv.Result.RestartRequired {
+			appName, err := getAppName()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("A restart is required for these changes to take effect. Run `fly pg restart -a %s` to restart.)\n", appName)
+		}
+
+		return nil
+	}
+
+	cmd.Flags().StringP("archive-timeout", "", "", "Archive timeout")
+	cmd.Flags().StringP("recovery-window", "", "", "Recovery window")
+	cmd.Flags().StringP("full-backup-frequency", "", "", "Full backup frequency")
+	cmd.Flags().StringP("minimum-redundancy", "", "", "Minimum redundancy")
+
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		requiredFlags := []string{"archive-timeout", "recovery-window", "full-backup-frequency", "minimum-redundancy"}
+		providedFlags := 0
+
+		for _, flag := range requiredFlags {
+			if cmd.Flag(flag).Changed {
+				providedFlags++
+			}
+		}
+
+		if providedFlags < 1 {
+			return fmt.Errorf("at least one flag must be specified")
+		}
+
+		return nil
+	}
+
+	return cmd
 }
