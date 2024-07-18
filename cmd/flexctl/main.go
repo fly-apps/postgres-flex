@@ -16,6 +16,7 @@ func main() {
 
 	// Backup commands
 	var backupCmd = &cobra.Command{Use: "backup"}
+	backupCmd.Aliases = []string{"backups"}
 
 	rootCmd.AddCommand(backupCmd)
 	backupCmd.AddCommand(backupListCmd)
