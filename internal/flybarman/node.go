@@ -139,7 +139,8 @@ wal_retention_policy = main
 		return fmt.Errorf("failed to write file %s: %s", n.RootPasswordConfigPath, err)
 	}
 
-	barmanCronFileContent := `* * * * * /usr/local/bin/barman_cron`
+	barmanCronFileContent := `* * * * * /usr/local/bin/barman_cron
+	`
 
 	if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
 		return fmt.Errorf("failed write %s: %s", n.BarmanCronFile, err)
