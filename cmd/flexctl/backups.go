@@ -379,7 +379,7 @@ func newConfigUpdate() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("A restart is required for these changes to take effect. Run `fly pg restart -a %s` to restart.)", appName)
+			fmt.Printf("A restart is required for these changes to take effect. Run `fly pg restart -a %s` to restart.)\n", appName)
 		}
 
 		return nil
