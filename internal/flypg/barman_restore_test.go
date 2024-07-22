@@ -43,7 +43,6 @@ const backupsResponse = `{
         },
         {
             "backup_label": "'START WAL LOCATION: 0/8000028 (file 000000010000000000000008)\\nCHECKPOINT LOCATION: 0/8000098\\nBACKUP METHOD: streamed\\nBACKUP FROM: primary\\nSTART TIME: 2024-06-25 19:44:13 UTC\\nLABEL: Barman backup cloud 20240625T194412\\nSTART TIMELINE: 1\\n'",
-            "backup_name": "test-backup-2",
             "begin_offset": 40,
             "begin_time": "Tue Jun 25 19:44:12 2024",
             "begin_wal": "000000010000000000000008",
@@ -87,6 +86,7 @@ const backupsResponse = `{
             "timeline": 1,
             "version": 150006,
             "xlog_segment_size": 16777216,
+			"backup_name": "test-backup-1",
             "backup_id": "20240625T194412"
         },
         {
@@ -212,6 +212,19 @@ func TestNewBarmanRestore(t *testing.T) {
 		}
 	})
 
+	t.Run("target-name-with-alias", func(t *testing.T) {
+		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=test-backup-1")
+
+		restore, err := NewBarmanRestore(os.Getenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG"))
+		if err != nil {
+			t.Fatalf("NewBarmanRestore failed with: %v", err)
+		}
+
+		if restore.recoveryTargetName != "test-backup-1" {
+			t.Fatalf("expected recovery target name to be test-backup-1, got %s", restore.recoveryTargetName)
+		}
+	})
+
 	t.Run("target-name-with-options", func(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240705T051010&targetAction=shutdown&targetTimeline=2&targetInclusive=false")
 
@@ -277,36 +290,57 @@ func TestParseBackups(t *testing.T) {
 			t.Fatalf("expected 2 backups, got %d", len(list.Backups))
 		}
 
-		firstBackup := list.Backups[0]
-		if firstBackup.BackupID != "20240702T210544" {
-			t.Fatalf("expected backup ID to be 20240625T194412, got %s", firstBackup.BackupID)
-		}
+		t.Run("first-backup", func(t *testing.T) {
+			backup := list.Backups[0]
+			if backup.ID != "20240702T210544" {
+				t.Fatalf("expected backup ID to be 20240625T194412, got %s", backup.ID)
+			}
 
-		if firstBackup.StartTime != "Tue Jun 24 19:44:20 2024" {
-			t.Fatalf("expected start time to be Tue Jun 24 19:44:20 2024, got %s", firstBackup.StartTime)
-		}
+			if backup.StartTime != "Tue Jun 24 19:44:20 2024" {
+				t.Fatalf("expected start time to be Tue Jun 24 19:44:20 2024, got %s", backup.StartTime)
+			}
 
-		if firstBackup.EndTime != "" {
-			t.Fatalf("expected end time to be empty, but got %s", firstBackup.EndTime)
-		}
+			if backup.EndTime != "" {
+				t.Fatalf("expected end time to be empty, but got %s", backup.EndTime)
+			}
 
-		if firstBackup.Status != "FAILED" {
-			t.Fatalf("expected status to be FAILED, got %s", firstBackup.Status)
-		}
+			if backup.Status != "FAILED" {
+				t.Fatalf("expected status to be FAILED, got %s", backup.Status)
+			}
 
-		secondBackup := list.Backups[2]
+			if backup.Name != "" {
+				t.Fatalf("expected name to be empty, but got %s", backup.Name)
+			}
 
-		if secondBackup.BackupID != "20240626T172443" {
-			t.Fatalf("expected backup ID to be 20240626T172443, got %s", secondBackup.BackupID)
-		}
+		})
 
-		if secondBackup.StartTime != "Wed Jun 26 17:24:43 2024" {
-			t.Fatalf("expected start time to be Wed Jun 26 17:24:43 2024, got %s", secondBackup.StartTime)
-		}
+		t.Run("second-backup", func(t *testing.T) {
+			backup := list.Backups[1]
+			if backup.Status != "DONE" {
+				t.Fatalf("expected status to be DONE, got %s", backup.Status)
+			}
 
-		if secondBackup.EndTime != "Wed Jun 26 17:27:02 2024" {
-			t.Fatalf("expected end time to be Wed Jun 26 17:27:02 2024, got %s", secondBackup.EndTime)
-		}
+			if backup.Name != "test-backup-1" {
+				t.Fatalf("expected name to be test-backup-1, got %s", backup.Name)
+			}
+		})
+
+		t.Run("third-backup", func(t *testing.T) {
+			backup := list.Backups[2]
+
+			if backup.ID != "20240626T172443" {
+				t.Fatalf("expected backup ID to be 20240626T172443, got %s", backup.ID)
+			}
+
+			if backup.StartTime != "Wed Jun 26 17:24:43 2024" {
+				t.Fatalf("expected start time to be Wed Jun 26 17:24:43 2024, got %s", backup.StartTime)
+			}
+
+			if backup.EndTime != "Wed Jun 26 17:27:02 2024" {
+				t.Fatalf("expected end time to be Wed Jun 26 17:27:02 2024, got %s", backup.EndTime)
+			}
+
+		})
 	})
 }
 
@@ -358,6 +392,29 @@ func TestResolveBackupTarget(t *testing.T) {
 
 		if backupID != "20240626T172443" {
 			t.Fatalf("expected backup ID to be 20240626T172443, got %s", backupID)
+		}
+	})
+
+	t.Run("resolve-backup-by-name", func(t *testing.T) {
+		backupID, err := restore.resolveBackupFromName(list, "20240625T194412")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if backupID != "20240625T194412" {
+			t.Fatalf("expected backup ID to be 20240625T194412, got %s", backupID)
+		}
+	})
+
+	t.Run("resolve-backup-by-name-with-alias", func(t *testing.T) {
+		// resolve backup by alias
+		backupID, err := restore.resolveBackupFromName(list, "test-backup-1")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if backupID != "20240625T194412" {
+			t.Fatalf("expected backup ID to be 20240625T194412, got %s", backupID)
 		}
 	})
 }

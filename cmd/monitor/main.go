@@ -47,7 +47,8 @@ func main() {
 		}
 	}()
 
-	if os.Getenv("S3_ARCHIVE_CONFIG") != "" {
+	// No need to monitor backups outside of the primary region.
+	if os.Getenv("S3_ARCHIVE_CONFIG") != "" && node.PrimaryRegion == node.RepMgr.Region {
 		store, err := state.NewStore()
 		if err != nil {
 			panic(fmt.Errorf("failed initialize cluster state store: %s", err))
@@ -63,10 +64,10 @@ func main() {
 		}
 
 		// Backup scheduler
-		go monitorBackupSchedule(ctx, barman)
+		go monitorBackupSchedule(ctx, node, barman)
 
 		// Backup retention monitor
-		go monitorBackupRetention(ctx, barman)
+		go monitorBackupRetention(ctx, node, barman)
 	}
 
 	// Readonly monitor

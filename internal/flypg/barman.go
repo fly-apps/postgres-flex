@@ -34,8 +34,9 @@ type Barman struct {
 }
 
 type Backup struct {
+	ID        string `json:"backup_id"`
+	Name      string `json:"backup_name"`
 	Status    string `json:"status"`
-	BackupID  string `json:"backup_id"`
 	StartTime string `json:"begin_time"`
 	EndTime   string `json:"end_time"`
 	BeginWal  string `json:"begin_wal"`
@@ -105,9 +106,12 @@ func (b *Barman) BucketURL() string {
 	return fmt.Sprintf("s3://%s", b.bucket)
 }
 
-// Backup performs a base backup of the database.
-// immediateCheckpoint - forces the initial checkpoint to be done as quickly as possible.
-func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, error) {
+type BackupConfig struct {
+	Name                string // A customized name for the backup.
+	ImmediateCheckpoint bool   // Force an immediate checkpoint.
+}
+
+func (b *Barman) Backup(ctx context.Context, cfg BackupConfig) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
@@ -118,22 +122,30 @@ func (b *Barman) Backup(ctx context.Context, immediateCheckpoint bool) ([]byte, 
 		b.bucketDirectory,
 	}
 
-	if immediateCheckpoint {
+	if cfg.ImmediateCheckpoint {
 		args = append(args, "--immediate-checkpoint")
+	}
+
+	if cfg.Name != "" {
+		// Ensure the alias is unique, otherwise we won't be able to restore using it.
+		if err := b.validateBackupName(ctx, cfg.Name); err != nil {
+			return nil, err
+		}
+		args = append(args, "-n", cfg.Name)
 	}
 
 	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup", args...)
 }
 
 // RestoreBackup returns the command string used to restore a base backup.
-func (b *Barman) RestoreBackup(ctx context.Context, backupID string) ([]byte, error) {
+func (b *Barman) RestoreBackup(ctx context.Context, name string) ([]byte, error) {
 	args := []string{
 		"--cloud-provider", providerDefault,
 		"--endpoint-url", b.endpoint,
 		"--profile", b.authProfile,
 		b.BucketURL(),
 		b.bucketDirectory,
-		backupID,
+		name,
 		defaultRestoreDir,
 	}
 
@@ -156,6 +168,33 @@ func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
 	}
 
 	return b.parseBackups(backupsBytes)
+}
+
+// ListRawBackups returns the raw output of the backups list command.
+func (b *Barman) ListRawBackups(ctx context.Context) ([]byte, error) {
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
+		"--format", "json",
+		b.BucketURL(),
+		b.bucketDirectory,
+	}
+
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-list", args...)
+}
+
+func (b *Barman) ShowBackup(ctx context.Context, id string) ([]byte, error) {
+	args := []string{
+		"--cloud-provider", providerDefault,
+		"--endpoint-url", b.endpoint,
+		"--profile", b.authProfile,
+		b.BucketURL(),
+		b.bucketDirectory,
+		id,
+	}
+
+	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup-show", args...)
 }
 
 func (b *Barman) WALArchiveDelete(ctx context.Context) ([]byte, error) {
@@ -250,6 +289,21 @@ func (*Barman) parseBackups(backupBytes []byte) (BackupList, error) {
 	}
 
 	return backupList, nil
+}
+
+func (b *Barman) validateBackupName(ctx context.Context, name string) error {
+	backupList, err := b.ListBackups(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list backups: %s", err)
+	}
+
+	for _, backup := range backupList.Backups {
+		if backup.Name == name {
+			return fmt.Errorf("backup name '%s' already exists", name)
+		}
+	}
+
+	return nil
 }
 
 func formatTimestamp(timestamp string) (string, error) {

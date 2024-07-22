@@ -8,24 +8,31 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 )
 
-func monitorBackupRetention(ctx context.Context, barman *flypg.Barman) {
+func monitorBackupRetention(ctx context.Context, node *flypg.Node, barman *flypg.Barman) {
+
 	ticker := time.NewTicker(defaultBackupRetentionEvalFrequency)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Shutting down backup retention monitor")
+			log.Println("[WARN] Shutting down backup retention monitor...")
 			return
 		case <-ticker.C:
-			result, err := barman.WALArchiveDelete(ctx)
+			primary, err := isPrimary(ctx, node)
 			if err != nil {
-				log.Printf("Backup retention failed with: %s", err)
+				log.Printf("[WARN] Failed to resolve primary when evaluating retention: %s", err)
+				continue
 			}
 
-			if len(result) > 0 {
-				log.Printf("Backup retention response: %s", result)
+			if !primary {
+				continue
 			}
+
+			if _, err := barman.WALArchiveDelete(ctx); err != nil {
+				log.Printf("[WARN] Failed to prune WAL Archive: %s", err)
+			}
+
 		}
 	}
 }

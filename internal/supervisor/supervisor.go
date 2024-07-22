@@ -70,7 +70,7 @@ func (h *Supervisor) AddProcess(name string, command string, opts ...Opt) {
 	h.procs = append(h.procs, proc)
 }
 
-func (h *Supervisor) runProcess(ctx context.Context, proc *process) error {
+func (*Supervisor) runProcess(ctx context.Context, proc *process) error {
 	restarts := 0
 
 	for {
