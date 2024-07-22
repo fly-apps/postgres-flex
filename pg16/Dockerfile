@@ -33,7 +33,7 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron gosu \
+    ca-certificates iproute2 curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud python3-setuptools cron gosu \
     && apt autoremove -y && apt clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
