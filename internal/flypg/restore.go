@@ -14,6 +14,7 @@ import (
 const (
 	pathToHBAFile   = "/data/postgresql/pg_hba.conf"
 	pathToHBABackup = "/data/postgresql/pg_hba.conf.bak"
+	postmasterPath  = "/data/postgresql/postmaster.pid"
 	restoreLockFile = "/data/restore.lock"
 )
 
@@ -85,6 +86,12 @@ func prepareRemoteRestore(ctx context.Context, node *Node) error {
 
 	svisor.Stop()
 
+	// Wait for the postmaster to exit
+	// TODO - This should be done in the supervisor
+	if err := waitForPostmasterExit(ctx); err != nil {
+		return fmt.Errorf("failed to wait for postmaster to exit: %s", err)
+	}
+
 	// Set the lock file so the init process knows not to restart
 	// the restore process.
 	if err := setRestoreLock(); err != nil {
@@ -96,6 +103,29 @@ func prepareRemoteRestore(ctx context.Context, node *Node) error {
 	}
 
 	return nil
+}
+
+func waitForPostmasterExit(ctx context.Context) error {
+	ticker := time.NewTicker(1 * time.Second)
+	timeout := time.After(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			switch _, err := os.Stat(postmasterPath); {
+			case os.IsNotExist(err):
+				return nil
+			case err != nil:
+				return fmt.Errorf("error checking postmaster file: %v", err)
+			default:
+				log.Println("Waiting for postmaster to exit...")
+			}
+		case <-timeout:
+			return fmt.Errorf("timed out waiting for postmaster to exit")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 func isRestoreActive() (bool, error) {
