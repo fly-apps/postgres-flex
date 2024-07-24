@@ -117,8 +117,6 @@ func waitForPostmasterExit(ctx context.Context) error {
 				return nil
 			case err != nil:
 				return fmt.Errorf("error checking postmaster file: %v", err)
-			default:
-				log.Println("Waiting for postmaster to exit...")
 			}
 		case <-timeout:
 			return fmt.Errorf("timed out waiting for postmaster to exit")
