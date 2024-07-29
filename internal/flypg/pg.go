@@ -159,6 +159,7 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 	}
 
 	c.internalConfig = ConfigMap{
+		"listen_addresses":         "'*'",
 		"random_page_cost":         "1.1",
 		"port":                     c.Port,
 		"shared_buffers":           fmt.Sprintf("%dMB", sharedBuffersMb),
