@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=15.6
+            PG_VERSION=15.7
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -44,14 +44,14 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex:15
-            flyio/postgres-flex:15.6
+            flyio/postgres-flex:15.7
       -
         name: Build and push Postgres 15 Timescale DB
         id: docker_build_15_timescaledb
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=15.6
+            PG_VERSION=15.7
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -59,7 +59,7 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex-timescaledb:15
-            flyio/postgres-flex-timescaledb:15.6
+            flyio/postgres-flex-timescaledb:15.7
 
       -
         name: Build and push Postgres 16
