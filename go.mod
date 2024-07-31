@@ -1,6 +1,6 @@
 module github.com/fly-apps/postgres-flex
 
-go 1.20
+go 1.23
 
 require (
 	github.com/go-chi/chi/v5 v5.0.8
@@ -8,8 +8,10 @@ require (
 	github.com/hashicorp/consul/api v1.18.0
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v5 v5.5.4
+	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/term v1.1.0
+	github.com/spf13/cobra v1.8.1
 	github.com/superfly/fly-checks v0.0.0-20230510154016-d189351293f2
 	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3
 	golang.org/x/sync v0.1.0
@@ -36,8 +38,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
-	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	golang.org/x/crypto v0.20.0 // indirect

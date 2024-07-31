@@ -1,3 +1,10 @@
 #!/bin/bash
 
-kill `cat /tmp/repmgrd.pid`
+if [ -f /tmp/repmgrd.pid ]; then
+    PID=$(cat /tmp/repmgrd.pid)
+
+    # Check if the process is running
+    if ps -p $PID > /dev/null 2>&1; then
+        kill $PID
+    fi
+fi

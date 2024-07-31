@@ -27,9 +27,9 @@ func main() {
 
 func processUnregistration(ctx context.Context) error {
 	encodedArg := os.Args[1]
-	hostnameBytes, err := base64.StdEncoding.DecodeString(encodedArg)
+	machineBytes, err := base64.StdEncoding.DecodeString(encodedArg)
 	if err != nil {
-		return fmt.Errorf("failed to decode hostname: %v", err)
+		return fmt.Errorf("failed to decode machine: %v", err)
 	}
 
 	node, err := flypg.NewNode()
@@ -43,9 +43,15 @@ func processUnregistration(ctx context.Context) error {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
-	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
+	machineID := string(machineBytes)
+
+	if len(machineID) != 14 {
+		return fmt.Errorf("invalid machine id: %s. (expected length 16, got %d)", machineID, len(machineBytes))
+	}
+
+	member, err := node.RepMgr.MemberByNodeName(ctx, conn, machineID)
 	if err != nil {
-		return fmt.Errorf("failed to resolve member: %s", err)
+		return fmt.Errorf("failed to resolve member using %s: %s", machineID, err)
 	}
 
 	if err := node.RepMgr.UnregisterMember(*member); err != nil {
@@ -53,11 +59,7 @@ func processUnregistration(ctx context.Context) error {
 	}
 
 	slotName := fmt.Sprintf("repmgr_slot_%d", member.ID)
-	if err := removeReplicationSlot(ctx, conn, slotName); err != nil {
-		return err
-	}
-
-	return nil
+	return removeReplicationSlot(ctx, conn, slotName)
 }
 
 func removeReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
