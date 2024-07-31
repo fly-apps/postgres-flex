@@ -34,6 +34,7 @@ type RepMgr struct {
 	PrimaryRegion      string
 	Region             string
 	PrivateIP          string
+	MachineID          string
 	DataDir            string
 	DatabaseName       string
 	Credentials        admin.Credential
@@ -161,10 +162,12 @@ func (r *RepMgr) setDefaults() error {
 		return err
 	}
 
+	hostname := fmt.Sprintf("%s.vm.%s.internal", r.MachineID, r.AppName)
+
 	conf := ConfigMap{
 		"node_id":                      nodeID,
-		"node_name":                    fmt.Sprintf("'%s'", r.PrivateIP),
-		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=5'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
+		"node_name":                    fmt.Sprintf("'%s'", r.MachineID),
+		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=5'", hostname, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":               fmt.Sprintf("'%s'", r.DataDir),
 		"failover":                     "'automatic'",
 		"use_replication_slots":        "yes",
@@ -432,25 +435,25 @@ func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname stri
 }
 
 func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
-	ips, err := r.InRegionPeerIPs(ctx)
+	machineIds, err := r.InRegionPeerMachines(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var target *Member
 
-	for _, ip := range ips {
-		if ip.String() == r.PrivateIP {
+	for _, machineId := range machineIds {
+		if machineId == r.MachineID {
 			continue
 		}
 
-		conn, err := r.NewRemoteConnection(ctx, ip.String())
+		conn, err := r.NewRemoteConnection(ctx, fmt.Sprintf("%s.vm.%s.internal", machineId, r.AppName))
 		if err != nil {
 			continue
 		}
 		defer func() { _ = conn.Close(ctx) }()
 
-		member, err := r.MemberByHostname(ctx, conn, ip.String())
+		member, err := r.MemberByHostname(ctx, conn, machineId)
 		if err != nil {
 			continue
 		}
@@ -475,6 +478,21 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 func (r *RepMgr) InRegionPeerIPs(ctx context.Context) ([]net.IPAddr, error) {
 	targets := fmt.Sprintf("%s.%s", r.PrimaryRegion, r.AppName)
 	return privnet.AllPeers(ctx, targets)
+}
+
+func (r *RepMgr) InRegionPeerMachines(ctx context.Context) ([]string, error) {
+	machines, err := privnet.AllMachines(ctx, r.AppName)
+	if err != nil {
+		return nil, err
+	}
+
+	var machineIDs []string
+	for _, machine := range machines {
+		if machine.Region == r.PrimaryRegion {
+			machineIDs = append(machineIDs, machine.Id)
+		}
+	}
+	return machineIDs, nil
 }
 
 func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error) {

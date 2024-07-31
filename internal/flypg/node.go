@@ -20,6 +20,7 @@ import (
 
 type Node struct {
 	AppName       string
+	MachineID     string
 	PrivateIP     string
 	PrimaryRegion string
 	DataDir       string
@@ -51,6 +52,8 @@ func NewNode() (*Node, error) {
 	}
 
 	node.PrivateIP = ipv6.String()
+
+	node.MachineID = os.Getenv("FLY_MACHINE_ID")
 
 	node.PrimaryRegion = os.Getenv("PRIMARY_REGION")
 	if node.PrimaryRegion == "" {
@@ -89,6 +92,7 @@ func NewNode() (*Node, error) {
 		PasswordConfigPath: "/data/.pgpass",
 		DataDir:            node.DataDir,
 		PrivateIP:          node.PrivateIP,
+		MachineID:          node.MachineID,
 		Port:               5433,
 		DatabaseName:       "repmgr",
 		Credentials:        node.ReplCredentials,
