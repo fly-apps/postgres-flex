@@ -304,14 +304,14 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 	return err
 }
 
-func (r *RepMgr) clonePrimary(ipStr string) error {
+func (r *RepMgr) clonePrimary(machineId string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
 	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -c -F",
-		ipStr,
+		fmt.Sprintf("%s.vm.%s.internal", machineId, r.AppName),
 		r.Port,
 		r.DatabaseName,
 		r.Credentials.Username,
