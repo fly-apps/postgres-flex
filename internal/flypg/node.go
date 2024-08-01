@@ -271,6 +271,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 
 		// Restart repmgrd in the event the IP changes for an already registered node.
 		// This can happen if the underlying volume is moved to a different node.
+		// TODO - this isn't an IP anymore
 		daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
 
 		switch member.Role {

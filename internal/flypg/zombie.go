@@ -215,6 +215,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		}
 
 		// Confirm that our rejoin target still identifies itself as the primary.
+		// TODO - machine IDs don't change
 		if primary.NodeName != primaryStr {
 			// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
 			if err := RemoveZombieLock(); err != nil {

@@ -254,7 +254,7 @@ func (r *RepMgr) registerStandby(restartDaemon bool) error {
 }
 
 func (r *RepMgr) registerWitness(primaryHostname string) error {
-	cmdStr := fmt.Sprintf("repmgr witness register -f %s -h %s -F", r.ConfigPath, primaryHostname)
+	cmdStr := fmt.Sprintf("repmgr witness register -f %s -h %s -F", r.ConfigPath, primaryHostname) // TODO
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
@@ -280,7 +280,7 @@ func (*RepMgr) restartDaemon() error {
 }
 
 func (r *RepMgr) daemonRestartRequired(m *Member) bool {
-	return m.Hostname != r.PrivateIP
+	return m.NodeName != r.PrivateIP // TODO
 }
 
 func (r *RepMgr) unregisterWitness(id int) error {
