@@ -100,7 +100,8 @@ func (r *RepMgr) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
 
-func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx.Conn, error) {
+func (r *RepMgr) NewRemoteConnection(ctx context.Context, machineID string) (*pgx.Conn, error) {
+	hostname := fmt.Sprintf("%s.vm.%s.internal", machineID, r.AppName)
 	host := net.JoinHostPort(hostname, strconv.Itoa(r.Port))
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
@@ -289,10 +290,10 @@ func (r *RepMgr) unregisterWitness(id int) error {
 	return err
 }
 
-func (r *RepMgr) rejoinCluster(hostname string) error {
+func (r *RepMgr) rejoinCluster(machineID string) error {
 	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
 		r.ConfigPath,
-		hostname,
+		fmt.Sprintf("%s.vm.%s.internal", machineID, r.AppName),
 		r.Port,
 		r.Credentials.Username,
 		r.DatabaseName,
@@ -327,7 +328,7 @@ func (r *RepMgr) clonePrimary(machineId string) error {
 
 type Member struct {
 	ID       int
-	Hostname string
+	NodeName string
 	Active   bool
 	Region   string
 	Role     string
@@ -344,7 +345,7 @@ func (*RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	var members []Member
 	for rows.Next() {
 		var member Member
-		if err := rows.Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role); err != nil {
+		if err := rows.Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role); err != nil {
 			return nil, err
 		}
 
@@ -377,7 +378,7 @@ func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
 func (*RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
 	var member Member
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes where type = 'primary' and active = true;"
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +415,7 @@ func (*RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, e
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_id = %d;", id)
 
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +427,7 @@ func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname stri
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_name = '%s';", hostname)
 
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -447,7 +448,7 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 			continue
 		}
 
-		conn, err := r.NewRemoteConnection(ctx, fmt.Sprintf("%s.vm.%s.internal", machineId, r.AppName))
+		conn, err := r.NewRemoteConnection(ctx, machineId)
 		if err != nil {
 			continue
 		}

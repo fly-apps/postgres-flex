@@ -70,31 +70,31 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 
 	for _, member := range members {
 		if member.Role == PrimaryRoleName {
-			endpoint := fmt.Sprintf("http://%s:5500/%s", fmt.Sprintf("%s.vm.%s.internal", member.Hostname, n.AppName), target)
+			endpoint := fmt.Sprintf("http://%s:5500/%s", fmt.Sprintf("%s.vm.%s.internal", member.NodeName, n.AppName), target)
 			resp, err := http.Get(endpoint)
 			if err != nil {
-				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %s", member.Hostname, err)
+				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %s", member.NodeName, err)
 				continue
 			}
 			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode > 299 {
-				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %d\n", member.Hostname, resp.StatusCode)
+				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %d\n", member.NodeName, resp.StatusCode)
 			}
 		}
 	}
 
 	for _, member := range members {
-		endpoint := fmt.Sprintf("http://%s:5500/%s", fmt.Sprintf("%s.vm.%s.internal", member.Hostname, n.AppName), RestartHaproxyEndpoint)
+		endpoint := fmt.Sprintf("http://%s:5500/%s", fmt.Sprintf("%s.vm.%s.internal", member.NodeName, n.AppName), RestartHaproxyEndpoint)
 		resp, err := http.Get(endpoint)
 		if err != nil {
-			log.Printf("[WARN] Failed to restart haproxy on member %s: %s", member.Hostname, err)
+			log.Printf("[WARN] Failed to restart haproxy on member %s: %s", member.NodeName, err)
 			continue
 		}
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode > 299 {
-			log.Printf("[WARN] Failed to restart haproxy on member %s: %d\n", member.Hostname, resp.StatusCode)
+			log.Printf("[WARN] Failed to restart haproxy on member %s: %d\n", member.NodeName, resp.StatusCode)
 		}
 	}
 

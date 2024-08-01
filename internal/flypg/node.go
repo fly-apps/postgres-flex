@@ -191,7 +191,7 @@ func (n *Node) Init(ctx context.Context) error {
 					return fmt.Errorf("failed to resolve member over dns: %s", err)
 				}
 
-				if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
+				if err := n.RepMgr.clonePrimary(cloneTarget.NodeName); err != nil {
 					// Clean-up the directory so it can be retried.
 					if rErr := os.Remove(n.DataDir); rErr != nil {
 						log.Printf("[ERROR] failed to cleanup postgresql dir after clone error: %s\n", rErr)
@@ -326,7 +326,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Register existing witness to apply any configuration changes.
-			if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
+			if err := n.RepMgr.registerWitness(primary.NodeName); err != nil {
 				return fmt.Errorf("failed to register existing witness: %s", err)
 			}
 		default:
@@ -408,7 +408,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to resolve primary member: %s", err)
 				}
 
-				if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
+				if err := n.RepMgr.registerWitness(primary.NodeName); err != nil {
 					return fmt.Errorf("failed to register witness: %s", err)
 				}
 			} else {
