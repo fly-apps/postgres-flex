@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/fly-apps/postgres-flex/internal/flypg"
+	"github.com/fly-apps/postgres-flex/internal/flypg/admin"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 )
 
@@ -46,6 +47,21 @@ func processUnregistration(ctx context.Context) error {
 
 	if err := node.RepMgr.UnregisterMember(*member); err != nil {
 		return fmt.Errorf("failed to unregister member: %v", err)
+	}
+
+	slots, err := admin.ListReplicationSlots(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to list replication slots: %v", err)
+	}
+
+	targetSlot := fmt.Sprintf("repmgr_slot_%d", member.ID)
+	for _, slot := range slots {
+		if slot.Name == targetSlot {
+			if err := admin.DropReplicationSlot(ctx, conn, targetSlot); err != nil {
+				return fmt.Errorf("failed to drop replication slot: %v", err)
+			}
+			break
+		}
 	}
 
 	return nil
