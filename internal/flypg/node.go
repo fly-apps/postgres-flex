@@ -578,7 +578,7 @@ func (n *Node) migrateNodeNameIfNeeded(ctx context.Context, repConn *pgx.Conn) e
 			return fmt.Errorf("failed to clone standby: %s", err)
 		}
 
-		if err := n.PGConfig.reload(ctx); err != nil {
+		if err := admin.ReloadPostgresConfig(ctx, repConn); err != nil {
 			return fmt.Errorf("failed to reload postgresql: %s", err)
 		}
 	}
