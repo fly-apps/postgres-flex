@@ -606,3 +606,11 @@ func diskSizeInBytes(dir string) (uint64, error) {
 	}
 	return stat.Blocks * uint64(stat.Bsize), nil
 }
+
+func (*PGConfig) reload(ctx context.Context) error {
+	_, err := utils.RunCmd(ctx, "postgres", "pg_ctl", "-D", "/data/postgresql/", "reload")
+	if err != nil {
+		return fmt.Errorf("failed to reload postgres: %s", err)
+	}
+	return nil
+}

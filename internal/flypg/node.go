@@ -16,6 +16,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/privnet"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/exp/slices"
 )
 
 type Node struct {
@@ -272,7 +273,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 		// Restart repmgrd in the event the IP changes for an already registered node.
 		// This can happen if the underlying volume is moved to a different node.
 		// TODO - this isn't an IP anymore
-		daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
+		//daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
+		daemonRestartRequired := false
 
 		switch member.Role {
 		case PrimaryRoleName:
@@ -316,6 +318,49 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 		case StandbyRoleName:
+			// This section handles migration from 6pn as repmgr node name to machine ID as repmgr node name
+			primary, err := n.RepMgr.PrimaryMember(ctx, repConn)
+			if err != nil {
+				return fmt.Errorf("failed to resolve primary member when updating standby: %s", err)
+			}
+
+			primaryConn, err := n.RepMgr.NewRemoteConnection(ctx, primary.NodeName)
+			if err != nil {
+				return fmt.Errorf("failed to establish connection to primary: %s", err)
+			}
+			defer func() { _ = primaryConn.Close(ctx) }()
+
+			rows, err := primaryConn.Query(ctx, "select application_name from pg_stat_replication")
+			if err != nil {
+				return fmt.Errorf("failed to query pg_stat_replication: %s", err)
+			}
+			defer rows.Close()
+
+			var applicationNames []string
+			for rows.Next() {
+				var applicationName string
+				if err := rows.Scan(&applicationName); err != nil {
+					return fmt.Errorf("failed to scan application_name: %s", err)
+				}
+				applicationNames = append(applicationNames, applicationName)
+			}
+			if err := rows.Err(); err != nil {
+				return fmt.Errorf("failed to iterate over rows: %s", err)
+			}
+
+			if slices.Contains(applicationNames, n.PrivateIP) {
+				log.Printf("pg_stat_replication on the primary has our ipv6 address as application_name, converting to machine ID...")
+
+				if err := n.RepMgr.regenReplicationConf(ctx); err != nil {
+					return fmt.Errorf("failed to clone standby: %s", err)
+				}
+
+				if err := n.PGConfig.reload(ctx); err != nil {
+					return fmt.Errorf("failed to reload postgresql: %s", err)
+				}
+			}
+			// end of 6pn -> machine ID migration stuff
+
 			// Register existing standby to apply any configuration changes.
 			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)

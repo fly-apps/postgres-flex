@@ -100,8 +100,19 @@ func (r *RepMgr) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
 
-func (r *RepMgr) NewRemoteConnection(ctx context.Context, machineID string) (*pgx.Conn, error) {
-	hostname := fmt.Sprintf("%s.vm.%s.internal", machineID, r.AppName)
+// target - can be an IP address, machine ID in the current app, or other hostname
+func (r *RepMgr) NewRemoteConnection(ctx context.Context, target string) (*pgx.Conn, error) {
+	var hostname string
+
+	ip := net.ParseIP(target)
+	if ip != nil {
+		hostname = target
+	} else if len(target) == 14 {
+		hostname = fmt.Sprintf("%s.vm.%s.internal", target, r.AppName)
+	} else {
+		hostname = target
+	}
+
 	host := net.JoinHostPort(hostname, strconv.Itoa(r.Port))
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
@@ -323,6 +334,21 @@ func (r *RepMgr) clonePrimary(machineId string) error {
 		return fmt.Errorf("failed to clone primary: %s", err)
 	}
 
+	return nil
+}
+
+func (r *RepMgr) regenReplicationConf(ctx context.Context) error {
+	// TODO: do we need -c?
+	if _, err := utils.RunCmd(ctx, "postgres",
+		"repmgr", "--replication-conf-only",
+		"-h", r.PrivateIP, // TODO: should this be the hostname, or even just localhost
+		"-p", fmt.Sprint(r.Port),
+		"-d", r.DatabaseName,
+		"-U", r.Credentials.Username,
+		"-f", r.ConfigPath,
+		"standby", "clone", "-F"); err != nil {
+		return fmt.Errorf("failed to regenerate replication conf: %s", err)
+	}
 	return nil
 }
 
