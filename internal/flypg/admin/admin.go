@@ -131,7 +131,7 @@ type ReplicationSlot struct {
 }
 
 func GetReplicationSlot(ctx context.Context, pg *pgx.Conn, slotName string) (*ReplicationSlot, error) {
-	sql := fmt.Sprintf("SELECT slot_name, active, wal_status, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS retained_wal FROM pg_replication_slots where slot_name = %s;", slotName)
+	sql := fmt.Sprintf("SELECT slot_name, active, wal_status, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS retained_wal FROM pg_replication_slots where slot_name = '%s';", slotName)
 	row := pg.QueryRow(ctx, sql)
 
 	var slot ReplicationSlot
@@ -179,7 +179,6 @@ func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot,
 
 func DropReplicationSlot(ctx context.Context, pg *pgx.Conn, name string) error {
 	sql := fmt.Sprintf("SELECT pg_drop_replication_slot('%s');", name)
-
 	_, err := pg.Exec(ctx, sql)
 	if err != nil {
 		return err
