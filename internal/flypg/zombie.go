@@ -117,7 +117,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		sample.totalActive++
 
 		// Record conflict when primary doesn't match.
-		if primary.NodeName != node.MachineID {
+		if primary.NodeName != node.MachineID && primary.NodeName != node.PrivateIP {
 			sample.totalConflicts++
 			sample.conflictMap[primary.NodeName]++
 		}

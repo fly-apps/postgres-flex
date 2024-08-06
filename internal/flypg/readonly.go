@@ -70,7 +70,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 
 	for _, member := range members {
 		if member.Role == PrimaryRoleName {
-			endpoint := fmt.Sprintf("http://%s:5500/%s", fmt.Sprintf("%s.vm.%s.internal", member.NodeName, n.AppName), target)
+			endpoint := fmt.Sprintf("http://%s:5500/%s", member.NodeName, target)
 			resp, err := http.Get(endpoint)
 			if err != nil {
 				log.Printf("[WARN] Failed to broadcast readonly state change to member %s: %s", member.NodeName, err)
@@ -85,7 +85,7 @@ func BroadcastReadonlyChange(ctx context.Context, n *Node, enabled bool) error {
 	}
 
 	for _, member := range members {
-		endpoint := fmt.Sprintf("http://%s:5500/%s", fmt.Sprintf("%s.vm.%s.internal", member.NodeName, n.AppName), RestartHaproxyEndpoint)
+		endpoint := fmt.Sprintf("http://%s:5500/%s", member.NodeName, RestartHaproxyEndpoint)
 		resp, err := http.Get(endpoint)
 		if err != nil {
 			log.Printf("[WARN] Failed to restart haproxy on member %s: %s", member.NodeName, err)

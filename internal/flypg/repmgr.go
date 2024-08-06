@@ -174,11 +174,11 @@ func (r *RepMgr) setDefaults() error {
 		return err
 	}
 
-	hostname := fmt.Sprintf("%s.vm.%s.internal", r.MachineID, r.AppName)
+	hostname := r.machineIdToDNS(r.MachineID)
 
 	conf := ConfigMap{
 		"node_id":                      nodeID,
-		"node_name":                    fmt.Sprintf("'%s'", r.MachineID),
+		"node_name":                    fmt.Sprintf("'%s'", hostname),
 		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=5'", hostname, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":               fmt.Sprintf("'%s'", r.DataDir),
 		"failover":                     "'automatic'",
@@ -301,10 +301,10 @@ func (r *RepMgr) unregisterWitness(id int) error {
 	return err
 }
 
-func (r *RepMgr) rejoinCluster(machineID string) error {
+func (r *RepMgr) rejoinCluster(nodeName string) error {
 	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
 		r.ConfigPath,
-		fmt.Sprintf("%s.vm.%s.internal", machineID, r.AppName),
+		nodeName,
 		r.Port,
 		r.Credentials.Username,
 		r.DatabaseName,
@@ -316,14 +316,14 @@ func (r *RepMgr) rejoinCluster(machineID string) error {
 	return err
 }
 
-func (r *RepMgr) clonePrimary(machineId string) error {
+func (r *RepMgr) clonePrimary(hostname string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
 	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -c -F",
-		fmt.Sprintf("%s.vm.%s.internal", machineId, r.AppName),
+		hostname,
 		r.Port,
 		r.DatabaseName,
 		r.Credentials.Username,
@@ -474,13 +474,13 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 			continue
 		}
 
-		conn, err := r.NewRemoteConnection(ctx, machineId)
+		conn, err := r.NewRemoteConnection(ctx, r.machineIdToDNS(machineId))
 		if err != nil {
 			continue
 		}
 		defer func() { _ = conn.Close(ctx) }()
 
-		member, err := r.MemberByHostname(ctx, conn, machineId)
+		member, err := r.MemberByHostname(ctx, conn, r.machineIdToDNS(machineId))
 		if err != nil {
 			continue
 		}
@@ -558,4 +558,12 @@ func (r *RepMgr) UnregisterMember(member Member) error {
 
 func (r *RepMgr) eligiblePrimary() bool {
 	return r.Region == r.PrimaryRegion
+}
+
+func (r *RepMgr) machineIdToDNS(nodeName string) string {
+	if len(nodeName) != 14 {
+		panic("invalid machine id")
+	}
+
+	return fmt.Sprintf("%s.vm.%s.internal", nodeName, r.AppName)
 }
