@@ -100,19 +100,7 @@ func (r *RepMgr) NewLocalConnection(ctx context.Context) (*pgx.Conn, error) {
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
 
-// target - can be an IP address, machine ID in the current app, or other hostname
-func (r *RepMgr) NewRemoteConnection(ctx context.Context, target string) (*pgx.Conn, error) {
-	var hostname string
-
-	ip := net.ParseIP(target)
-	if ip != nil {
-		hostname = target
-	} else if len(target) == 14 {
-		hostname = fmt.Sprintf("%s.vm.%s.internal", target, r.AppName)
-	} else {
-		hostname = target
-	}
-
+func (r *RepMgr) NewRemoteConnection(ctx context.Context, hostname string) (*pgx.Conn, error) {
 	host := net.JoinHostPort(hostname, strconv.Itoa(r.Port))
 	return openConnection(ctx, host, r.DatabaseName, r.Credentials)
 }
@@ -265,7 +253,7 @@ func (r *RepMgr) registerStandby(restartDaemon bool) error {
 }
 
 func (r *RepMgr) registerWitness(primaryHostname string) error {
-	cmdStr := fmt.Sprintf("repmgr witness register -f %s -h %s -F", r.ConfigPath, primaryHostname) // TODO
+	cmdStr := fmt.Sprintf("repmgr witness register -f %s -h %s -F", r.ConfigPath, primaryHostname)
 	_, err := utils.RunCommand(cmdStr, "postgres")
 
 	return err
@@ -291,7 +279,7 @@ func (*RepMgr) restartDaemon() error {
 }
 
 func (r *RepMgr) daemonRestartRequired(m *Member) bool {
-	return m.NodeName != r.PrivateIP // TODO
+	return m.Hostname != r.MachineID
 }
 
 func (r *RepMgr) unregisterWitness(id int) error {
@@ -301,10 +289,10 @@ func (r *RepMgr) unregisterWitness(id int) error {
 	return err
 }
 
-func (r *RepMgr) rejoinCluster(nodeName string) error {
+func (r *RepMgr) rejoinCluster(hostname string) error {
 	cmdStr := fmt.Sprintf("repmgr -f %s node rejoin -h %s -p %d -U %s -d %s --force-rewind --no-wait",
 		r.ConfigPath,
-		nodeName,
+		hostname,
 		r.Port,
 		r.Credentials.Username,
 		r.DatabaseName,
@@ -341,7 +329,7 @@ func (r *RepMgr) regenReplicationConf(ctx context.Context) error {
 	// TODO: do we need -c?
 	if _, err := utils.RunCmd(ctx, "postgres",
 		"repmgr", "--replication-conf-only",
-		"-h", r.PrivateIP, // TODO: should this be the hostname, or even just localhost
+		"-h", r.PrivateIP,
 		"-p", fmt.Sprint(r.Port),
 		"-d", r.DatabaseName,
 		"-U", r.Credentials.Username,
@@ -354,7 +342,7 @@ func (r *RepMgr) regenReplicationConf(ctx context.Context) error {
 
 type Member struct {
 	ID       int
-	NodeName string
+	Hostname string
 	Active   bool
 	Region   string
 	Role     string
@@ -371,7 +359,7 @@ func (*RepMgr) Members(ctx context.Context, pg *pgx.Conn) ([]Member, error) {
 	var members []Member
 	for rows.Next() {
 		var member Member
-		if err := rows.Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role); err != nil {
+		if err := rows.Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role); err != nil {
 			return nil, err
 		}
 
@@ -404,7 +392,7 @@ func (r *RepMgr) Member(ctx context.Context, conn *pgx.Conn) (*Member, error) {
 func (*RepMgr) PrimaryMember(ctx context.Context, pg *pgx.Conn) (*Member, error) {
 	var member Member
 	sql := "select node_id, node_name, location, active, type from repmgr.nodes where type = 'primary' and active = true;"
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +429,7 @@ func (*RepMgr) MemberByID(ctx context.Context, pg *pgx.Conn, id int) (*Member, e
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_id = %d;", id)
 
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +441,7 @@ func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname stri
 	var member Member
 	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_name = '%s';", hostname)
 
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.NodeName, &member.Region, &member.Active, &member.Role)
+	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
 	if err != nil {
 		return nil, err
 	}

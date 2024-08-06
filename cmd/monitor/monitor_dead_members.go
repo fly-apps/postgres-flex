@@ -71,13 +71,13 @@ func deadMemberMonitorTick(ctx context.Context, node *flypg.Node, seenAt map[int
 	}
 
 	for _, voter := range votingMembers {
-		sConn, err := node.RepMgr.NewRemoteConnection(ctx, voter.NodeName)
+		sConn, err := node.RepMgr.NewRemoteConnection(ctx, voter.Hostname)
 		if err != nil {
 			// TODO - Verify the exception that's getting thrown.
 			if time.Since(seenAt[voter.ID]) >= deadMemberRemovalThreshold {
-				log.Printf("Removing dead member: %s\n", voter.NodeName)
+				log.Printf("Removing dead member: %s\n", voter.Hostname)
 				if err := node.RepMgr.UnregisterMember(voter); err != nil {
-					log.Printf("failed to unregister member %s: %v", voter.NodeName, err)
+					log.Printf("failed to unregister member %s: %v", voter.Hostname, err)
 					continue
 				}
 				delete(seenAt, voter.ID)

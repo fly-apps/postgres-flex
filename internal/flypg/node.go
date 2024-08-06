@@ -192,7 +192,7 @@ func (n *Node) Init(ctx context.Context) error {
 					return fmt.Errorf("failed to resolve member over dns: %s", err)
 				}
 
-				if err := n.RepMgr.clonePrimary(cloneTarget.NodeName); err != nil {
+				if err := n.RepMgr.clonePrimary(cloneTarget.Hostname); err != nil {
 					// Clean-up the directory so it can be retried.
 					if rErr := os.Remove(n.DataDir); rErr != nil {
 						log.Printf("[ERROR] failed to cleanup postgresql dir after clone error: %s\n", rErr)
@@ -270,11 +270,9 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to resolve member role: %s", err)
 		}
 
-		// Restart repmgrd in the event the IP changes for an already registered node.
+		// Restart repmgrd in the event the machine ID changes for an already registered node.
 		// This can happen if the underlying volume is moved to a different node.
-		// TODO - this isn't an IP anymore
-		//daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
-		daemonRestartRequired := false
+		daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
 
 		switch member.Role {
 		case PrimaryRoleName:
@@ -333,7 +331,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// Register existing witness to apply any configuration changes.
-			if err := n.RepMgr.registerWitness(primary.NodeName); err != nil {
+			if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
 				return fmt.Errorf("failed to register existing witness: %s", err)
 			}
 		default:
@@ -415,7 +413,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to resolve primary member: %s", err)
 				}
 
-				if err := n.RepMgr.registerWitness(primary.NodeName); err != nil {
+				if err := n.RepMgr.registerWitness(primary.Hostname); err != nil {
 					return fmt.Errorf("failed to register witness: %s", err)
 				}
 			} else {
@@ -546,7 +544,7 @@ func (n *Node) migrateNodeNameIfNeeded(ctx context.Context, repConn *pgx.Conn) e
 		return fmt.Errorf("failed to resolve primary member when updating standby: %s", err)
 	}
 
-	primaryConn, err := n.RepMgr.NewRemoteConnection(ctx, primary.NodeName)
+	primaryConn, err := n.RepMgr.NewRemoteConnection(ctx, primary.Hostname)
 	if err != nil {
 		return fmt.Errorf("failed to establish connection to primary: %s", err)
 	}

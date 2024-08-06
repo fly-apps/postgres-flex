@@ -94,9 +94,9 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 
 	for _, standby := range standbys {
 		// Check for connectivity
-		mConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.NodeName)
+		mConn, err := node.RepMgr.NewRemoteConnection(ctx, standby.Hostname)
 		if err != nil {
-			log.Printf("[WARN] Failed to connect to %s\n", standby.NodeName)
+			log.Printf("[WARN] Failed to connect to %s\n", standby.Hostname)
 			sample.totalInactive++
 			continue
 		}
@@ -105,7 +105,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		// Verify the primary
 		primary, err := node.RepMgr.PrimaryMember(ctx, mConn)
 		if err != nil {
-			log.Printf("[WARN] Failed to resolve primary from standby %s\n", standby.NodeName)
+			log.Printf("[WARN] Failed to resolve primary from standby %s\n", standby.Hostname)
 			sample.totalInactive++
 			continue
 		}
@@ -117,9 +117,9 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		sample.totalActive++
 
 		// Record conflict when primary doesn't match.
-		if primary.NodeName != node.MachineID && primary.NodeName != node.PrivateIP {
+		if primary.Hostname != node.MachineID && primary.Hostname != node.PrivateIP {
 			sample.totalConflicts++
-			sample.conflictMap[primary.NodeName]++
+			sample.conflictMap[primary.Hostname]++
 		}
 	}
 
@@ -198,11 +198,6 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 	// If the zombie lock contains a hostname, it means we were able to
 	// resolve the real primary and will attempt to rejoin it.
 	if primaryStr != "" {
-		//ip := net.ParseIP(primaryStr)
-		//if ip == nil {
-		//	return fmt.Errorf("zombie.lock file contains an invalid ipv6 address")
-		//}
-
 		conn, err := n.RepMgr.NewRemoteConnection(ctx, primaryStr)
 		if err != nil {
 			return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", primaryStr, err)
@@ -215,8 +210,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		}
 
 		// Confirm that our rejoin target still identifies itself as the primary.
-		// TODO - machine IDs don't change
-		if primary.NodeName != primaryStr {
+		if primary.Hostname != primaryStr {
 			// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
 			if err := RemoveZombieLock(); err != nil {
 				return fmt.Errorf("failed to remove zombie lock: %s", err)
@@ -231,7 +225,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 			return ErrZombieLockRegionMismatch
 		}
 
-		if err := n.RepMgr.rejoinCluster(primary.NodeName); err != nil {
+		if err := n.RepMgr.rejoinCluster(primary.Hostname); err != nil {
 			return fmt.Errorf("failed to rejoin cluster: %s", err)
 		}
 
