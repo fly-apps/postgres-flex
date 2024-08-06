@@ -75,7 +75,7 @@ func getResolver() *net.Resolver {
 	nameserver = net.JoinHostPort(nameserver, "53")
 	return &net.Resolver{
 		PreferGo: true,
-		Dial: func(ctx context.Context, _network, _address string) (net.Conn, error) {
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			d := net.Dialer{
 				Timeout: 1 * time.Second,
 			}
