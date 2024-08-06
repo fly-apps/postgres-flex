@@ -84,7 +84,7 @@ type DNASample struct {
 
 func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASample, error) {
 	sample := &DNASample{
-		hostname:       node.PrivateIP,
+		hostname:       node.RepMgr.machineIdToDNS(node.MachineID),
 		totalMembers:   len(standbys) + 1,
 		totalActive:    1,
 		totalInactive:  0,
@@ -117,7 +117,8 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		sample.totalActive++
 
 		// Record conflict when primary doesn't match.
-		if primary.Hostname != node.MachineID && primary.Hostname != node.PrivateIP {
+		// We're checking PrivateIP here for backwards compatibility
+		if primary.Hostname != node.RepMgr.machineIdToDNS(node.MachineID) && primary.Hostname != node.PrivateIP {
 			sample.totalConflicts++
 			sample.conflictMap[primary.Hostname]++
 		}

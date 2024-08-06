@@ -297,10 +297,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 
 			// This should never happen
-			if primary != n.PrivateIP {
+			if primary != n.RepMgr.machineIdToDNS(n.MachineID) {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen",
 					primary,
-					n.PrivateIP,
+					n.RepMgr.machineIdToDNS(n.MachineID),
 				)
 			}
 
