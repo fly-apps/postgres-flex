@@ -449,6 +449,37 @@ func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname stri
 	return &member, nil
 }
 
+// MemberBy6PN returns a member by its 6PN address.
+// This assumes the hostnames are hostnames
+func (r *RepMgr) MemberBy6PN(ctx context.Context, pg *pgx.Conn, ip string) (*Member, error) {
+	members, err := r.Members(ctx, pg)
+	if err != nil {
+		return nil, err
+	}
+
+	resolver := privnet.GetResolver()
+	var lastErr error
+	for _, member := range members {
+		ips, err := resolver.LookupIPAddr(ctx, member.Hostname)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		for _, addr := range ips {
+			if addr.IP.String() == ip {
+				return &member, nil
+			}
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("no matches found for %s, and error encountered: %s", ip, lastErr)
+	}
+
+	return nil, nil
+}
+
 func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 	machineIds, err := r.InRegionPeerMachines(ctx)
 	if err != nil {

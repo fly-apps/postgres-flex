@@ -14,7 +14,7 @@ func AllPeers(ctx context.Context, appName string) ([]net.IPAddr, error) {
 }
 
 func Get6PN(ctx context.Context, hostname string) ([]net.IPAddr, error) {
-	r := getResolver()
+	r := GetResolver()
 	ips, err := r.LookupIPAddr(ctx, hostname)
 
 	if err != nil {
@@ -47,7 +47,7 @@ type Machine struct {
 }
 
 func AllMachines(ctx context.Context, appName string) ([]Machine, error) {
-	r := getResolver()
+	r := GetResolver()
 	txts, err := r.LookupTXT(ctx, fmt.Sprintf("vms.%s.internal", appName))
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func AllMachines(ctx context.Context, appName string) ([]Machine, error) {
 	return machines, nil
 }
 
-func getResolver() *net.Resolver {
+func GetResolver() *net.Resolver {
 	nameserver := os.Getenv("FLY_NAMESERVER")
 	if nameserver == "" {
 		nameserver = "fdaa::3"
