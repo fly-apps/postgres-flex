@@ -317,7 +317,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 			}
 		case StandbyRoleName:
 			if err := n.migrateNodeNameIfNeeded(ctx, repConn); err != nil {
-				return fmt.Errorf("failed to migrate node name: %s", err)
+				log.Printf("[ERROR] failed to migrate node name: %s", err)
+				// We try to bring the standby up anyway
 			}
 
 			// Register existing standby to apply any configuration changes.
