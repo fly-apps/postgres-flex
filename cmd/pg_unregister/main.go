@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -44,7 +45,13 @@ func processUnregistration(ctx context.Context) error {
 	defer func() { _ = conn.Close(ctx) }()
 
 	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
+		// for historical reasons, flyctl passes in the 6pn as the hostname
+		member, err = node.RepMgr.MemberBy6PN(ctx, conn, string(hostnameBytes))
+		if err != nil {
+			return fmt.Errorf("failed to resolve member by hostname and 6pn: %s", err)
+		}
+	} else if err != nil {
 		return fmt.Errorf("failed to resolve member: %s", err)
 	}
 
