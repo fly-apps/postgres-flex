@@ -130,6 +130,18 @@ type ReplicationSlot struct {
 	RetainedWalInBytes int
 }
 
+func GetReplicationSlot(ctx context.Context, pg *pgx.Conn, slotName string) (*ReplicationSlot, error) {
+	sql := fmt.Sprintf("SELECT slot_name, active, wal_status, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS retained_wal FROM pg_replication_slots where slot_name = '%s';", slotName)
+	row := pg.QueryRow(ctx, sql)
+
+	var slot ReplicationSlot
+	if err := row.Scan(&slot.Name, &slot.Active, &slot.WalStatus, &slot.RetainedWalInBytes); err != nil {
+		return nil, err
+	}
+
+	return &slot, nil
+}
+
 func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot, error) {
 	sql := "SELECT slot_name, active, wal_status, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS retained_wal FROM pg_replication_slots;"
 	rows, err := pg.Query(ctx, sql)
@@ -167,7 +179,6 @@ func ListReplicationSlots(ctx context.Context, pg *pgx.Conn) ([]ReplicationSlot,
 
 func DropReplicationSlot(ctx context.Context, pg *pgx.Conn, name string) error {
 	sql := fmt.Sprintf("SELECT pg_drop_replication_slot('%s');", name)
-
 	_, err := pg.Exec(ctx, sql)
 	if err != nil {
 		return err

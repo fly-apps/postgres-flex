@@ -21,14 +21,18 @@ COPY ./bin/* /fly/bin/
 
 FROM ubuntu:24.04
 
-ENV PGDATA=/data/postgresql
-ENV PGPASSFILE=/data/.pgpass
-ENV AWS_SHARED_CREDENTIALS_FILE=/data/.aws/credentials
 ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG POSTGIS_MAJOR=3
 ARG HAPROXY_VERSION=2.8
 ARG REPMGR_VERSION=5.4.1-1build2
+
+ENV PGDATA=/data/postgresql
+ENV PGPASSFILE=/data/.pgpass
+ENV AWS_SHARED_CREDENTIALS_FILE=/data/.aws/credentials
+ENV PG_MAJOR_VERSION=${PG_MAJOR_VERSION}
+ENV PATH="/usr/lib/postgresql/${PG_MAJOR_VERSION}/bin:$PATH"
+
 
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
@@ -63,15 +67,14 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     haproxy=$HAPROXY_VERSION.\* \
     && apt autoremove -y && apt clean
 
-
-# Add PostgreSQL bin directory to PATH
-ENV PATH="/usr/lib/postgresql/${PG_MAJOR_VERSION}/bin:$PATH"
-
 # Copy Go binaries from the builder stage
 COPY --from=builder /fly/bin/* /usr/local/bin
 
 # Copy Postgres exporter
 COPY --from=wrouesnel/postgres_exporter:latest /postgres_exporter /usr/local/bin/
+
+# Move pg_rewind into path.
+RUN ln -s /usr/lib/postgresql/${PG_MAJOR_VERSION}/bin/pg_rewind /usr/bin/pg_rewind
 
 ADD /config/* /fly/
 RUN mkdir -p /run/haproxy/
