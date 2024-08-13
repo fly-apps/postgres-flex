@@ -450,7 +450,6 @@ func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname stri
 }
 
 // MemberBy6PN returns a member by its 6PN address.
-// This assumes the hostnames are hostnames
 func (r *RepMgr) MemberBy6PN(ctx context.Context, pg *pgx.Conn, ip string) (*Member, error) {
 	members, err := r.Members(ctx, pg)
 	if err != nil {
