@@ -284,6 +284,8 @@ func (n *Node) PostInit(ctx context.Context) error {
 				if err := Quarantine(ctx, n, primary); err != nil {
 					return fmt.Errorf("failed to quarantine failed primary: %s", err)
 				}
+
+				panic(err)
 			} else if errors.Is(err, ErrZombieDiscovered) {
 				log.Printf("[ERROR] The majority of registered members agree that '%s' is the real primary.\n", primary)
 				// Turn member read-only
