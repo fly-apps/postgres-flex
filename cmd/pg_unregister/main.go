@@ -46,7 +46,9 @@ func processUnregistration(ctx context.Context) error {
 
 	member, err := node.RepMgr.MemberByHostname(ctx, conn, string(hostnameBytes))
 	if errors.Is(err, pgx.ErrNoRows) {
-		// for historical reasons, flyctl passes in the 6pn as the hostname
+		// for historical reasons, old versions of flyctl passes in the 6pn as the hostname
+		// most likely this won't work because the hostname does not resolve if the machine is stopped,
+		// but we try anyway
 		member, err = node.RepMgr.MemberBy6PN(ctx, conn, string(hostnameBytes))
 		if err != nil {
 			return fmt.Errorf("failed to resolve member by hostname and 6pn: %s", err)
