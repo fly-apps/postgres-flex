@@ -34,7 +34,6 @@ type RepMgr struct {
 	PrimaryRegion      string
 	Region             string
 	PrivateIP          string
-	MachineID          string
 	DataDir            string
 	DatabaseName       string
 	Credentials        admin.Credential
@@ -162,12 +161,10 @@ func (r *RepMgr) setDefaults() error {
 		return err
 	}
 
-	hostname := r.machineIdToDNS(r.MachineID)
-
 	conf := ConfigMap{
 		"node_id":                      nodeID,
-		"node_name":                    fmt.Sprintf("'%s'", hostname),
-		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=5'", hostname, r.Port, r.Credentials.Username, r.DatabaseName),
+		"node_name":                    fmt.Sprintf("'%s'", r.PrivateIP),
+		"conninfo":                     fmt.Sprintf("'host=%s port=%d user=%s dbname=%s connect_timeout=5'", r.PrivateIP, r.Port, r.Credentials.Username, r.DatabaseName),
 		"data_directory":               fmt.Sprintf("'%s'", r.DataDir),
 		"failover":                     "'automatic'",
 		"use_replication_slots":        "yes",
@@ -279,7 +276,7 @@ func (*RepMgr) restartDaemon() error {
 }
 
 func (r *RepMgr) daemonRestartRequired(m *Member) bool {
-	return m.Hostname != r.MachineID
+	return m.Hostname != r.PrivateIP
 }
 
 func (r *RepMgr) unregisterWitness(id int) error {
@@ -304,14 +301,14 @@ func (r *RepMgr) rejoinCluster(hostname string) error {
 	return err
 }
 
-func (r *RepMgr) clonePrimary(hostname string) error {
+func (r *RepMgr) clonePrimary(ipStr string) error {
 	cmdStr := fmt.Sprintf("mkdir -p %s", r.DataDir)
 	if _, err := utils.RunCommand(cmdStr, "postgres"); err != nil {
 		return fmt.Errorf("failed to create pg directory: %s", err)
 	}
 
 	cmdStr = fmt.Sprintf("repmgr -h %s -p %d -d %s -U %s -f %s standby clone -c -F",
-		hostname,
+		ipStr,
 		r.Port,
 		r.DatabaseName,
 		r.Credentials.Username,
@@ -322,21 +319,6 @@ func (r *RepMgr) clonePrimary(hostname string) error {
 		return fmt.Errorf("failed to clone primary: %s", err)
 	}
 
-	return nil
-}
-
-func (r *RepMgr) regenReplicationConf(ctx context.Context) error {
-	// TODO: do we need -c?
-	if _, err := utils.RunCmd(ctx, "postgres",
-		"repmgr", "--replication-conf-only",
-		"-h", "",
-		"-p", fmt.Sprint(r.Port),
-		"-d", r.DatabaseName,
-		"-U", r.Credentials.Username,
-		"-f", r.ConfigPath,
-		"standby", "clone", "-F"); err != nil {
-		return fmt.Errorf("failed to regenerate replication conf: %s", err)
-	}
 	return nil
 }
 
@@ -449,56 +431,26 @@ func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname stri
 	return &member, nil
 }
 
-// MemberBy6PN returns a member by its 6PN address.
-func (r *RepMgr) MemberBy6PN(ctx context.Context, pg *pgx.Conn, ip string) (*Member, error) {
-	members, err := r.Members(ctx, pg)
-	if err != nil {
-		return nil, err
-	}
-
-	resolver := privnet.GetResolver()
-	var lastErr error
-	for _, member := range members {
-		ips, err := resolver.LookupIPAddr(ctx, member.Hostname)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		for _, addr := range ips {
-			if addr.IP.String() == ip {
-				return &member, nil
-			}
-		}
-	}
-
-	if lastErr != nil {
-		return nil, fmt.Errorf("no matches found for %s, and error encountered: %s", ip, lastErr)
-	}
-
-	return nil, nil
-}
-
 func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
-	machineIds, err := r.InRegionPeerMachines(ctx)
+	ips, err := r.InRegionPeerIPs(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var target *Member
 
-	for _, machineId := range machineIds {
-		if machineId == r.MachineID {
+	for _, ip := range ips {
+		if ip.String() == r.PrivateIP {
 			continue
 		}
 
-		conn, err := r.NewRemoteConnection(ctx, r.machineIdToDNS(machineId))
+		conn, err := r.NewRemoteConnection(ctx, ip.String())
 		if err != nil {
 			continue
 		}
 		defer func() { _ = conn.Close(ctx) }()
 
-		member, err := r.MemberByHostname(ctx, conn, r.machineIdToDNS(machineId))
+		member, err := r.MemberByHostname(ctx, conn, ip.String())
 		if err != nil {
 			continue
 		}
@@ -523,21 +475,6 @@ func (r *RepMgr) ResolveMemberOverDNS(ctx context.Context) (*Member, error) {
 func (r *RepMgr) InRegionPeerIPs(ctx context.Context) ([]net.IPAddr, error) {
 	targets := fmt.Sprintf("%s.%s", r.PrimaryRegion, r.AppName)
 	return privnet.AllPeers(ctx, targets)
-}
-
-func (r *RepMgr) InRegionPeerMachines(ctx context.Context) ([]string, error) {
-	machines, err := privnet.AllMachines(ctx, r.AppName)
-	if err != nil {
-		return nil, err
-	}
-
-	var machineIDs []string
-	for _, machine := range machines {
-		if machine.Region == r.PrimaryRegion {
-			machineIDs = append(machineIDs, machine.Id)
-		}
-	}
-	return machineIDs, nil
 }
 
 func (r *RepMgr) HostInRegion(ctx context.Context, hostname string) (bool, error) {
@@ -576,12 +513,4 @@ func (r *RepMgr) UnregisterMember(member Member) error {
 
 func (r *RepMgr) eligiblePrimary() bool {
 	return r.Region == r.PrimaryRegion
-}
-
-func (r *RepMgr) machineIdToDNS(nodeName string) string {
-	if len(nodeName) != 14 {
-		panic("invalid machine id")
-	}
-
-	return fmt.Sprintf("%s.vm.%s.internal", nodeName, r.AppName)
 }

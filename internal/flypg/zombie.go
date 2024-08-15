@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 
 	"github.com/fly-apps/postgres-flex/internal/utils"
@@ -84,7 +85,7 @@ type DNASample struct {
 
 func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASample, error) {
 	sample := &DNASample{
-		hostname:       node.RepMgr.machineIdToDNS(node.MachineID),
+		hostname:       node.PrivateIP,
 		totalMembers:   len(standbys) + 1,
 		totalActive:    1,
 		totalInactive:  0,
@@ -117,8 +118,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		sample.totalActive++
 
 		// Record conflict when primary doesn't match.
-		// We're checking PrivateIP here for backwards compatibility
-		if primary.Hostname != node.RepMgr.machineIdToDNS(node.MachineID) && primary.Hostname != node.PrivateIP {
+		if primary.Hostname != node.PrivateIP {
 			sample.totalConflicts++
 			sample.conflictMap[primary.Hostname]++
 		}
@@ -199,19 +199,24 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 	// If the zombie lock contains a hostname, it means we were able to
 	// resolve the real primary and will attempt to rejoin it.
 	if primaryStr != "" {
-		conn, err := n.RepMgr.NewRemoteConnection(ctx, primaryStr)
+		ip := net.ParseIP(primaryStr)
+		if ip == nil {
+			return fmt.Errorf("zombie.lock file contains an invalid ipv6 address")
+		}
+
+		conn, err := n.RepMgr.NewRemoteConnection(ctx, ip.String())
 		if err != nil {
-			return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", primaryStr, err)
+			return fmt.Errorf("failed to establish a connection to our rejoin target %s: %s", ip.String(), err)
 		}
 		defer func() { _ = conn.Close(ctx) }()
 
 		primary, err := n.RepMgr.PrimaryMember(ctx, conn)
 		if err != nil {
-			return fmt.Errorf("failed to confirm primary on recover target %s: %s", primaryStr, err)
+			return fmt.Errorf("failed to confirm primary on recover target %s: %s", ip.String(), err)
 		}
 
 		// Confirm that our rejoin target still identifies itself as the primary.
-		if primary.Hostname != primaryStr {
+		if primary.Hostname != ip.String() {
 			// Clear the zombie.lock file so we can attempt to re-resolve the correct primary.
 			if err := RemoveZombieLock(); err != nil {
 				return fmt.Errorf("failed to remove zombie lock: %s", err)
