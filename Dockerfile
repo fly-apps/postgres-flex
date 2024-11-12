@@ -30,8 +30,8 @@ LABEL fly.pg-version=${PG_VERSION}
 LABEL fly.pg-manager=repmgr
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron &&
-    apt autoremove -y
+    ca-certificates iproute2 postgresql-$PG_MAJOR_VERSION-repmgr curl bash dnsutils vim socat procps ssh gnupg rsync barman-cli barman barman-cli-cloud cron \
+    && apt autoremove -y
 
 # PostGIS
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -39,16 +39,16 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     postgresql-$PG_MAJOR-postgis-$POSTGIS_MAJOR-scripts
 
 # Haproxy
-RUN curl https://haproxy.debian.net/bernat.debian.org.gpg |
-    gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
+RUN curl https://haproxy.debian.net/bernat.debian.org.gpg \
+    | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
 
 RUN echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
     http://haproxy.debian.net bookworm-backports-${HAPROXY_VERSION} main \
-    >/etc/apt/sources.list.d/haproxy.list
+    > /etc/apt/sources.list.d/haproxy.list
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    haproxy=$HAPROXY_VERSION.\* &&
-    apt autoremove -y
+    haproxy=$HAPROXY_VERSION.\* \
+    && apt autoremove -y
 
 COPY --from=0 /fly/bin/* /usr/local/bin
 COPY --from=postgres_exporter /postgres_exporter /usr/local/bin/
