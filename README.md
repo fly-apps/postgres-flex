@@ -21,6 +21,9 @@ fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.3 --name <app-name>
 
 # Provision a 3 member cluster with Pg 16.4
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.4 --name <app-name> --initial-cluster-size 3 --region ord --flex
+
+# Provision a 3 member cluster with Pg 17.0
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex:17.0 --name <app-name> --initial-cluster-size 3 --region ord --flex
 ```
 
 ## High Availability
@@ -63,6 +66,9 @@ fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.3
 
 # With Pg 16.4
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.4
+
+# With Pg 17.0
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:17.0
 ```
 
 ## Having trouble?
