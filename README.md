@@ -16,6 +16,9 @@ fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.1 --name <app-name>
 # Provision a 3 member cluster with Pg 16.2
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.2 --name <app-name> --initial-cluster-size 3 --region ord --flex
 
+# Provision a 3 member cluster with Pg 16.3
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.3 --name <app-name> --initial-cluster-size 3 --region ord --flex
+
 # Provision a 3 member cluster with Pg 16.4
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex:16.4 --name <app-name> --initial-cluster-size 3 --region ord --flex
 ```
@@ -54,6 +57,9 @@ fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.1
 
 # With Pg 16.2
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.2
+
+# With Pg 16.3
+fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.3
 
 # With Pg 16.4
 fly pg create --image-ref ghcr.io/groguelon/postgres-flex-timescaledb:16.4
