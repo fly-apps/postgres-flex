@@ -1,8 +1,8 @@
 ARG PG_VERSION=16.4
 ARG PG_MAJOR_VERSION=16
-ARG VERSION=custom
+ARG VERSION=v0.0.63
 
-FROM golang:1.20 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .
