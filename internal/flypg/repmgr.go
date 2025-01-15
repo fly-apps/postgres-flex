@@ -278,7 +278,7 @@ func (*RepMgr) restartDaemon() error {
 }
 
 func (r *RepMgr) daemonRestartRequired(m *Member) bool {
-	return m.Hostname != r.MachineID
+	return m.Name != r.MachineID
 }
 
 func (r *RepMgr) unregisterWitness(id int) error {
