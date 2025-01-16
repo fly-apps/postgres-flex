@@ -117,7 +117,7 @@ func TakeDNASample(ctx context.Context, node *Node, standbys []Member) (*DNASamp
 		sample.totalActive++
 
 		// Record conflict when primary name does not match our machine ID
-		if primary.Hostname != node.Hostname() {
+		if primary.Hostname != node.Hostname() && primary.Hostname != node.PrivateIP {
 			sample.totalConflicts++
 			sample.conflictMap[primary.Hostname]++
 		}
@@ -244,6 +244,7 @@ func handleZombieLock(ctx context.Context, n *Node) error {
 		// TODO - Provide link to documentation on how to address this
 		log.Println("[WARN] Zombie lock file does not contain a hostname.")
 		log.Println("[WARN] This likely means that we were unable to determine who the real primary is.")
+		log.Println("[WARN] If a new primary has been established, consider adding a new replica with `fly machines clone <primary-machine-id>` and then remove this member.")
 	}
 
 	return nil

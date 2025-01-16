@@ -231,14 +231,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 // PostInit are operations that need to be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
-	if ZombieLockExists() {
-		log.Println("[ERROR] Manual intervention required.")
-		log.Println("[ERROR] If a new primary has been established, consider adding a new replica with `fly machines clone <primary-machine-id>` and then remove this member.")
-		log.Println("[ERROR] Sleeping for 5 minutes.")
-		time.Sleep(5 * time.Minute)
-		return fmt.Errorf("unrecoverable zombie")
-	}
-
 	// Use the Postgres user on boot, since our internal user may not have been created yet.
 	conn, err := n.NewLocalConnection(ctx, "postgres", n.OperatorCredentials)
 	if err != nil {
@@ -297,12 +289,20 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}
 
-			// This should never happen
-			if primary != n.PrivateIP {
+			// This should never happen, but check anyways for correctness
+			if primary != n.Hostname() {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen",
 					primary,
-					n.PrivateIP,
+					n.Hostname(),
 				)
+			}
+
+			// Clear the zombie lock if it exists.
+			if ZombieLockExists() {
+				log.Println("[INFO] Clearing zombie lock and re-enabling read/write")
+				if err := RemoveZombieLock(); err != nil {
+					return fmt.Errorf("failed to remove zombie lock: %s", err)
+				}
 			}
 
 			// Re-register primary to apply any configuration changes.
