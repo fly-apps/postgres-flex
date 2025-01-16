@@ -46,7 +46,7 @@ func processUnregistration(ctx context.Context) error {
 	machineID := string(machineBytes)
 
 	if len(machineID) != 14 {
-		return fmt.Errorf("invalid machine id: %s. (expected length 16, got %d)", machineID, len(machineBytes))
+		return fmt.Errorf("invalid machine id: %s", machineID)
 	}
 
 	member, err := node.RepMgr.MemberByNodeName(ctx, conn, machineID)
