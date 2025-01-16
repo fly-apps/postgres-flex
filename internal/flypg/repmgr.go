@@ -469,19 +469,6 @@ func (r *RepMgr) MemberByNodeName(ctx context.Context, pg *pgx.Conn, name string
 	return &member, nil
 }
 
-// Deprecated: Use MemberByNodeName instead.
-func (*RepMgr) MemberByHostname(ctx context.Context, pg *pgx.Conn, hostname string) (*Member, error) {
-	var member Member
-	sql := fmt.Sprintf("select node_id, node_name, location, active, type from repmgr.nodes where node_name = '%s';", hostname)
-
-	err := pg.QueryRow(ctx, sql).Scan(&member.ID, &member.Hostname, &member.Region, &member.Active, &member.Role)
-	if err != nil {
-		return nil, err
-	}
-
-	return &member, nil
-}
-
 func (r *RepMgr) ResolvePrimaryOverDNS(ctx context.Context) (*Member, error) {
 	machineIDs, err := r.InRegionPeerMachines(ctx)
 	if err != nil {
