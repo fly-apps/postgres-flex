@@ -74,7 +74,7 @@ func processUnregistration(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open /dev/null: %v", err)
 	}
-	defer devnull.Close()
+	defer func() { _ = devnull.Close() }()
 
 	// Save the original log output
 	originalLogOutput := log.Writer()
