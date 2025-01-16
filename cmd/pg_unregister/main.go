@@ -51,15 +51,44 @@ func processUnregistration(ctx context.Context) error {
 
 	member, err := node.RepMgr.MemberByNodeName(ctx, conn, machineID)
 	if err != nil {
-		return fmt.Errorf("failed to resolve member using %s: %s", machineID, err)
+		// If no rows are found, the member was either already unregistered or never registered
+		if err != pgx.ErrNoRows {
+			return fmt.Errorf("failed to resolve member using %s: %s", machineID, err)
+		}
 	}
 
-	if err := node.RepMgr.UnregisterMember(*member); err != nil {
-		return fmt.Errorf("failed to unregister member: %v", err)
+	// If the member exists unregister it and remove the replication slot
+	if member != nil {
+		if err := node.RepMgr.UnregisterMember(*member); err != nil {
+			return fmt.Errorf("failed to unregister member: %v", err)
+		}
+
+		slotName := fmt.Sprintf("repmgr_slot_%d", member.ID)
+		if err := removeReplicationSlot(ctx, conn, slotName); err != nil {
+			return fmt.Errorf("failed to remove replication slot: %v", err)
+		}
 	}
 
-	slotName := fmt.Sprintf("repmgr_slot_%d", member.ID)
-	return removeReplicationSlot(ctx, conn, slotName)
+	// Redirect logs to /dev/null temporarily so we don't pollute the response data.
+	devnull, err := os.Open(os.DevNull)
+	if err != nil {
+		return fmt.Errorf("failed to open /dev/null: %v", err)
+	}
+	defer devnull.Close()
+
+	// Save the original log output
+	originalLogOutput := log.Writer()
+
+	// Redirect logs to /dev/null
+	log.SetOutput(devnull)
+
+	if err := flypg.EvaluateClusterState(ctx, conn, node); err != nil {
+		return fmt.Errorf("failed to evaluate cluster state: %v", err)
+	}
+	// Restore the original log output
+	log.SetOutput(originalLogOutput)
+
+	return nil
 }
 
 func removeReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
