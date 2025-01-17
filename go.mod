@@ -14,7 +14,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/superfly/fly-checks v0.0.0-20230510154016-d189351293f2
 	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
@@ -40,7 +40,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	golang.org/x/crypto v0.20.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 )
