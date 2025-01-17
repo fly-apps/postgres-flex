@@ -33,6 +33,7 @@ func TestRepmgrInitialization(t *testing.T) {
 		UserConfigPath:     repgmrUserConfigFilePath,
 		PasswordConfigPath: repgmrPasswordConfigFilePath,
 		DataDir:            repmgrTestDirectory,
+		MachineID:          "abcdefg1234567",
 		PrivateIP:          "127.0.0.1",
 		Credentials: admin.Credential{
 			Username: "user",
@@ -91,8 +92,8 @@ func TestRepmgrInitialization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if config["node_name"] != "'127.0.0.1'" {
-			t.Fatalf("expected node_name to be '127.0.0.1', got %v", config["node_name"])
+		if config["node_name"] != "'abcdefg1234567'" {
+			t.Fatalf("expected node_name to be 'abcdefg1234567', got %v", config["node_name"])
 		}
 
 		if config["location"] != "'dev'" {
@@ -122,6 +123,7 @@ func TestRepmgrNodeIDGeneration(t *testing.T) {
 
 		DataDir:      repmgrTestDirectory,
 		PrivateIP:    "127.0.0.1",
+		MachineID:    "abcdefg1234567",
 		Port:         5433,
 		DatabaseName: "repmgr",
 		Credentials: admin.Credential{

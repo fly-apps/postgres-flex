@@ -16,10 +16,12 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/privnet"
 	"github.com/fly-apps/postgres-flex/internal/utils"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/exp/slices"
 )
 
 type Node struct {
 	AppName       string
+	MachineID     string
 	PrivateIP     string
 	PrimaryRegion string
 	DataDir       string
@@ -51,6 +53,8 @@ func NewNode() (*Node, error) {
 	}
 
 	node.PrivateIP = ipv6.String()
+
+	node.MachineID = os.Getenv("FLY_MACHINE_ID")
 
 	node.PrimaryRegion = os.Getenv("PRIMARY_REGION")
 	if node.PrimaryRegion == "" {
@@ -88,7 +92,9 @@ func NewNode() (*Node, error) {
 		UserConfigPath:     "/data/repmgr.user.conf",
 		PasswordConfigPath: "/data/.pgpass",
 		DataDir:            node.DataDir,
+		HostName:           node.Hostname(),
 		PrivateIP:          node.PrivateIP,
+		MachineID:          node.MachineID,
 		Port:               5433,
 		DatabaseName:       "repmgr",
 		Credentials:        node.ReplCredentials,
@@ -182,7 +188,7 @@ func (n *Node) Init(ctx context.Context) error {
 				}
 			} else {
 				log.Println("Provisioning standby")
-				cloneTarget, err := n.RepMgr.ResolveMemberOverDNS(ctx)
+				cloneTarget, err := n.RepMgr.ResolvePrimaryOverDNS(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to resolve member over dns: %s", err)
 				}
@@ -225,14 +231,6 @@ func (n *Node) Init(ctx context.Context) error {
 
 // PostInit are operations that need to be executed against a running Postgres on boot.
 func (n *Node) PostInit(ctx context.Context) error {
-	if ZombieLockExists() {
-		log.Println("[ERROR] Manual intervention required.")
-		log.Println("[ERROR] If a new primary has been established, consider adding a new replica with `fly machines clone <primary-machine-id>` and then remove this member.")
-		log.Println("[ERROR] Sleeping for 5 minutes.")
-		time.Sleep(5 * time.Minute)
-		return fmt.Errorf("unrecoverable zombie")
-	}
-
 	// Use the Postgres user on boot, since our internal user may not have been created yet.
 	conn, err := n.NewLocalConnection(ctx, "postgres", n.OperatorCredentials)
 	if err != nil {
@@ -265,7 +263,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed to resolve member role: %s", err)
 		}
 
-		// Restart repmgrd in the event the IP changes for an already registered node.
+		// Restart repmgrd in the event the machine ID changes for an already registered node.
 		// This can happen if the underlying volume is moved to a different node.
 		daemonRestartRequired := n.RepMgr.daemonRestartRequired(member)
 
@@ -291,12 +289,20 @@ func (n *Node) PostInit(ctx context.Context) error {
 				return fmt.Errorf("failed to run zombie diagnosis: %s", err)
 			}
 
-			// This should never happen
-			if primary != n.PrivateIP {
+			// This should never happen, but check anyways for correctness
+			if primary != n.Hostname() {
 				return fmt.Errorf("resolved primary '%s' does not match ourself '%s'. this should not happen",
 					primary,
-					n.PrivateIP,
+					n.Hostname(),
 				)
+			}
+
+			// Clear the zombie lock if it exists.
+			if ZombieLockExists() {
+				log.Println("[INFO] Clearing zombie lock and re-enabling read/write")
+				if err := RemoveZombieLock(); err != nil {
+					return fmt.Errorf("failed to remove zombie lock: %s", err)
+				}
 			}
 
 			// Re-register primary to apply any configuration changes.
@@ -311,6 +317,10 @@ func (n *Node) PostInit(ctx context.Context) error {
 				}
 			}
 		case StandbyRoleName:
+			if err := n.migrateNodeNameIfNeeded(ctx, repConn); err != nil {
+				return fmt.Errorf("failed to migrate node name: %s", err)
+			}
+
 			// Register existing standby to apply any configuration changes.
 			if err := n.RepMgr.registerStandby(daemonRestartRequired); err != nil {
 				return fmt.Errorf("failed to register existing standby: %s", err)
@@ -399,7 +409,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 					return fmt.Errorf("failed to enable repmgr: %s", err)
 				}
 
-				primary, err := n.RepMgr.ResolveMemberOverDNS(ctx)
+				primary, err := n.RepMgr.ResolvePrimaryOverDNS(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to resolve primary member: %s", err)
 				}
@@ -526,4 +536,56 @@ func (n *Node) handleRemoteRestore(ctx context.Context, store *state.Store) erro
 	}
 
 	return nil
+}
+
+// migrate node name from 6pn to machine ID if needed
+func (n *Node) migrateNodeNameIfNeeded(ctx context.Context, repConn *pgx.Conn) error {
+	primary, err := n.RepMgr.PrimaryMember(ctx, repConn)
+	if err != nil {
+		return fmt.Errorf("failed to resolve primary member when updating standby: %s", err)
+	}
+
+	primaryConn, err := n.RepMgr.NewRemoteConnection(ctx, primary.Hostname)
+	if err != nil {
+		return fmt.Errorf("failed to establish connection to primary: %s", err)
+	}
+	defer func() { _ = primaryConn.Close(ctx) }()
+
+	rows, err := primaryConn.Query(ctx, "select application_name from pg_stat_replication")
+	if err != nil {
+		return fmt.Errorf("failed to query pg_stat_replication: %s", err)
+	}
+	defer rows.Close()
+
+	var applicationNames []string
+	for rows.Next() {
+		var applicationName string
+		if err := rows.Scan(&applicationName); err != nil {
+			return fmt.Errorf("failed to scan application_name: %s", err)
+		}
+		applicationNames = append(applicationNames, applicationName)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate over rows: %s", err)
+	}
+
+	// if we find our 6pn as application_name, we need to regenerate postgresql.auto.conf and reload postgresql
+	if slices.Contains(applicationNames, n.PrivateIP) {
+		log.Printf("pg_stat_replication on the primary has our ipv6 address as application_name, converting to machine ID...")
+
+		if err := n.RepMgr.regenReplicationConf(ctx); err != nil {
+			return fmt.Errorf("failed to clone standby: %s", err)
+		}
+
+		if err := admin.ReloadPostgresConfig(ctx, repConn); err != nil {
+			return fmt.Errorf("failed to reload postgresql: %s", err)
+		}
+	}
+
+	return nil
+}
+
+// Hostname returns the hostname of the node.
+func (n *Node) Hostname() string {
+	return fmt.Sprintf("%s.vm.%s.internal", n.MachineID, n.AppName)
 }

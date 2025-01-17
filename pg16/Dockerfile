@@ -2,7 +2,7 @@ ARG PG_VERSION=16.4
 ARG PG_MAJOR_VERSION=16
 ARG VERSION=custom
 
-FROM golang:1.20 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .
@@ -23,6 +23,7 @@ FROM ubuntu:24.04
 
 ARG VERSION
 ARG PG_MAJOR_VERSION
+ARG PG_VERSION
 ARG POSTGIS_MAJOR=3
 ARG HAPROXY_VERSION=2.8
 ARG REPMGR_VERSION=5.4.1-1build2
