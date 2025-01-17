@@ -325,7 +325,6 @@ func (r *RepMgr) clonePrimary(hostname string) error {
 }
 
 func (r *RepMgr) regenReplicationConf(ctx context.Context) error {
-	// TODO: do we need -c?
 	if _, err := utils.RunCmd(ctx, "postgres",
 		"repmgr", "--replication-conf-only",
 		"-h", r.HostName,
