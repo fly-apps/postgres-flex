@@ -2,7 +2,7 @@ ARG PG_VERSION=17.2
 ARG PG_MAJOR_VERSION=17
 ARG VERSION=custom
 
-FROM golang:1.20 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .
@@ -23,8 +23,10 @@ FROM ubuntu:24.04
 
 ARG VERSION
 ARG PG_MAJOR_VERSION
+ARG PG_VERSION
 ARG POSTGIS_MAJOR=3
 ARG HAPROXY_VERSION=2.8
+ARG REPMGR_VERSION=5.5.0+debpgdg-1.pgdg24.04+1
 
 ENV PGDATA=/data/postgresql
 ENV PGPASSFILE=/data/.pgpass
@@ -63,7 +65,7 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
         postgresql-${PG_MAJOR_VERSION} \
         postgresql-client-${PG_MAJOR_VERSION} \
         postgresql-contrib-${PG_MAJOR_VERSION} \
-        postgresql-${PG_MAJOR_VERSION}-repmgr
+        postgresql-${PG_MAJOR_VERSION}-repmgr=${REPMGR_VERSION}
 
 # TimescaleDB and PostGIS
 RUN echo "deb https://packagecloud.io/timescale/timescaledb/ubuntu/ jammy main" > /etc/apt/sources.list.d/timescaledb.list \
