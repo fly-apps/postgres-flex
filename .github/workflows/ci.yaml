@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=15.8
+            PG_VERSION=15.10
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -44,14 +44,14 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex:15
-            flyio/postgres-flex:15.8
+            flyio/postgres-flex:15.10
       -
         name: Build and push Postgres 15 Timescale DB
         id: docker_build_15_timescaledb
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=15.8
+            PG_VERSION=15.10
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -59,7 +59,7 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex-timescaledb:15
-            flyio/postgres-flex-timescaledb:15.8
+            flyio/postgres-flex-timescaledb:15.10
 
       -
         name: Build and push Postgres 16
@@ -67,7 +67,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=16.4
+            PG_VERSION=16.6
             PG_MAJOR_VERSION=16
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -75,14 +75,14 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex:16
-            flyio/postgres-flex:16.4
+            flyio/postgres-flex:16.6
       -
         name: Build and push Postgres 16 Timescale DB
         id: docker_build_16_timescaledb
         uses: docker/build-push-action@v3
         with:
           build-args: |
-            PG_VERSION=16.4
+            PG_VERSION=16.6
             PG_MAJOR_VERSION=16
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
@@ -90,7 +90,7 @@ jobs:
           push: true
           tags: |
             flyio/postgres-flex-timescaledb:16
-            flyio/postgres-flex-timescaledb:16.4
+            flyio/postgres-flex-timescaledb:16.6
       -
         name: Postgres 15 Image digest
         run: echo ${{ steps.docker_build_15.outputs.digest }}
