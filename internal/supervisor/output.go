@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -54,10 +55,17 @@ func (m *multiOutput) PipeOutput(proc *process) {
 	pipe := m.openPipe(proc)
 
 	go func(proc *process, pipe *ptyPipe) {
-		scanner := bufio.NewScanner(pipe.pty)
-
-		for scanner.Scan() {
-			m.WriteLine(proc, scanner.Bytes())
+		reader := bufio.NewReader(pipe.pty)
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				// EOF is expected, so don't log it
+				if err != io.EOF {
+					log.Printf("reader error: %v", err)
+				}
+				break
+			}
+			m.WriteLine(proc, line)
 		}
 	}(proc, pipe)
 }
