@@ -4,6 +4,8 @@ ARG VERSION=custom
 
 FROM golang:1.23
 
+ARG VERSION
+
 WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .
 
@@ -14,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start_monitor ./cmd/monitor
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start_admin_server ./cmd/admin_server
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/flexctl ./cmd/flexctl
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start -ldflags="-X main.version=${VERSION}" ./cmd/start
 
 COPY ./bin/* /fly/bin/
 
