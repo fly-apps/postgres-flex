@@ -184,7 +184,15 @@ func (c *PGConfig) SetDefaults(ctx context.Context, store *state.Store) error {
 		return fmt.Errorf("failed to set recovery target config: %s", err)
 	}
 
-	// Override any default settings that may conflict with pg_control.
+	// Evaluate pg_control settings to determine if any internal settings need to be updated
+	if err := c.setPGControlOverrides(ctx); err != nil {
+		return fmt.Errorf("failed to set pg_control overrides: %s", err)
+	}
+
+	return nil
+}
+
+func (c *PGConfig) setPGControlOverrides(ctx context.Context) error {
 	pgControlMap, err := pgControlSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch pg_control settings: %s", err)
@@ -197,10 +205,17 @@ func (c *PGConfig) SetDefaults(ctx context.Context, store *state.Store) error {
 				continue
 			}
 
-			// Check for value discrepancies and log a warning if found.
-			if c.internalConfig[k] != v {
-				log.Printf("[WARN] Overriding internal config setting %s: %s -> %s", k, c.internalConfig[k], v)
-				c.internalConfig[k] = v
+			if k == "max_connections" {
+				maxConns, err := strconv.Atoi(v)
+				if err != nil {
+					log.Printf("[WARN] Failed to parse max_connections from pg_control: %v", err)
+					continue
+				}
+				if maxConns > c.internalConfig[k].(int) {
+					// If the max_connections from pg_control is greater than the current default, update it.
+					log.Printf("[WARN] pg_control specifies a max_connections value of %d, which is greater than our default of %d. Updating.", maxConns, c.internalConfig[k].(int))
+					c.internalConfig[k] = maxConns
+				}
 			}
 		}
 	}
