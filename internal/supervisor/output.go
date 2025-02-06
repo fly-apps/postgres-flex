@@ -58,10 +58,10 @@ func (m *multiOutput) PipeOutput(proc *process) {
 		reader := bufio.NewReader(pipe.pty)
 		for {
 			line, err := reader.ReadBytes('\n')
-
-			// Write to console regardless of whether there's an error.
-			m.WriteLine(proc, line)
-
+			// Only write non-empty lines.
+			if len(line) > 0 {
+				m.WriteLine(proc, line)
+			}
 			if err != nil {
 				if err != io.EOF {
 					log.Printf("reader error: %v", err)
