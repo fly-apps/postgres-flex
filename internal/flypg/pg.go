@@ -112,7 +112,7 @@ func (c *PGConfig) Print(w io.Writer) error {
 	return e.Encode(cfg)
 }
 
-func (c *PGConfig) SetDefaults(store *state.Store) error {
+func (c *PGConfig) SetDefaults(ctx context.Context, store *state.Store) error {
 	// The default wal_segment_size in mb
 	const walSegmentSize = 16
 
@@ -182,6 +182,27 @@ func (c *PGConfig) SetDefaults(store *state.Store) error {
 	// Set recovery target settings
 	if err := c.setRecoveryTargetConfig(); err != nil {
 		return fmt.Errorf("failed to set recovery target config: %s", err)
+	}
+
+	// Override any default settings that may conflict with pg_control.
+	pgControlMap, err := pgControlSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch pg_control settings: %s", err)
+	}
+
+	if pgControlMap != nil {
+		for k, v := range pgControlMap {
+			// Skip any settings that are not already specified by the internal config
+			if _, ok := c.internalConfig[k]; !ok {
+				continue
+			}
+
+			// Check for value discrepancies and log a warning if found.
+			if c.internalConfig[k] != v {
+				log.Printf("[WARN] Overriding internal config setting %s: %s -> %s", k, c.internalConfig[k], v)
+				c.internalConfig[k] = v
+			}
+		}
 	}
 
 	return nil
@@ -269,7 +290,7 @@ func (c *PGConfig) isInitialized() bool {
 
 // initialize will ensure the required configuration files are stubbed and the parent
 // postgresql.conf file includes them.
-func (c *PGConfig) initialize(store *state.Store) error {
+func (c *PGConfig) initialize(ctx context.Context, store *state.Store) error {
 	if err := c.setDefaultHBA(); err != nil {
 		return fmt.Errorf("failed updating pg_hba.conf: %s", err)
 	}
@@ -294,7 +315,7 @@ func (c *PGConfig) initialize(store *state.Store) error {
 		}
 	}
 
-	if err := c.SetDefaults(store); err != nil {
+	if err := c.SetDefaults(context.TODO(), store); err != nil {
 		return fmt.Errorf("failed to set pg defaults: %s", err)
 	}
 

@@ -218,7 +218,7 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize fly config: %s", err)
 	}
 
-	if err := n.PGConfig.initialize(store); err != nil {
+	if err := n.PGConfig.initialize(ctx, store); err != nil {
 		return fmt.Errorf("failed to initialize pg config: %s", err)
 	}
 
@@ -527,7 +527,7 @@ func (n *Node) handleRemoteRestore(ctx context.Context, store *state.Store) erro
 		}
 
 		// Set restore configuration
-		if err := n.PGConfig.initialize(store); err != nil {
+		if err := n.PGConfig.initialize(ctx, store); err != nil {
 			return fmt.Errorf("failed to initialize pg config: %s", err)
 		}
 

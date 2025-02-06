@@ -1,6 +1,7 @@
 package flypg
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -25,6 +26,8 @@ func TestPGConfigInitialization(t *testing.T) {
 	}
 	defer cleanup()
 
+	ctx := context.TODO()
+
 	pgConf := &PGConfig{
 		DataDir:                pgTestDirectory,
 		Port:                   5433,
@@ -41,7 +44,7 @@ func TestPGConfigInitialization(t *testing.T) {
 
 	t.Run("initialize", func(t *testing.T) {
 		store, _ := state.NewStore()
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -98,7 +101,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("TIMESCALEDB_ENABLED", "true")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -129,7 +132,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		}
 
 		t.Run("defaults", func(t *testing.T) {
-			if err := pgConf.initialize(store); err != nil {
+			if err := pgConf.initialize(ctx, store); err != nil {
 				t.Fatal(err)
 			}
 
@@ -160,7 +163,7 @@ func TestPGConfigInitialization(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := pgConf.initialize(store); err != nil {
+			if err := pgConf.initialize(ctx, store); err != nil {
 				t.Fatal(err)
 			}
 
@@ -181,7 +184,7 @@ func TestPGConfigInitialization(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := pgConf.initialize(store); err != nil {
+			if err := pgConf.initialize(ctx, store); err != nil {
 				t.Fatal(err)
 			}
 
@@ -202,7 +205,7 @@ func TestPGConfigInitialization(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := pgConf.initialize(store); err != nil {
+			if err := pgConf.initialize(ctx, store); err != nil {
 				t.Fatal(err)
 			}
 
@@ -223,7 +226,7 @@ func TestPGConfigInitialization(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := pgConf.initialize(store); err != nil {
+			if err := pgConf.initialize(ctx, store); err != nil {
 				t.Fatal(err)
 			}
 
@@ -242,7 +245,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -257,7 +260,7 @@ func TestPGConfigInitialization(t *testing.T) {
 
 		t.Setenv("S3_ARCHIVE_CONFIG", "")
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -275,7 +278,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -293,7 +296,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetName=20240626T172443")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -311,7 +314,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?target=immediate")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -329,7 +332,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00Z&targetInclusive=false")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -351,7 +354,7 @@ func TestPGConfigInitialization(t *testing.T) {
 		t.Setenv("S3_ARCHIVE_REMOTE_RESTORE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory?targetTime=2024-06-30T11:15:00-06:00&targetTimeline=2")
 		store, _ := state.NewStore()
 
-		if err := pgConf.initialize(store); err != nil {
+		if err := pgConf.initialize(ctx, store); err != nil {
 			t.Fatal(err)
 		}
 
@@ -391,7 +394,7 @@ func TestPGUserConfigOverride(t *testing.T) {
 	}
 
 	store, _ := state.NewStore()
-	if err := pgConf.initialize(store); err != nil {
+	if err := pgConf.initialize(context.TODO(), store); err != nil {
 		t.Error(err)
 	}
 
@@ -542,7 +545,7 @@ func TestValidateCompatibility(t *testing.T) {
 	}
 
 	store, _ := state.NewStore()
-	if err := pgConf.initialize(store); err != nil {
+	if err := pgConf.initialize(context.TODO(), store); err != nil {
 		t.Fatal(err)
 	}
 	t.Run("SharedPreloadLibraries", func(t *testing.T) {
