@@ -58,23 +58,18 @@ func (m *multiOutput) PipeOutput(proc *process) {
 		reader := bufio.NewReader(pipe.pty)
 		for {
 			line, err := reader.ReadBytes('\n')
+
+			// Write to console regardless of whether there's an error.
+			m.WriteLine(proc, line)
+
 			if err != nil {
-				// EOF is expected, so don't log it
 				if err != io.EOF {
 					log.Printf("reader error: %v", err)
 				}
 				break
 			}
-			m.WriteLine(proc, line)
 		}
 	}(proc, pipe)
-}
-
-func (m *multiOutput) ClosePipe(proc *process) {
-	if pipe := m.pipes[proc]; pipe != nil {
-		_ = pipe.pty.Close()
-		_ = pipe.tty.Close()
-	}
 }
 
 func (m *multiOutput) WriteLine(proc *process, p []byte) {
@@ -91,6 +86,8 @@ func (m *multiOutput) WriteLine(proc *process, p []byte) {
 
 	buf.WriteString("\033[0m | ")
 
+	// remove trailing newline if present.
+	p = bytes.TrimSuffix(p, []byte("\n"))
 	buf.Write(p)
 	buf.WriteByte('\n')
 
@@ -100,6 +97,13 @@ func (m *multiOutput) WriteLine(proc *process, p []byte) {
 	_, err := buf.WriteTo(os.Stdout)
 	if err != nil {
 		log.Printf("failed to write to stdout: %s", err)
+	}
+}
+
+func (m *multiOutput) ClosePipe(proc *process) {
+	if pipe := m.pipes[proc]; pipe != nil {
+		_ = pipe.pty.Close()
+		_ = pipe.tty.Close()
 	}
 }
 
