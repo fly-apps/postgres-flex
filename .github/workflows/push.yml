@@ -56,7 +56,7 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
-      - uses: dominikh/staticcheck-action@v1.2.0
+      - uses: dominikh/staticcheck-action@v1.4.0
         with:
           install-go: false
 
