@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <TMPDIR_PATTERN> <CMD> <ARGS...>" >&2
+    exit 1
+fi
+
+TMPDIR_PATTERN=$1
+shift
+export TMPDIR=$(mktemp -d "${TMPDIR_PATTERN}")
+
+if [ -z "${TMPDIR}" ]; then
+    echo "Couldn't create temp directory, exiting" >&2
+    exit 1
+fi
+
+
+echo "Created temp directory ${TMPDIR}" >&2
+
+cleanup() {
+    local rc=$?
+
+    if [ -z "${EXITCODE}" ]; then
+        kill %% >/dev/null
+    fi
+
+    if [ -e "${TMPDIR}" ]; then
+        echo "Removing temp directory ${TMPDIR} ..."
+        rm -rf -- "${TMPDIR}"
+    fi
+
+    # restore the original exit status
+    exit ${EXITCODE:-$rc}
+}
+
+trap cleanup EXIT
+
+"$@" &
+wait %%
+EXITCODE=$?
