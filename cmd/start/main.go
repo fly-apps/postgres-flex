@@ -13,7 +13,10 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/supervisor"
 )
 
+var version = "(devel)"
+
 func main() {
+	log.Printf("Starting postgres-flex %s.", version)
 	log.SetFlags(0)
 
 	requiredPasswords := []string{"SU_PASSWORD", "OPERATOR_PASSWORD", "REPL_PASSWORD"}
