@@ -123,6 +123,36 @@ jobs:
             flyio/postgres-flex-timescaledb:17
             flyio/postgres-flex-timescaledb:17.6
 
+      -
+        name: Build and push Postgres 18
+        id: docker_build_18
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            PG_VERSION=18.1
+            PG_MAJOR_VERSION=18
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./pg18/Dockerfile
+          push: true
+          tags: |
+            flyio/postgres-flex:18
+            flyio/postgres-flex:18.1
+      -
+        name: Build and push Postgres 18 Timescale DB
+        id: docker_build_18_timescaledb
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            PG_VERSION=18.1
+            PG_MAJOR_VERSION=18
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./pg18/Dockerfile-timescaledb
+          push: true
+          tags: |
+            flyio/postgres-flex-timescaledb:18
+            flyio/postgres-flex-timescaledb:18.1
 
       -
         name: Postgres 15 Image digest
@@ -142,3 +172,9 @@ jobs:
       -
         name: Postgres 17 TimescaleDB Image digest
         run: echo ${{ steps.docker_build_17_timescaledb.outputs.digest }}
+      -
+        name: Postgres 18 Image digest
+        run: echo ${{ steps.docker_build_18.outputs.digest }}
+      -
+        name: Postgres 18 TimescaleDB Image digest
+        run: echo ${{ steps.docker_build_18_timescaledb.outputs.digest }}
