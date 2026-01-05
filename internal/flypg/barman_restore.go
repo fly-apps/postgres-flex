@@ -28,7 +28,7 @@ type BarmanRestore struct {
 
 const (
 	defaultRestoreDir     = "/data/postgresql"
-	waitOnRecoveryTimeout = 10 * time.Minute
+	waitOnRecoveryTimeout = 60 * time.Minute
 )
 
 func NewBarmanRestore(configURL string) (*BarmanRestore, error) {
