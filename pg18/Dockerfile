@@ -74,7 +74,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     postgresql-${PG_MAJOR_VERSION}-postgis-$POSTGIS_MAJOR-scripts
 
 # Haproxy
-RUN apt-get update && apt-get install --no-install-recommends -y \
+RUN apt-get update && apt-get install --no-install-recommends -y software-properties-common && \
+    add-apt-repository ppa:vbernat/haproxy-${HAPROXY_VERSION} && \
+    apt-get update && apt-get install --no-install-recommends -y \
     haproxy=$HAPROXY_VERSION.\* \
     && apt autoremove -y && apt clean
 
