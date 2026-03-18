@@ -42,6 +42,7 @@ func clusterStateMonitorTick(ctx context.Context, node *flypg.Node) error {
 		if err := flypg.Quarantine(ctx, node, primary); err != nil {
 			return fmt.Errorf("failed to quarantine failed primary: %s", err)
 		}
+
 		return fmt.Errorf("primary has been quarantined: %s", err)
 	} else if err != nil {
 		return fmt.Errorf("failed to run zombie diagnosis: %s", err)

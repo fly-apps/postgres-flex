@@ -113,7 +113,7 @@ func (r *RepMgr) initialize() error {
 	}
 
 	entriesStr := strings.Join(entries, "")
-	if err := os.WriteFile(r.ConfigPath, []byte(entriesStr), 0600); err != nil {
+	if err := os.WriteFile(r.ConfigPath, []byte(entriesStr), 0o600); err != nil {
 		return fmt.Errorf("failed to create %s: %s", r.ConfigPath, err)
 	}
 
@@ -123,7 +123,7 @@ func (r *RepMgr) initialize() error {
 
 	// Create password file that repmgr will hook into for internal operations.
 	passStr := fmt.Sprintf("*:*:*:%s:%s", r.Credentials.Username, r.Credentials.Password)
-	if err := os.WriteFile(r.PasswordConfigPath, []byte(passStr), 0600); err != nil {
+	if err := os.WriteFile(r.PasswordConfigPath, []byte(passStr), 0o600); err != nil {
 		return fmt.Errorf("failed to write file %s: %s", r.PasswordConfigPath, err)
 	}
 
@@ -335,6 +335,7 @@ func (r *RepMgr) regenReplicationConf(ctx context.Context) error {
 		"standby", "clone", "-F"); err != nil {
 		return fmt.Errorf("failed to regenerate replication conf: %s", err)
 	}
+
 	return nil
 }
 
@@ -528,6 +529,7 @@ func (r *RepMgr) InRegionPeerMachines(ctx context.Context) ([]string, error) {
 			machineIDs = append(machineIDs, machine.Id)
 		}
 	}
+
 	return machineIDs, nil
 }
 

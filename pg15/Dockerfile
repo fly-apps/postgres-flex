@@ -2,7 +2,7 @@ ARG PG_VERSION=15.15
 ARG PG_MAJOR_VERSION=15
 ARG VERSION=custom
 
-FROM golang:1.23
+FROM golang:1.26
 
 WORKDIR /go/src/github.com/fly-apps/fly-postgres
 COPY . .

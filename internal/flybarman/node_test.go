@@ -108,7 +108,7 @@ func setup(t *testing.T) error {
 
 	if _, err := os.Stat(barmanTestDirectory); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.Mkdir(barmanTestDirectory, 0750); err != nil {
+			if err := os.Mkdir(barmanTestDirectory, 0o750); err != nil {
 				return err
 			}
 		} else {

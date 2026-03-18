@@ -45,7 +45,7 @@ func writeS3Credentials(ctx context.Context, s3AuthDir string) error {
 	s3AuthFilePath := filepath.Join(s3AuthDir, s3AuthFileName)
 
 	// Ensure the directory exists
-	if err := os.MkdirAll(s3AuthDir, 0700); err != nil {
+	if err := os.MkdirAll(s3AuthDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create AWS credentials directory: %w", err)
 	}
 
@@ -55,7 +55,7 @@ func writeS3Credentials(ctx context.Context, s3AuthDir string) error {
 	}
 
 	// Set file permissions
-	if err := os.Chmod(s3AuthFilePath, 0644); err != nil {
+	if err := os.Chmod(s3AuthFilePath, 0o644); err != nil {
 		return fmt.Errorf("failed to set file permissions: %w", err)
 	}
 
@@ -76,8 +76,8 @@ func writeCredentialsToFile(credentials []*s3Credentials, pathToCredentialFile s
 
 	// Write the credentials to disk
 	for _, cred := range credentials {
-		_, err := file.WriteString(fmt.Sprintf("[%s]\naws_access_key_id=%s\naws_secret_access_key=%s\n\n",
-			cred.profile, cred.accessKeyID, cred.secretAccessKey))
+		_, err := fmt.Fprintf(file, "[%s]\naws_access_key_id=%s\naws_secret_access_key=%s\n\n",
+			cred.profile, cred.accessKeyID, cred.secretAccessKey)
 		if err != nil {
 			return fmt.Errorf("failed to write s3 profile %s: %w", cred.profile, err)
 		}

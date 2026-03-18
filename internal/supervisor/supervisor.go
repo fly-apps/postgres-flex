@@ -94,7 +94,7 @@ func (*Supervisor) runProcess(ctx context.Context, proc *process) error {
 		}
 
 		restarts++
-		proc.writeLine([]byte(fmt.Sprintf("restarting in %s [attempt %d]", proc.restartDelay, restarts)))
+		proc.writeLine(fmt.Appendf(nil, "restarting in %s [attempt %d]", proc.restartDelay, restarts))
 		select {
 		case <-time.After(proc.restartDelay):
 		case <-ctx.Done():

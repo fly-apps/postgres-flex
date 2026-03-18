@@ -153,11 +153,11 @@ func backupHBAFile() error {
 		return err
 	}
 
-	return os.WriteFile(pathToHBABackup, val, 0600)
+	return os.WriteFile(pathToHBABackup, val, 0o600)
 }
 
 func grantLocalAccess() error {
-	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func restoreHBAFile() error {
 	}
 
 	// open the main pg_hba
-	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(pathToHBAFile, os.O_RDWR|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func restoreHBAFile() error {
 }
 
 func setRestoreLock() error {
-	file, err := os.OpenFile(restoreLockFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(restoreLockFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}

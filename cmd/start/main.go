@@ -76,6 +76,7 @@ func main() {
 				fmt.Printf("failed post-init: %s. Retrying...\n", err)
 				continue
 			}
+
 			return
 		}
 	}()
@@ -159,6 +160,7 @@ func scaleToZeroWorker(ctx context.Context, node *flypg.Node) error {
 			if current > 1 {
 				continue
 			}
+
 			return fmt.Errorf("scale to zero condition hit")
 		}
 	}
@@ -176,6 +178,7 @@ func getCurrentConnCount(ctx context.Context, node *flypg.Node) (int, error) {
 	if err := conn.QueryRow(ctx, sql).Scan(&current); err != nil {
 		return 0, err
 	}
+
 	return current, nil
 }
 

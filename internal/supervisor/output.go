@@ -1,3 +1,4 @@
+// Package supervisor manages the lifecycle of supervised processes.
 package supervisor
 
 import (
@@ -66,6 +67,7 @@ func (m *multiOutput) PipeOutput(proc *process) {
 				if err != io.EOF {
 					log.Printf("reader error: %v", err)
 				}
+
 				break
 			}
 		}
@@ -108,7 +110,6 @@ func (m *multiOutput) ClosePipe(proc *process) {
 }
 
 func (m *multiOutput) WriteErr(proc *process, err error) {
-	m.WriteLine(proc, []byte(
-		fmt.Sprintf("\033[0;31m%v\033[0m", err),
-	))
+	m.WriteLine(proc,
+		fmt.Appendf(nil, "\033[0;31m%v\033[0m", err))
 }

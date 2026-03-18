@@ -1,8 +1,26 @@
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: "gomod"
     directory: "/"
+    labels:
+      - "dependencies"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      tracing:
+        patterns:
+          - "go.opentelemetry.io/*"
+      golangx:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    labels:
+      - "dependencies"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

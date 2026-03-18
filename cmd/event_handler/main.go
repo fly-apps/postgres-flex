@@ -19,10 +19,7 @@ func main() {
 	details := flag.String("details", "", "details")
 	flag.Parse()
 
-	succ := true
-	if *success == "0" {
-		succ = false
-	}
+	succ := *success != "0"
 
 	req := api.EventRequest{
 		Name:    *event,

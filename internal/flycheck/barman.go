@@ -14,7 +14,7 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		checks.AddCheck("connection", func() (string, error) {
+		_ = checks.AddCheck("connection", func() (string, error) {
 			msg := "failed running `barman check pg`"
 			return "", errors.New(msg)
 		})
@@ -25,9 +25,9 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 	// Each line besides the first represents a check and will include FAILED or OK
 	// We just separate those lines and create a health check entry of our own
 	// so it's uniform how we handle it
-	lines := strings.Split(string(output), "\n")
+	lines := strings.SplitSeq(string(output), "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		pattern := `\s*(.*?):(.*)$`
 		regex := regexp.MustCompile(pattern)
 		matches := regex.FindStringSubmatch(line)
@@ -40,7 +40,7 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 				continue
 			}
 
-			checks.AddCheck(left, func() (string, error) {
+			_ = checks.AddCheck(left, func() (string, error) {
 				if strings.Contains(right, "FAILED") {
 					return "", errors.New(right)
 				}

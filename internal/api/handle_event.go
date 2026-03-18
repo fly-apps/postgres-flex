@@ -37,6 +37,7 @@ func handleEvent(w http.ResponseWriter, r *http.Request) {
 		errMsg := fmt.Sprintf("[ERROR] Event %q failed: %s", event.Name, event.Details)
 		log.Println(errMsg)
 		renderErr(w, errors.New(errMsg))
+
 		return
 	}
 
