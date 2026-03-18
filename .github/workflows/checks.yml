@@ -1,0 +1,41 @@
+name: "Checks"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: "Build and test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run unit tests
+        run: go test -v ./...
+
+      - name: Build binaries
+        run: go install ./cmd/...
+
+  precommit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - uses: j178/prek-action@v1
+        with:
+          extra-args: --all-files --stage=manual
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+
+      - name: generate command strings
+        run: go generate ./... && git diff --exit-code

@@ -314,7 +314,7 @@ func (c *PGConfig) initialize(store *state.Store) error {
 }
 
 func (c *PGConfig) writePGConfigEntries(entries []string) error {
-	file, err := os.OpenFile(c.ConfigFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	file, err := os.OpenFile(c.ConfigFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (c *PGConfig) writePGConfigEntries(entries []string) error {
 }
 
 func (c *PGConfig) writePasswordFile(pwd string) error {
-	if err := os.WriteFile(c.passwordFilePath, []byte(pwd), 0600); err != nil {
+	if err := os.WriteFile(c.passwordFilePath, []byte(pwd), 0o600); err != nil {
 		return fmt.Errorf("failed to write default password to %s: %s", c.passwordFilePath, err)
 	}
 
@@ -566,7 +566,7 @@ func (c *PGConfig) setDefaultHBA() error {
 	}
 
 	path := fmt.Sprintf("%s/pg_hba.conf", c.DataDir)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0600)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to create pg_hba.conf file: %s", err)
 	}
@@ -604,5 +604,6 @@ func diskSizeInBytes(dir string) (uint64, error) {
 	if err := syscall.Statfs(dir, &stat); err != nil {
 		return 0, err
 	}
+
 	return stat.Blocks * uint64(stat.Bsize), nil
 }

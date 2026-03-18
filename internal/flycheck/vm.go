@@ -15,17 +15,16 @@ import (
 
 // CheckVM for system / disk checks
 func CheckVM(checks *check.CheckSuite) *check.CheckSuite {
-
-	checks.AddCheck("checkDisk", func() (string, error) {
+	_ = checks.AddCheck("checkDisk", func() (string, error) {
 		return checkDisk("/data/")
 	})
 
-	checks.AddCheck("checkLoad", checkLoad)
+	_ = checks.AddCheck("checkLoad", checkLoad)
 
 	pressureNames := []string{"memory", "cpu", "io"}
 	for _, n := range pressureNames {
 		name := n
-		checks.AddCheck(name, func() (string, error) {
+		_ = checks.AddCheck(name, func() (string, error) {
 			return checkPressure(name)
 		})
 	}
@@ -83,7 +82,6 @@ func checkLoad() (string, error) {
 	var loadAverage1, loadAverage5, loadAverage10 float64
 	var runningProcesses, totalProcesses, lastProcessID int
 	raw, err := os.ReadFile("/proc/loadavg")
-
 	if err != nil {
 		return "", err
 	}
@@ -114,7 +112,6 @@ func checkDisk(dir string) (string, error) {
 	var stat syscall.Statfs_t
 
 	err := syscall.Statfs(dir, &stat)
-
 	if err != nil {
 		return "", fmt.Errorf("%s: %s", dir, err)
 	}
@@ -136,15 +133,14 @@ func diskUsage(dir string) (size uint64, available uint64, err error) {
 	var stat syscall.Statfs_t
 
 	err = syscall.Statfs(dir, &stat)
-
 	if err != nil {
 		return 0, 0, fmt.Errorf("%s: %s", dir, err)
 	}
 
 	size = stat.Blocks * uint64(stat.Bsize)
 	available = stat.Bavail * uint64(stat.Bsize)
-	return size, available, nil
 
+	return size, available, nil
 }
 
 func round(val float64, roundOn float64, places int) (newVal float64) {
@@ -158,8 +154,10 @@ func round(val float64, roundOn float64, places int) (newVal float64) {
 		round = math.Floor(digit)
 	}
 	newVal = round / pow
+
 	return
 }
+
 func dataSize(size uint64) string {
 	var suffixes [5]string
 	suffixes[0] = "B"
@@ -171,6 +169,7 @@ func dataSize(size uint64) string {
 	base := math.Log(float64(size)) / math.Log(1024)
 	getSize := round(math.Pow(1024, base-math.Floor(base)), .5, 2)
 	getSuffix := suffixes[int(math.Floor(base))]
+
 	return fmt.Sprint(strconv.FormatFloat(getSize, 'f', -1, 64) + " " + getSuffix)
 }
 

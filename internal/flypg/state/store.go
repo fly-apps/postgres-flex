@@ -1,3 +1,4 @@
+// Package state manages the persistent state store for the flypg cluster.
 package state
 
 import (

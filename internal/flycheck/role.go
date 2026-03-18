@@ -13,7 +13,7 @@ import (
 // PostgreSQLRole outputs current role
 func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
 	if os.Getenv("IS_BARMAN") != "" {
-		checks.AddCheck("role", func() (string, error) {
+		_ = checks.AddCheck("role", func() (string, error) {
 			return "barman", nil
 		})
 
@@ -35,7 +35,7 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 		_ = conn.Close(ctx)
 	}
 
-	checks.AddCheck("role", func() (string, error) {
+	_ = checks.AddCheck("role", func() (string, error) {
 		if flypg.ZombieLockExists() {
 			return "zombie", nil
 		}
@@ -61,5 +61,6 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 			return "unknown", nil
 		}
 	})
+
 	return checks, nil
 }

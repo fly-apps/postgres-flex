@@ -153,7 +153,6 @@ func TestPGConfigInitialization(t *testing.T) {
 		})
 
 		t.Run("custom-archive-timeout-with-m", func(t *testing.T) {
-
 			barman.SetUserConfig(ConfigMap{"archive_timeout": "60m"})
 
 			if err := writeUserConfigFile(barman); err != nil {
@@ -498,7 +497,7 @@ func setup(t *testing.T) error {
 
 	if _, err := os.Stat(pgTestDirectory); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.Mkdir(pgTestDirectory, 0750); err != nil {
+			if err := os.Mkdir(pgTestDirectory, 0o750); err != nil {
 				return err
 			}
 		} else {
@@ -508,7 +507,7 @@ func setup(t *testing.T) error {
 
 	if _, err := os.Stat(testBarmanConfigDir); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.Mkdir(testBarmanConfigDir, 0750); err != nil {
+			if err := os.Mkdir(testBarmanConfigDir, 0o750); err != nil {
 				return err
 			}
 		} else {
@@ -592,7 +591,6 @@ func TestValidateCompatibility(t *testing.T) {
 		if _, err := pgConf.validateCompatibility(valid); err == nil {
 			t.Fatal("expected validation to fail when repmgr is missing")
 		}
-
 	})
 
 	t.Run("WalLevel", func(t *testing.T) {
@@ -625,7 +623,6 @@ func TestValidateCompatibility(t *testing.T) {
 		if _, err := pgConf.validateCompatibility(invalid); err == nil {
 			t.Fatal(err)
 		}
-
 	})
 
 	t.Run("WalLevelMinimal", func(t *testing.T) {
@@ -740,6 +737,7 @@ func stubPGConfigFile() error {
 		return err
 	}
 	defer func() { _ = file.Close() }()
+
 	return file.Sync()
 }
 

@@ -107,6 +107,7 @@ func removeReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string)
 				if err == pgx.ErrNoRows {
 					return nil
 				}
+
 				return fmt.Errorf("failed to get replication slot %s: %v", slotName, err)
 			}
 

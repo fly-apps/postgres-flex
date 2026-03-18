@@ -64,7 +64,7 @@ func isRegistered(ctx context.Context, conn *pgx.Conn, n *Node) (bool, error) {
 }
 
 func issueRegistrationCert() error {
-	return os.WriteFile(registrationFile, []byte(""), 0600)
+	return os.WriteFile(registrationFile, []byte(""), 0o600)
 }
 
 func registrationCertExists() bool {
@@ -73,6 +73,7 @@ func registrationCertExists() bool {
 			return false
 		}
 	}
+
 	return true
 }
 

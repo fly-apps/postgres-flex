@@ -57,6 +57,7 @@ var backupShowCmd = &cobra.Command{
 		if !backupsEnabled() {
 			return fmt.Errorf("backups are not enabled")
 		}
+
 		return showBackup(cmd, args)
 	},
 	Args: cobra.ExactArgs(1),
@@ -172,6 +173,7 @@ func listBackups(cmd *cobra.Command) error {
 		}
 
 		fmt.Println(string(jsonBytes))
+
 		return nil
 	}
 
@@ -229,7 +231,7 @@ func backupsEnabled() bool {
 }
 
 func newBackupConfig() *cobra.Command {
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage backup configuration",
 	}
@@ -248,20 +250,22 @@ func getAppName() (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("FLY_APP_NAME is not set")
 	}
+
 	return name, nil
 }
 
-func getApiUrl() (string, error) {
+func getAPIURL() (string, error) {
 	hostname, err := getAppName()
 	if err != nil {
 		return "", err
 	}
 	url := fmt.Sprintf("http://%s.internal:5500", hostname)
+
 	return url, nil
 }
 
 func newConfigShow() *cobra.Command {
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -269,7 +273,7 @@ func newConfigShow() *cobra.Command {
 				return fmt.Errorf("backups are not enabled")
 			}
 
-			url, err := getApiUrl()
+			url, err := getAPIURL()
 			if err != nil {
 				return err
 			}
@@ -279,6 +283,7 @@ func newConfigShow() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			defer resp.Body.Close() // nolint:errcheck
 
 			var rv configShowResult
 			if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {
@@ -303,12 +308,12 @@ type successfulUpdateResult struct {
 }
 
 type configUpdateResult struct {
-	Result successfulUpdateResult `json:"result,omitempty"`
+	Result successfulUpdateResult `json:"result"`
 	Error  string                 `json:"error,omitempty"`
 }
 
 func newConfigUpdate() *cobra.Command {
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update configuration",
 	}
@@ -350,7 +355,7 @@ func newConfigUpdate() *cobra.Command {
 			return err
 		}
 
-		url, err := getApiUrl()
+		url, err := getAPIURL()
 		if err != nil {
 			return err
 		}
@@ -360,6 +365,7 @@ func newConfigUpdate() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		defer resp.Body.Close() // nolint:errcheck
 
 		var rv configUpdateResult
 		if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {

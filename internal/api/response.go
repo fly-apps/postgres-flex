@@ -3,15 +3,14 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"net/http"
-
 	"log"
+	"net/http"
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 )
 
-func renderJSON(w http.ResponseWriter, data interface{}, status int) {
+func renderJSON(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -48,5 +47,6 @@ func status(err error) int {
 			return http.StatusInternalServerError
 		}
 	}
+
 	return http.StatusInternalServerError
 }

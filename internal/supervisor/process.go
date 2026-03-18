@@ -98,13 +98,13 @@ func (p *process) Run() {
 		p.writeErr(err)
 	} else {
 		status := p.cmd.ProcessState.ExitCode()
-		p.writeLine([]byte(fmt.Sprintf("\033[1mProcess exited %d\033[0m", status)))
+		p.writeLine(fmt.Appendf(nil, "\033[1mProcess exited %d\033[0m", status))
 	}
 }
 
 func (p *process) Interrupt() {
 	if p.Running() {
-		p.writeLine([]byte(fmt.Sprintf("\033[1mStopping %s...\033[0m", p.stopSignal)))
+		p.writeLine(fmt.Appendf(nil, "\033[1mStopping %s...\033[0m", p.stopSignal))
 		p.signal(p.stopSignal)
 	}
 }

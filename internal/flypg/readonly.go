@@ -115,7 +115,7 @@ func writeReadOnlyLock() error {
 		return nil
 	}
 
-	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0600); err != nil {
+	if err := os.WriteFile(readOnlyLockFile, []byte(time.Now().String()), 0o600); err != nil {
 		return fmt.Errorf("failed to create readonly.lock: %s", err)
 	}
 
