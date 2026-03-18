@@ -29,7 +29,7 @@ jobs:
 
       - name: Build and push Postgres 15
         id: docker_build_15
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=15.10
@@ -44,7 +44,7 @@ jobs:
 
       - name: Build and push Postgres 15 Timescale DB
         id: docker_build_15_timescaledb
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=15.10
@@ -59,7 +59,7 @@ jobs:
 
       - name: Build and push Postgres 16
         id: docker_build_16
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=16.6
@@ -74,7 +74,7 @@ jobs:
 
       - name: Build and push Postgres 16 Timescale DB
         id: docker_build_16_timescaledb
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=16.6
@@ -89,7 +89,7 @@ jobs:
 
       - name: Build and push Postgres 17
         id: docker_build_17
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=17.2
@@ -104,7 +104,7 @@ jobs:
 
       - name: Build and push Postgres 17 Timescale DB
         id: docker_build_17_timescaledb
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=17.2
