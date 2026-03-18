@@ -127,7 +127,7 @@ jobs:
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
           file: ./pg18/Dockerfile
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex:18
             flyio/postgres-flex:18.1
@@ -142,7 +142,7 @@ jobs:
             VERSION=${{ steps.get-latest-tag.outputs.tag }}
           context: .
           file: ./pg18/Dockerfile-timescaledb
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex-timescaledb:18
             flyio/postgres-flex-timescaledb:18.1
