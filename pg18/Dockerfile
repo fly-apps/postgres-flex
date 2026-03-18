@@ -1,5 +1,5 @@
-ARG PG_VERSION=16.13
-ARG PG_MAJOR_VERSION=16
+ARG PG_VERSION=18.1
+ARG PG_MAJOR_VERSION=18
 ARG VERSION=custom
 
 FROM golang:1.26 AS builder
@@ -25,14 +25,15 @@ ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG PG_VERSION
 ARG POSTGIS_MAJOR=3
-ARG HAPROXY_VERSION=2.8
-ARG REPMGR_VERSION=5.4.1-1build2
+ARG HAPROXY_VERSION=3.3
+ARG REPMGR_VERSION=5.5.0+debpgdg-3.pgdg24.04+1
 
 ENV PGDATA=/data/postgresql
 ENV PGPASSFILE=/data/.pgpass
 ENV AWS_SHARED_CREDENTIALS_FILE=/data/.aws/credentials
 ENV PG_MAJOR_VERSION=${PG_MAJOR_VERSION}
 ENV PATH="/usr/lib/postgresql/${PG_MAJOR_VERSION}/bin:$PATH"
+
 
 LABEL fly.app_role=postgres_cluster
 LABEL fly.version=${VERSION}
@@ -64,26 +65,18 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
     apt-get update && apt-get install --no-install-recommends -y \
         postgresql-${PG_MAJOR_VERSION} \
         postgresql-client-${PG_MAJOR_VERSION} \
-        postgresql-contrib-${PG_MAJOR_VERSION}
+        postgresql-contrib-${PG_MAJOR_VERSION} \
+        postgresql-${PG_MAJOR_VERSION}-repmgr=${REPMGR_VERSION}
 
-# Repmgr
-RUN curl -L http://launchpadlibrarian.net/722514158/postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb -o postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb && \
-    apt-get install -y ./postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb \
-    && rm ./postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb
-
-
-# TimescaleDB and PostGIS
-RUN curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor > /usr/share/keyrings/timescaledb.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/timescaledb.gpg] https://packagecloud.io/timescale/timescaledb/ubuntu/ jammy main" > /etc/apt/sources.list.d/timescaledb.list
-
+# PostGIS
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR \
-    postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR-scripts \
-    timescaledb-2-postgresql-$PG_MAJOR_VERSION \
-    && apt autoremove -y && apt clean
+    postgresql-${PG_MAJOR_VERSION}-postgis-$POSTGIS_MAJOR \
+    postgresql-${PG_MAJOR_VERSION}-postgis-$POSTGIS_MAJOR-scripts
 
 # Haproxy
-RUN apt-get update && apt-get install --no-install-recommends -y \
+RUN apt-get update && apt-get install --no-install-recommends -y software-properties-common && \
+    add-apt-repository ppa:vbernat/haproxy-${HAPROXY_VERSION} && \
+    apt-get update && apt-get install --no-install-recommends -y \
     haproxy=$HAPROXY_VERSION.\* \
     && apt autoremove -y && apt clean
 
@@ -99,8 +92,6 @@ RUN ln -s /usr/lib/postgresql/${PG_MAJOR_VERSION}/bin/pg_rewind /usr/bin/pg_rewi
 ADD /config/* /fly/
 RUN mkdir -p /run/haproxy/
 RUN usermod -d /data postgres
-
-ENV TIMESCALEDB_ENABLED=true
 
 EXPOSE 5432
 

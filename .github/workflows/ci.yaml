@@ -32,7 +32,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            PG_VERSION=15.10
+            PG_VERSION=15.15
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag || 'pr-build' }}
           context: .
@@ -40,14 +40,14 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex:15
-            flyio/postgres-flex:15.10
+            flyio/postgres-flex:15.15
 
       - name: Build and push Postgres 15 Timescale DB
         id: docker_build_15_timescaledb
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            PG_VERSION=15.10
+            PG_VERSION=15.15
             PG_MAJOR_VERSION=15
             VERSION=${{ steps.get-latest-tag.outputs.tag || 'pr-build' }}
           context: .
@@ -55,14 +55,14 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex-timescaledb:15
-            flyio/postgres-flex-timescaledb:15.10
+            flyio/postgres-flex-timescaledb:15.15
 
       - name: Build and push Postgres 16
         id: docker_build_16
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            PG_VERSION=16.6
+            PG_VERSION=16.11
             PG_MAJOR_VERSION=16
             VERSION=${{ steps.get-latest-tag.outputs.tag || 'pr-build' }}
           context: .
@@ -70,14 +70,14 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex:16
-            flyio/postgres-flex:16.6
+            flyio/postgres-flex:16.11
 
       - name: Build and push Postgres 16 Timescale DB
         id: docker_build_16_timescaledb
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            PG_VERSION=16.6
+            PG_VERSION=16.11
             PG_MAJOR_VERSION=16
             VERSION=${{ steps.get-latest-tag.outputs.tag || 'pr-build' }}
           context: .
@@ -85,14 +85,14 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex-timescaledb:16
-            flyio/postgres-flex-timescaledb:16.6
+            flyio/postgres-flex-timescaledb:16.11
 
       - name: Build and push Postgres 17
         id: docker_build_17
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            PG_VERSION=17.2
+            PG_VERSION=17.7
             PG_MAJOR_VERSION=17
             VERSION=${{ steps.get-latest-tag.outputs.tag || 'pr-build' }}
           context: .
@@ -100,14 +100,14 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex:17
-            flyio/postgres-flex:17.2
+            flyio/postgres-flex:17.7
 
       - name: Build and push Postgres 17 Timescale DB
         id: docker_build_17_timescaledb
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            PG_VERSION=17.2
+            PG_VERSION=17.7
             PG_MAJOR_VERSION=17
             VERSION=${{ steps.get-latest-tag.outputs.tag || 'pr-build' }}
           context: .
@@ -115,7 +115,37 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             flyio/postgres-flex-timescaledb:17
-            flyio/postgres-flex-timescaledb:17.2
+            flyio/postgres-flex-timescaledb:17.7
+
+      - name: Build and push Postgres 18
+        id: docker_build_18
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            PG_VERSION=18.1
+            PG_MAJOR_VERSION=18
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./pg18/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            flyio/postgres-flex:18
+            flyio/postgres-flex:18.1
+
+      - name: Build and push Postgres 18 Timescale DB
+        id: docker_build_18_timescaledb
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            PG_VERSION=18.1
+            PG_MAJOR_VERSION=18
+            VERSION=${{ steps.get-latest-tag.outputs.tag }}
+          context: .
+          file: ./pg18/Dockerfile-timescaledb
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            flyio/postgres-flex-timescaledb:18
+            flyio/postgres-flex-timescaledb:18.1
 
       - name: Postgres 15 Image digest
         run: echo ${{ steps.docker_build_15.outputs.digest }}
@@ -134,3 +164,9 @@ jobs:
 
       - name: Postgres 17 TimescaleDB Image digest
         run: echo ${{ steps.docker_build_17_timescaledb.outputs.digest }}
+
+      - name: Postgres 18 Image digest
+        run: echo ${{ steps.docker_build_18.outputs.digest }}
+
+      - name: Postgres 18 TimescaleDB Image digest
+        run: echo ${{ steps.docker_build_18_timescaledb.outputs.digest }}

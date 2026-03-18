@@ -1,4 +1,4 @@
-ARG PG_VERSION=17.2
+ARG PG_VERSION=17.9
 ARG PG_MAJOR_VERSION=17
 ARG VERSION=custom
 
@@ -68,8 +68,8 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
         postgresql-${PG_MAJOR_VERSION}-repmgr=${REPMGR_VERSION}
 
 # TimescaleDB and PostGIS
-RUN echo "deb https://packagecloud.io/timescale/timescaledb/ubuntu/ jammy main" > /etc/apt/sources.list.d/timescaledb.list \
-    && curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add -
+RUN curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor > /usr/share/keyrings/timescaledb.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/timescaledb.gpg] https://packagecloud.io/timescale/timescaledb/ubuntu/ jammy main" > /etc/apt/sources.list.d/timescaledb.list
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     postgresql-$PG_MAJOR_VERSION-postgis-$POSTGIS_MAJOR \

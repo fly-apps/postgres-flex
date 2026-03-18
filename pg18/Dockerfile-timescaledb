@@ -1,5 +1,5 @@
-ARG PG_VERSION=16.13
-ARG PG_MAJOR_VERSION=16
+ARG PG_VERSION=18.3
+ARG PG_MAJOR_VERSION=18
 ARG VERSION=custom
 
 FROM golang:1.26 AS builder
@@ -25,8 +25,8 @@ ARG VERSION
 ARG PG_MAJOR_VERSION
 ARG PG_VERSION
 ARG POSTGIS_MAJOR=3
-ARG HAPROXY_VERSION=2.8
-ARG REPMGR_VERSION=5.4.1-1build2
+ARG HAPROXY_VERSION=3.3
+ARG REPMGR_VERSION=5.5.0+debpgdg-3.pgdg24.04+1
 
 ENV PGDATA=/data/postgresql
 ENV PGPASSFILE=/data/.pgpass
@@ -64,13 +64,8 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
     apt-get update && apt-get install --no-install-recommends -y \
         postgresql-${PG_MAJOR_VERSION} \
         postgresql-client-${PG_MAJOR_VERSION} \
-        postgresql-contrib-${PG_MAJOR_VERSION}
-
-# Repmgr
-RUN curl -L http://launchpadlibrarian.net/722514158/postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb -o postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb && \
-    apt-get install -y ./postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb \
-    && rm ./postgresql-${PG_MAJOR_VERSION}-repmgr_${REPMGR_VERSION}_amd64.deb
-
+        postgresql-contrib-${PG_MAJOR_VERSION} \
+        postgresql-${PG_MAJOR_VERSION}-repmgr=${REPMGR_VERSION}
 
 # TimescaleDB and PostGIS
 RUN curl -L https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor > /usr/share/keyrings/timescaledb.gpg \
@@ -83,7 +78,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     && apt autoremove -y && apt clean
 
 # Haproxy
-RUN apt-get update && apt-get install --no-install-recommends -y \
+RUN apt-get update && apt-get install --no-install-recommends -y software-properties-common && \
+    add-apt-repository ppa:vbernat/haproxy-${HAPROXY_VERSION} && \
+    apt-get update && apt-get install --no-install-recommends -y \
     haproxy=$HAPROXY_VERSION.\* \
     && apt autoremove -y && apt clean
 
