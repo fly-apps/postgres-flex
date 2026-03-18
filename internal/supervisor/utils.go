@@ -11,7 +11,7 @@ func fatalOnErr(err error) {
 	}
 }
 
-func fatal(i ...interface{}) {
+func fatal(i ...any) {
 	fmt.Fprint(os.Stderr, "hivemind: ")
 	fmt.Fprintln(os.Stderr, i...)
 	panic(i)

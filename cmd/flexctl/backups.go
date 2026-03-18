@@ -308,7 +308,7 @@ type successfulUpdateResult struct {
 }
 
 type configUpdateResult struct {
-	Result successfulUpdateResult `json:"result,omitempty"`
+	Result successfulUpdateResult `json:"result"`
 	Error  string                 `json:"error,omitempty"`
 }
 

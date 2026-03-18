@@ -56,8 +56,8 @@ func AllMachines(ctx context.Context, appName string) ([]Machine, error) {
 
 	machines := make([]Machine, 0)
 	for _, txt := range txts {
-		parts := strings.Split(txt, ",")
-		for _, part := range parts {
+		parts := strings.SplitSeq(txt, ",")
+		for part := range parts {
 			parts := strings.Split(part, " ")
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid machine DNS TXT format: %s", txt)

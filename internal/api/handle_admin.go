@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -145,7 +146,7 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var requestedChanges map[string]interface{}
+	var requestedChanges map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&requestedChanges); err != nil {
 		renderErr(w, err)
 		return
@@ -158,9 +159,7 @@ func handleUpdatePostgresSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for k, v := range requestedChanges {
-		cfg[k] = v
-	}
+	maps.Copy(cfg, requestedChanges)
 
 	node.PGConfig.SetUserConfig(cfg)
 
@@ -287,7 +286,7 @@ func handleViewRepmgrSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := map[string]interface{}{}
+	out := map[string]any{}
 
 	for key := range all {
 		val := all[key]
@@ -362,7 +361,7 @@ func handleUpdateBarmanSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var requestedChanges map[string]interface{}
+	var requestedChanges map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&requestedChanges); err != nil {
 		renderErr(w, err)
 		return
@@ -373,9 +372,7 @@ func handleUpdateBarmanSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for k, v := range requestedChanges {
-		cfg[k] = v
-	}
+	maps.Copy(cfg, requestedChanges)
 
 	barman.SetUserConfig(cfg)
 

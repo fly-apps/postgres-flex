@@ -25,9 +25,9 @@ func CheckBarmanConnection(checks *check.CheckSuite) *check.CheckSuite {
 	// Each line besides the first represents a check and will include FAILED or OK
 	// We just separate those lines and create a health check entry of our own
 	// so it's uniform how we handle it
-	lines := strings.Split(string(output), "\n")
+	lines := strings.SplitSeq(string(output), "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		pattern := `\s*(.*?):(.*)$`
 		regex := regexp.MustCompile(pattern)
 		matches := regex.FindStringSubmatch(line)

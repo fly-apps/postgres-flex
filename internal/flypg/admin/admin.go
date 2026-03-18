@@ -330,7 +330,7 @@ func DropOwned(ctx context.Context, conn *pgx.Conn, user string) error {
 	return nil
 }
 
-func SetConfigurationSetting(ctx context.Context, conn *pgx.Conn, key string, value interface{}) error {
+func SetConfigurationSetting(ctx context.Context, conn *pgx.Conn, key string, value any) error {
 	sql := fmt.Sprintf("SET %s to %s", key, value)
 	_, err := conn.Exec(ctx, sql)
 	return err
@@ -400,7 +400,7 @@ func GetSetting(ctx context.Context, pg *pgx.Conn, setting string) (*PGSetting, 
 	return &out, nil
 }
 
-func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[string]interface{}) error {
+func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[string]any) error {
 	for k, v := range requested {
 		exists, err := SettingExists(ctx, conn, k)
 		if err != nil {
@@ -413,8 +413,8 @@ func ValidatePGSettings(ctx context.Context, conn *pgx.Conn, requested map[strin
 		// Verify specified extensions are installed
 		if k == "shared_preload_libraries" {
 			extensions := strings.Trim(v.(string), "'")
-			extSlice := strings.Split(extensions, ",")
-			for _, e := range extSlice {
+			extSlice := strings.SplitSeq(extensions, ",")
+			for e := range extSlice {
 				available, err := ExtensionAvailable(ctx, conn, e)
 				if err != nil {
 					return fmt.Errorf("failed to verify pg extension %s: %s", e, err)
