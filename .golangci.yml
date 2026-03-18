@@ -15,6 +15,7 @@ linters:
     - gocheckcompilerdirectives
     - errname
     - errchkjson
+    - unparam
   settings:
     nlreturn:
       block-size: 3
