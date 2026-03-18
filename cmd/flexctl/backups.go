@@ -254,7 +254,7 @@ func getAppName() (string, error) {
 	return name, nil
 }
 
-func getApiUrl() (string, error) {
+func getAPIURL() (string, error) {
 	hostname, err := getAppName()
 	if err != nil {
 		return "", err
@@ -273,7 +273,7 @@ func newConfigShow() *cobra.Command {
 				return fmt.Errorf("backups are not enabled")
 			}
 
-			url, err := getApiUrl()
+			url, err := getAPIURL()
 			if err != nil {
 				return err
 			}
@@ -283,6 +283,7 @@ func newConfigShow() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			defer resp.Body.Close() // nolint:errcheck
 
 			var rv configShowResult
 			if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {
@@ -354,7 +355,7 @@ func newConfigUpdate() *cobra.Command {
 			return err
 		}
 
-		url, err := getApiUrl()
+		url, err := getAPIURL()
 		if err != nil {
 			return err
 		}
@@ -364,6 +365,7 @@ func newConfigUpdate() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		defer resp.Body.Close() // nolint:errcheck
 
 		var rv configUpdateResult
 		if err := json.NewDecoder(resp.Body).Decode(&rv); err != nil {

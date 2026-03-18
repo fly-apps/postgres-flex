@@ -1,3 +1,4 @@
+// Package api provides HTTP handlers for the postgres management API.
 package api
 
 import (

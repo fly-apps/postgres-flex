@@ -1,3 +1,4 @@
+// Package utils provides shared utility functions.
 package utils
 
 import (
@@ -43,7 +44,7 @@ func RunCmd(ctx context.Context, usr string, name string, args ...string) ([]byt
 	return cmd.Output()
 }
 
-// Deprecated, use RunCmd instead
+// RunCommand runs a shell command as the given user. Deprecated, use RunCmd instead.
 func RunCommand(cmdStr, usr string) ([]byte, error) {
 	uid, gid, err := SystemUserIDs(usr)
 	if err != nil {

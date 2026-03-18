@@ -1,3 +1,4 @@
+// Package privnet provides utilities for working with private networks.
 package privnet
 
 import (

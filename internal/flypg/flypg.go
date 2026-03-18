@@ -1,3 +1,4 @@
+// Package flypg manages the postgres cluster lifecycle on fly.io.
 package flypg
 
 import (

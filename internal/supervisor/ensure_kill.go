@@ -1,6 +1,7 @@
 //go:build !linux
 // +build !linux
 
+// Package supervisor manages the lifecycle of supervised processes.
 package supervisor
 
 import "os/exec"

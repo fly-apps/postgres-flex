@@ -1,3 +1,4 @@
+// Package flybarman manages barman backup nodes.
 package flybarman
 
 import (

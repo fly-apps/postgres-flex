@@ -15,16 +15,16 @@ import (
 
 // CheckVM for system / disk checks
 func CheckVM(checks *check.CheckSuite) *check.CheckSuite {
-	checks.AddCheck("checkDisk", func() (string, error) {
+	_ = checks.AddCheck("checkDisk", func() (string, error) {
 		return checkDisk("/data/")
 	})
 
-	checks.AddCheck("checkLoad", checkLoad)
+	_ = checks.AddCheck("checkLoad", checkLoad)
 
 	pressureNames := []string{"memory", "cpu", "io"}
 	for _, n := range pressureNames {
 		name := n
-		checks.AddCheck(name, func() (string, error) {
+		_ = checks.AddCheck(name, func() (string, error) {
 			return checkPressure(name)
 		})
 	}

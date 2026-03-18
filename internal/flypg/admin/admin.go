@@ -1,3 +1,4 @@
+// Package admin provides administrative utilities for managing postgres.
 package admin
 
 import (

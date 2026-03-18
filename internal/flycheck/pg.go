@@ -41,13 +41,13 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		_ = repConn.Close(ctx)
 	}
 
-	checks.AddCheck("connections", func() (string, error) {
+	_ = checks.AddCheck("connections", func() (string, error) {
 		return connectionCount(ctx, localConn)
 	})
 
 	if member.Role == flypg.PrimaryRoleName {
 		// Check to see if any locks are present.
-		checks.AddCheck("cluster-locks", func() (string, error) {
+		_ = checks.AddCheck("cluster-locks", func() (string, error) {
 			if flypg.ZombieLockExists() {
 				return "", fmt.Errorf("`zombie.lock` detected")
 			}
@@ -62,7 +62,7 @@ func CheckPostgreSQL(ctx context.Context, checks *check.CheckSuite) (*check.Chec
 		if member.Active {
 			// Check that provides additional insight into disk capacity and
 			// how close we are to hitting the readonly threshold.
-			checks.AddCheck("disk-capacity", func() (string, error) {
+			_ = checks.AddCheck("disk-capacity", func() (string, error) {
 				return diskCapacityCheck(ctx, node)
 			})
 		}

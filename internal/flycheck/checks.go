@@ -1,3 +1,4 @@
+// Package flycheck implements health check handlers for fly.io postgres.
 package flycheck
 
 import (
