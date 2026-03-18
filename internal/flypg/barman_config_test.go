@@ -20,7 +20,6 @@ func TestValidateBarmanConfig(t *testing.T) {
 	}
 
 	t.Run("valid-config", func(t *testing.T) {
-
 		conf := ConfigMap{
 			"archive_timeout":       "120s",
 			"recovery_window":       "7d",
@@ -151,7 +150,6 @@ func TestValidateBarmanConfig(t *testing.T) {
 			t.Fatalf("expected error, got nil")
 		}
 	})
-
 }
 
 func TestBarmanConfigSettings(t *testing.T) {
@@ -183,7 +181,6 @@ func TestBarmanConfigSettings(t *testing.T) {
 		if b.Settings.ArchiveTimeout != "60s" {
 			t.Fatalf("expected archive_timeout to be 60s, but got %s", b.Settings.ArchiveTimeout)
 		}
-
 	})
 }
 

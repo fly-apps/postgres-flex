@@ -83,6 +83,7 @@ func (*BarmanRestore) walReplayAndReset(ctx context.Context, node *Node) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
+
 		return fmt.Errorf("failed backing up pg_hba.conf: %s", err)
 	}
 
@@ -185,7 +186,7 @@ func (b *BarmanRestore) restoreFromBackup(ctx context.Context) error {
 	}
 
 	// Write the recovery.signal file
-	if err := os.WriteFile("/data/postgresql/recovery.signal", []byte(""), 0600); err != nil {
+	if err := os.WriteFile("/data/postgresql/recovery.signal", []byte(""), 0o600); err != nil {
 		return fmt.Errorf("failed to write recovery.signal: %s", err)
 	}
 

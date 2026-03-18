@@ -8,14 +8,14 @@ import (
 )
 
 func main() {
-	var rootCmd = &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:           "flexctl",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
 
 	// Backup commands
-	var backupCmd = &cobra.Command{Use: "backup"}
+	backupCmd := &cobra.Command{Use: "backup"}
 	backupCmd.Aliases = []string{"backups"}
 
 	rootCmd.AddCommand(backupCmd)

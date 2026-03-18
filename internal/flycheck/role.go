@@ -61,5 +61,6 @@ func PostgreSQLRole(ctx context.Context, checks *check.CheckSuite) (*check.Check
 			return "unknown", nil
 		}
 	})
+
 	return checks, nil
 }

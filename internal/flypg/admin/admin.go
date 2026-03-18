@@ -24,6 +24,7 @@ func GrantSuperuser(ctx context.Context, pg *pgx.Conn, username string) error {
 	sql := fmt.Sprintf("ALTER USER %s WITH SUPERUSER;", username)
 
 	_, err := pg.Exec(ctx, sql)
+
 	return err
 }
 
@@ -69,6 +70,7 @@ func ChangePassword(ctx context.Context, pg *pgx.Conn, username, password string
 	sql := fmt.Sprintf("ALTER USER %s WITH LOGIN PASSWORD '%s';", username, password)
 
 	_, err := pg.Exec(ctx, sql)
+
 	return err
 }
 
@@ -100,6 +102,7 @@ func CreateDatabase(ctx context.Context, pg *pgx.Conn, name string) error {
 
 	sql := fmt.Sprintf("CREATE DATABASE %s;", name)
 	_, err = pg.Exec(ctx, sql)
+
 	return err
 }
 
@@ -336,6 +339,7 @@ func ReloadPostgresConfig(ctx context.Context, pg *pgx.Conn) error {
 	sql := "SELECT pg_reload_conf()"
 
 	_, err := pg.Exec(ctx, sql)
+
 	return err
 }
 
@@ -345,6 +349,7 @@ func SettingExists(ctx context.Context, pg *pgx.Conn, setting string) (bool, err
 	if err := pg.QueryRow(ctx, sql).Scan(&out); err != nil {
 		return false, err
 	}
+
 	return out, nil
 }
 
@@ -354,6 +359,7 @@ func ExtensionAvailable(ctx context.Context, pg *pgx.Conn, extension string) (bo
 	if err := pg.QueryRow(ctx, sql).Scan(&out); err != nil {
 		return false, err
 	}
+
 	return out, nil
 }
 
@@ -364,6 +370,7 @@ func SettingRequiresRestart(ctx context.Context, pg *pgx.Conn, setting string) (
 	if err := row.Scan(&out); err != nil {
 		return false, err
 	}
+
 	return out, nil
 }
 
@@ -388,6 +395,7 @@ func GetSetting(ctx context.Context, pg *pgx.Conn, setting string) (*PGSetting, 
 	if err := row.Scan(&out.Name, &out.Setting, &out.VarType, &out.MinVal, &out.MaxVal, &out.EnumVals, &out.Context, &out.Unit, &out.Desc, &out.PendingRestart); err != nil {
 		return nil, err
 	}
+
 	return &out, nil
 }
 

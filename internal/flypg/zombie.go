@@ -31,7 +31,7 @@ func ZombieLockExists() bool {
 }
 
 func writeZombieLock(hostname string) error {
-	if err := os.WriteFile(zombieLockFile, []byte(hostname), 0600); err != nil {
+	if err := os.WriteFile(zombieLockFile, []byte(hostname), 0o600); err != nil {
 		return err
 	}
 
@@ -157,6 +157,7 @@ func ZombieDiagnosis(s *DNASample) (string, error) {
 		if s.totalConflicts > 0 {
 			return "", ErrZombieDiagnosisUndecided
 		}
+
 		return s.hostname, nil
 	}
 
@@ -257,6 +258,7 @@ func EvaluateClusterState(ctx context.Context, conn *pgx.Conn, node *Node) error
 			return fmt.Errorf("failed to quarantine failed primary: %s", err)
 		}
 		log.Println("[WARN] Primary is going read-only to protect against potential split-brain")
+
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to run zombie diagnosis: %s", err)

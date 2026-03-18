@@ -57,6 +57,7 @@ var backupShowCmd = &cobra.Command{
 		if !backupsEnabled() {
 			return fmt.Errorf("backups are not enabled")
 		}
+
 		return showBackup(cmd, args)
 	},
 	Args: cobra.ExactArgs(1),
@@ -172,6 +173,7 @@ func listBackups(cmd *cobra.Command) error {
 		}
 
 		fmt.Println(string(jsonBytes))
+
 		return nil
 	}
 
@@ -229,7 +231,7 @@ func backupsEnabled() bool {
 }
 
 func newBackupConfig() *cobra.Command {
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage backup configuration",
 	}
@@ -248,6 +250,7 @@ func getAppName() (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("FLY_APP_NAME is not set")
 	}
+
 	return name, nil
 }
 
@@ -257,11 +260,12 @@ func getApiUrl() (string, error) {
 		return "", err
 	}
 	url := fmt.Sprintf("http://%s.internal:5500", hostname)
+
 	return url, nil
 }
 
 func newConfigShow() *cobra.Command {
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -308,7 +312,7 @@ type configUpdateResult struct {
 }
 
 func newConfigUpdate() *cobra.Command {
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update configuration",
 	}

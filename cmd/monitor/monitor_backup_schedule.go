@@ -111,6 +111,7 @@ func calculateNextBackupTime(barman *flypg.Barman, lastBackupTime time.Time) tim
 	if lastBackupTime.IsZero() {
 		return -1
 	}
+
 	return time.Until(lastBackupTime.Add(backupFrequency(barman)))
 }
 

@@ -13,7 +13,7 @@ const (
 )
 
 func WriteSSHKey() error {
-	err := os.Mkdir("/data/.ssh", 0700)
+	err := os.Mkdir("/data/.ssh", 0o700)
 	if err != nil && !os.IsExist(err) {
 		return err
 	}
@@ -30,11 +30,11 @@ func WriteSSHKey() error {
 		return fmt.Errorf("failed to write .ssh/config: %s", err)
 	}
 
-	if err := os.Chmod(privateKeyFile, 0600); err != nil {
+	if err := os.Chmod(privateKeyFile, 0o600); err != nil {
 		return fmt.Errorf("failed to chmod private key file: %s", err)
 	}
 
-	if err := os.Chmod(publicKeyFile, 0600); err != nil {
+	if err := os.Chmod(publicKeyFile, 0o600); err != nil {
 		return fmt.Errorf("failed to chmod public key file: %s", err)
 	}
 

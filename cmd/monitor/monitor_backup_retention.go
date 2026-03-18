@@ -9,7 +9,6 @@ import (
 )
 
 func monitorBackupRetention(ctx context.Context, node *flypg.Node, barman *flypg.Barman) {
-
 	ticker := time.NewTicker(defaultBackupRetentionEvalFrequency)
 	defer ticker.Stop()
 

@@ -170,7 +170,7 @@ func (c *BarmanConfig) Validate(requestedChanges map[string]interface{}) error {
 
 func (c *BarmanConfig) initialize(store *state.Store, configDir string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(configDir, 0600); err != nil {
+	if err := os.MkdirAll(configDir, 0o600); err != nil {
 		return fmt.Errorf("failed to create barman config directory: %s", err)
 	}
 
@@ -215,6 +215,7 @@ func convertRecoveryWindowDuration(durationStr string) string {
 			return strings.TrimSuffix(durationStr, unit) + " " + text
 		}
 	}
+
 	return durationStr
 }
 

@@ -105,5 +105,4 @@ func TestFormatTimestamp(t *testing.T) {
 func setDefaultEnv(t *testing.T) {
 	t.Setenv("S3_ARCHIVE_CONFIG", "https://my-key:my-secret@fly.storage.tigris.dev/my-bucket/my-directory")
 	t.Setenv("FLY_APP_NAME", "postgres-flex")
-
 }

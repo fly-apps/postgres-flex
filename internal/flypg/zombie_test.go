@@ -6,7 +6,6 @@ import (
 )
 
 func TestZombieDiagnosis(t *testing.T) {
-
 	t.Run("SingleMember", func(t *testing.T) {
 		sample := &DNASample{
 			hostname:      "host-1",
@@ -24,7 +23,6 @@ func TestZombieDiagnosis(t *testing.T) {
 		if primary != sample.hostname {
 			t.Fatalf("expected %s, got %q", sample.hostname, primary)
 		}
-
 	})
 
 	t.Run("TwoMember", func(t *testing.T) {
@@ -309,5 +307,4 @@ func TestZombieDiagnosis(t *testing.T) {
 			t.Fatalf("expected %s, got %q", "host-99", primary)
 		}
 	})
-
 }

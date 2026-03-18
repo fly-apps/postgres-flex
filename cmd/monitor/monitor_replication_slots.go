@@ -74,6 +74,7 @@ func replicationSlotMonitorTick(ctx context.Context, node *flypg.Node, inactiveS
 				}
 
 				delete(inactiveSlotStatus, int(slot.MemberID))
+
 				continue
 			}
 

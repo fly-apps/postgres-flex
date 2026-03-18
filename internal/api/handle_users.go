@@ -29,7 +29,6 @@ func handleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderJSON(w, res, http.StatusOK)
-
 }
 
 func handleGetUser(w http.ResponseWriter, r *http.Request) {

@@ -66,6 +66,7 @@ func (m *multiOutput) PipeOutput(proc *process) {
 				if err != io.EOF {
 					log.Printf("reader error: %v", err)
 				}
+
 				break
 			}
 		}

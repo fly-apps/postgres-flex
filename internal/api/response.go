@@ -3,9 +3,8 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"net/http"
-
 	"log"
+	"net/http"
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
@@ -48,5 +47,6 @@ func status(err error) int {
 			return http.StatusInternalServerError
 		}
 	}
+
 	return http.StatusInternalServerError
 }

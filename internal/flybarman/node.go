@@ -107,7 +107,7 @@ retention_policy = RECOVERY WINDOW OF 7 days
 wal_retention_policy = main
 `, n.AppName, n.AppName)
 
-		if err := os.WriteFile(n.BarmanConfigFile, []byte(barmanConfigFileContent), 0644); err != nil {
+		if err := os.WriteFile(n.BarmanConfigFile, []byte(barmanConfigFileContent), 0o644); err != nil {
 			return fmt.Errorf("failed write %s: %s", n.BarmanConfigFile, err)
 		}
 
@@ -131,18 +131,18 @@ wal_retention_policy = main
 	log.Println("Barman home directory successfully.")
 
 	passStr := fmt.Sprintf("*:*:*:%s:%s", n.ReplCredentials.Username, n.ReplCredentials.Password)
-	if err := os.WriteFile(n.PasswordConfigPath, []byte(passStr), 0700); err != nil {
+	if err := os.WriteFile(n.PasswordConfigPath, []byte(passStr), 0o700); err != nil {
 		return fmt.Errorf("failed to write file %s: %s", n.PasswordConfigPath, err)
 	}
 	// We need this in case the user ssh to the vm as root
-	if err := os.WriteFile(n.RootPasswordConfigPath, []byte(passStr), 0700); err != nil {
+	if err := os.WriteFile(n.RootPasswordConfigPath, []byte(passStr), 0o700); err != nil {
 		return fmt.Errorf("failed to write file %s: %s", n.RootPasswordConfigPath, err)
 	}
 
 	barmanCronFileContent := `* * * * * /usr/local/bin/barman_cron
 	`
 
-	if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0644); err != nil {
+	if err := os.WriteFile(n.BarmanCronFile, []byte(barmanCronFileContent), 0o644); err != nil {
 		return fmt.Errorf("failed write %s: %s", n.BarmanCronFile, err)
 	}
 	log.Println(n.BarmanCronFile + " created successfully.")
@@ -195,5 +195,6 @@ func (n *Node) deleteGlobalBarmanFile() error {
 	}
 
 	log.Println(n.GlobalBarmanConfigFile + " deleted successfully")
+
 	return nil
 }

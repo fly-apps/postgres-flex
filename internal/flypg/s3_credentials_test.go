@@ -90,5 +90,4 @@ func TestWriteAWSCredentials(t *testing.T) {
 			t.Fatalf("expected contents to be %s, but got %s", expected, string(contents))
 		}
 	})
-
 }

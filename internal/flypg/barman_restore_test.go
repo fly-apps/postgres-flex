@@ -170,7 +170,6 @@ func TestNewBarmanRestore(t *testing.T) {
 		if restore.endpoint != "https://fly.storage.tigris.dev" {
 			t.Fatalf("expected endpoint to be https://fly.storage.tigris.dev, got %s", restore.endpoint)
 		}
-
 	})
 
 	t.Run("target", func(t *testing.T) {
@@ -244,7 +243,6 @@ func TestNewBarmanRestore(t *testing.T) {
 		if restore.recoveryTargetTimeline != "2" {
 			t.Fatalf("expected recovery target timeline to be 2, got %s", restore.recoveryTargetTimeline)
 		}
-
 	})
 }
 
@@ -311,7 +309,6 @@ func TestParseBackups(t *testing.T) {
 			if backup.Name != "" {
 				t.Fatalf("expected name to be empty, but got %s", backup.Name)
 			}
-
 		})
 
 		t.Run("second-backup", func(t *testing.T) {
@@ -339,7 +336,6 @@ func TestParseBackups(t *testing.T) {
 			if backup.EndTime != "Wed Jun 26 17:27:02 2024" {
 				t.Fatalf("expected end time to be Wed Jun 26 17:27:02 2024, got %s", backup.EndTime)
 			}
-
 		})
 	})
 }

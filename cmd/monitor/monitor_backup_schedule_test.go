@@ -115,7 +115,6 @@ func TestCalculateNextBackupTime(t *testing.T) {
 			t.Fatalf("expected next backup time duration to be %f, but got %f", expected, val)
 		}
 	})
-
 }
 
 func setDefaultEnv(t *testing.T) {
@@ -129,13 +128,14 @@ func setup(t *testing.T) error {
 
 	if _, err := os.Stat(pgTestDirectory); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.Mkdir(pgTestDirectory, 0750); err != nil {
+			if err := os.Mkdir(pgTestDirectory, 0o750); err != nil {
 				return err
 			}
 		} else {
 			return err
 		}
 	}
+
 	return nil
 }
 
