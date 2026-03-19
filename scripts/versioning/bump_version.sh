@@ -11,7 +11,6 @@ prerel=${2:-none}
 targetpath="../../scripts/versioning"
 
 if [[ $bump == "prerel" ]]; then
-  bump="patch"
   prerel="prerel"
 fi
 
@@ -23,7 +22,7 @@ elif [[ $(git status --porcelain -b | grep -e "ahead" -e "behind") != "" ]]; the
   exit 1
 fi
 
-dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 previous_version="$("$dir"/$targetpath/version.sh -s)"
 
@@ -51,8 +50,7 @@ echo "Bumping version from v${previous_version} to ${new_version}"
 
 read -p "Are you sure? " -n 1 -r
 echo
-if [[ $REPLY =~ ^[Yy]$ ]]
-then
+if [[ $REPLY =~ ^[Yy]$ ]]; then
   git tag -m "release ${new_version}" -a "$new_version" && git push "${ORIGIN}" tag "$new_version"
   echo "done"
 fi
