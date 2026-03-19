@@ -87,28 +87,22 @@ function compare-version {
   for i in 0 1 2; do
     local diff=$((${V[$i]} - ${V_[$i]}))
     if [[ $diff -lt 0 ]]; then
-      echo -1
-      return 0
+      echo -1; return 0
     elif [[ $diff -gt 0 ]]; then
-      echo 1
-      return 0
+      echo 1; return 0
     fi
   done
 
   # PREREL should compare with the ASCII order.
   if [[ -z "${V[3]}" ]] && [[ -n "${V_[3]}" ]]; then
-    echo 1
-    return 0
+    echo 1; return 0;
   elif [[ -n "${V[3]}" ]] && [[ -z "${V_[3]}" ]]; then
-    echo -1
-    return 0
+    echo -1; return 0;
   elif [[ -n "${V[3]}" ]] && [[ -n "${V_[3]}" ]]; then
     if [[ "${V[3]}" > "${V_[3]}" ]]; then
-      echo 1
-      return 0
+      echo 1; return 0;
     elif [[ "${V[3]}" < "${V_[3]}" ]]; then
-      echo -1
-      return 0
+      echo -1; return 0;
     fi
   fi
 
@@ -116,27 +110,18 @@ function compare-version {
 }
 
 function command-bump {
-  local new
-  local version
-  local sub_version
-  local command
+  local new; local version; local sub_version; local command;
 
   case $# in
-  2) case $1 in
-    major | minor | patch | release)
-      command=$1
-      version=$2
-      ;;
-    *) usage-help ;;
-    esac ;;
-  3) case $1 in
-    prerel | build)
-      command=$1
-      sub_version=$2 version=$3
-      ;;
-    *) usage-help ;;
-    esac ;;
-  *) usage-help ;;
+    2) case $1 in
+        major|minor|patch|release) command=$1; version=$2;;
+        *) usage-help;;
+       esac ;;
+    3) case $1 in
+        prerel|build) command=$1; sub_version=$2 version=$3 ;;
+        *) usage-help;;
+       esac ;;
+    *) usage-help;;
   esac
 
   validate-version "$version" parts
@@ -148,13 +133,13 @@ function command-bump {
   local build="${parts[4]}"
 
   case "$command" in
-  major) new="$((major + 1)).0.0" ;;
-  minor) new="${major}.$((minor + 1)).0" ;;
-  patch) new="${major}.${minor}.$((patch + 1))" ;;
-  release) new="${major}.${minor}.${patch}" ;;
-  prerel) new=$(validate-version "${major}.${minor}.${patch}-${sub_version}") ;;
-  build) new=$(validate-version "${major}.${minor}.${patch}${prere}+${sub_version}") ;;
-  *) usage-help ;;
+    major) new="$((major + 1)).0.0";;
+    minor) new="${major}.$((minor + 1)).0";;
+    patch) new="${major}.${minor}.$((patch + 1))";;
+    release) new="${major}.${minor}.${patch}";;
+    prerel) new=$(validate-version "${major}.${minor}.${patch}-${sub_version}");;
+    build) new=$(validate-version "${major}.${minor}.${patch}${prere}+${sub_version}");;
+    *) usage-help ;;
   esac
 
   echo "$new"
@@ -162,75 +147,54 @@ function command-bump {
 }
 
 function command-compare {
-  local v
-  local v_
+  local v; local v_;
 
   case $# in
-  2)
-    v=$(validate-version "$1")
-    v_=$(validate-version "$2")
-    ;;
-  *) usage-help ;;
+    2) v=$(validate-version "$1"); v_=$(validate-version "$2") ;;
+    *) usage-help ;;
   esac
 
   compare-version "$v" "$v_"
   exit 0
 }
 
+
 # shellcheck disable=SC2034
 function command-get {
-  local part version
+    local part version
 
-  if [[ "$#" -ne "2" ]] || [[ -z "$1" ]] || [[ -z "$2" ]]; then
-    usage-help
+    if [[ "$#" -ne "2" ]] || [[ -z "$1" ]] || [[ -z "$2" ]]; then
+        usage-help
+        exit 0
+    fi
+
+    part="$1"
+    version="$2"
+
+    validate-version "$version" parts
+    local major="${parts[0]}"
+    local minor="${parts[1]}"
+    local patch="${parts[2]}"
+    local prerel="${parts[3]:1}"
+    local build="${parts[4]:1}"
+
+    case "$part" in
+        major|minor|patch|release|prerel|build) echo "${!part}" ;;
+        *) usage-help ;;
+    esac
+
     exit 0
-  fi
-
-  part="$1"
-  version="$2"
-
-  validate-version "$version" parts
-  local major="${parts[0]}"
-  local minor="${parts[1]}"
-  local patch="${parts[2]}"
-  local prerel="${parts[3]:1}"
-  local build="${parts[4]:1}"
-
-  case "$part" in
-  major | minor | patch | release | prerel | build) echo "${!part}" ;;
-  *) usage-help ;;
-  esac
-
-  exit 0
 }
 
 case $# in
-0)
-  echo "Unknown command: $*"
-  usage-help
-  ;;
+  0) echo "Unknown command: $*"; usage-help;;
 esac
 
 case $1 in
---help | -h)
-  echo -e "$USAGE"
-  exit 0
-  ;;
---version | -v) usage-version ;;
-bump)
-  shift
-  command-bump "$@"
-  ;;
-get)
-  shift
-  command-get "$@"
-  ;;
-compare)
-  shift
-  command-compare "$@"
-  ;;
-*)
-  echo "Unknown arguments: $*"
-  usage-help
-  ;;
+  --help|-h) echo -e "$USAGE"; exit 0;;
+  --version|-v) usage-version ;;
+  bump) shift; command-bump "$@";;
+  get) shift; command-get "$@";;
+  compare) shift; command-compare "$@";;
+  *) echo "Unknown arguments: $*"; usage-help;;
 esac
