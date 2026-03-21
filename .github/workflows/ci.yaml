@@ -119,7 +119,7 @@ jobs:
 
       - name: Build and push Postgres 18
         id: docker_build_18
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=18.1
@@ -134,7 +134,7 @@ jobs:
 
       - name: Build and push Postgres 18 Timescale DB
         id: docker_build_18_timescaledb
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             PG_VERSION=18.1
