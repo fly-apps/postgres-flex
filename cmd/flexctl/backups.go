@@ -12,6 +12,7 @@ import (
 	"github.com/fly-apps/postgres-flex/internal/flypg"
 	"github.com/fly-apps/postgres-flex/internal/flypg/state"
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 )
 
@@ -199,34 +200,32 @@ func listBackups(cmd *cobra.Command) error {
 		return fmt.Errorf("failed to get status flag: %v", err)
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"ID/Name", "Alias", "Status", "End time", "Begin WAL"})
-
-	// Set table alignment, borders, padding, etc. as needed
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetBorder(true) // Set to false to hide borders
-	table.SetCenterSeparator("|")
-	table.SetColumnSeparator("|")
-	table.SetRowSeparator("-")
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(true) // Enable header line
-	table.SetAutoWrapText(false)
+	table := tablewriter.NewTable(os.Stdout,
+		tablewriter.WithRowAlignment(tw.AlignLeft),
+		tablewriter.WithHeaderAlignment(tw.AlignLeft),
+		tablewriter.WithRowAutoWrap(tw.WrapNone),
+	)
+	table.Header("ID/Name", "Alias", "Status", "End time", "Begin WAL")
 
 	for _, b := range backupList.Backups {
 		if filterStatus != "" && b.Status != filterStatus {
 			continue
 		}
 
-		table.Append([]string{
+		if err := table.Append([]string{
 			b.ID,
 			b.Name,
 			b.Status,
 			b.EndTime,
 			b.BeginWal,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to append row: %v", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %v", err)
+	}
 
 	return nil
 }
