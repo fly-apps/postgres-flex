@@ -134,7 +134,7 @@ func (b *Barman) Backup(ctx context.Context, cfg BackupConfig) ([]byte, error) {
 		args = append(args, "-n", cfg.Name)
 	}
 
-	return utils.RunCmd(ctx, "postgres", "barman-cloud-backup", args...)
+	return utils.RunCmd(ctx, "postgres", "with_tmpdir", append([]string{"/data/barman.tmp.XXXXXXXX", "barman-cloud-backup"}, args...)...)
 }
 
 // RestoreBackup returns the command string used to restore a base backup.
@@ -149,7 +149,7 @@ func (b *Barman) RestoreBackup(ctx context.Context, name string) ([]byte, error)
 		defaultRestoreDir,
 	}
 
-	return utils.RunCmd(ctx, "postgres", "barman-cloud-restore", args...)
+	return utils.RunCmd(ctx, "postgres", "with_tmpdir", append([]string{"/data/barman.tmp.XXXXXXXX", "barman-cloud-restore"}, args...)...)
 }
 
 func (b *Barman) ListBackups(ctx context.Context) (BackupList, error) {
