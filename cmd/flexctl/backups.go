@@ -15,6 +15,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	barmanCloudMetadataTimeout = 5 * time.Minute
+	barmanCloudBackupTimeout   = 1 * time.Hour
+)
+
 var backupListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Lists all backups",
@@ -66,7 +71,7 @@ var backupShowCmd = &cobra.Command{
 func showBackup(cmd *cobra.Command, args []string) error {
 	id := args[0]
 
-	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(cmd.Context(), barmanCloudMetadataTimeout)
 	defer cancel()
 
 	store, err := state.NewStore()
@@ -90,7 +95,7 @@ func showBackup(cmd *cobra.Command, args []string) error {
 }
 
 func createBackup(cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(cmd.Context(), barmanCloudBackupTimeout)
 	defer cancel()
 
 	n, err := flypg.NewNode()
@@ -148,7 +153,7 @@ func createBackup(cmd *cobra.Command) error {
 }
 
 func listBackups(cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(cmd.Context(), barmanCloudMetadataTimeout)
 	defer cancel()
 
 	store, err := state.NewStore()
@@ -167,7 +172,7 @@ func listBackups(cmd *cobra.Command) error {
 	}
 
 	if isJSON {
-		jsonBytes, err := barman.ListRawBackups(cmd.Context())
+		jsonBytes, err := barman.ListRawBackups(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to list backups: %v", err)
 		}
