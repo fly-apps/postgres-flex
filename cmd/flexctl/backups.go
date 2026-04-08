@@ -212,16 +212,20 @@ func listBackups(cmd *cobra.Command) error {
 			continue
 		}
 
-		table.Append([]string{
+		if err := table.Append([]string{
 			b.ID,
 			b.Name,
 			b.Status,
 			b.EndTime,
 			b.BeginWal,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to append row: %v", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %v", err)
+	}
 
 	return nil
 }
