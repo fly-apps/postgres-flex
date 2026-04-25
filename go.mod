@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul/api v1.34.0
+	github.com/hashicorp/consul/api v1.34.1
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/olekukonko/tablewriter v1.1.4
