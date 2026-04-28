@@ -29,7 +29,7 @@ jobs:
         with:
           go-version-file: "go.mod"
 
-      - uses: j178/prek-action@v2.0.1
+      - uses: j178/prek-action@v2.0.2
         with:
           extra-args: --all-files --stage=manual
 
