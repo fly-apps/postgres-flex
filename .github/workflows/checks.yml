@@ -35,7 +35,7 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.11.3
 
       - name: generate command strings
         run: go generate ./... && git diff --exit-code
