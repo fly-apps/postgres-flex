@@ -22,7 +22,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - id: get-latest-tag
         if: github.event_name != 'pull_request'
         uses: "WyriHaximus/github-action-get-previous-tag@v2"
