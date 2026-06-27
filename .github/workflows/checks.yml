@@ -10,7 +10,7 @@ jobs:
     name: "Build and test"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
       - uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
@@ -24,7 +24,7 @@ jobs:
   precommit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
       - uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
