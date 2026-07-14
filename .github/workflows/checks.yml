@@ -33,7 +33,7 @@ jobs:
         with:
           extra-args: --all-files --stage=manual
 
-      - uses: golangci/golangci-lint-action@v9.2.1
+      - uses: golangci/golangci-lint-action@v9.3.0
         with:
           version: v2.11.3
 
