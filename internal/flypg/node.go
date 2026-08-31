@@ -142,7 +142,7 @@ func (n *Node) Init(ctx context.Context) error {
 	// Atomically claim primary status for this cluster. Exactly one node
 	// across the whole app ever wins this; everyone else must join as a
 	// standby (or witness) against whoever did.
-	isPrimary, err := store.TryClaimPrimary(n.MachineID)
+	isPrimary, err := n.tryClaimPrimary(store)
 	if err != nil {
 		return fmt.Errorf("failed to verify cluster state %s", err)
 	}
@@ -190,7 +190,7 @@ func (n *Node) Init(ctx context.Context) error {
 				}
 			} else {
 				log.Println("Provisioning standby")
-				cloneTarget, err := n.RepMgr.ResolvePrimaryOverDNS(ctx)
+				cloneTarget, err := n.RepMgr.WaitForPrimaryOverDNS(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to resolve member over dns: %s", err)
 				}
@@ -357,7 +357,7 @@ func (n *Node) PostInit(ctx context.Context) error {
 			return fmt.Errorf("failed initialize cluster state store. %v", err)
 		}
 
-		isPrimary, err := store.TryClaimPrimary(n.MachineID)
+		isPrimary, err := n.tryClaimPrimary(store)
 		if err != nil {
 			return fmt.Errorf("failed to verify cluster state: %s", err)
 		}
@@ -365,14 +365,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 		if isPrimary {
 			// Configure as primary
 			log.Println("Registering primary")
-
-			// Verify we reside within the clusters primary region
-			if !n.RepMgr.eligiblePrimary() {
-				return fmt.Errorf("unable to configure as the primary. expected region: %q, got: %q",
-					n.PrimaryRegion,
-					n.RepMgr.Region,
-				)
-			}
 
 			// Create required users
 			if err := n.setupCredentials(ctx, conn); err != nil {
@@ -435,6 +427,16 @@ func (n *Node) PostInit(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// tryClaimPrimary ensures only non-witness nodes in the primary region can
+// participate in the initial primary election.
+func (n *Node) tryClaimPrimary(store *state.Store) (bool, error) {
+	if n.RepMgr.Witness || !n.RepMgr.eligiblePrimary() {
+		return false, nil
+	}
+
+	return store.TryClaimPrimary(n.MachineID)
 }
 
 func (n *Node) setupCredentials(ctx context.Context, conn *pgx.Conn) error {
