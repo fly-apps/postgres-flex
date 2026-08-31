@@ -70,6 +70,7 @@ func (c *Store) TryClaimPrimary(machineID string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to verify primary claim: %s", err)
 	}
+
 	return pair != nil && string(pair.Value) == machineID, nil
 }
 
