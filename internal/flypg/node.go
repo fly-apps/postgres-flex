@@ -139,8 +139,10 @@ func (n *Node) Init(ctx context.Context) error {
 		return fmt.Errorf("failed initialize cluster state store: %s", err)
 	}
 
-	// Check to see if cluster has already been initialized.
-	clusterInitialized, err := store.IsInitializationFlagSet()
+	// Atomically claim primary status for this cluster. Exactly one node
+	// across the whole app ever wins this; everyone else must join as a
+	// standby (or witness) against whoever did.
+	isPrimary, err := store.TryClaimPrimary(n.MachineID)
 	if err != nil {
 		return fmt.Errorf("failed to verify cluster state %s", err)
 	}
@@ -153,7 +155,7 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	// Remote restores are only eligible on uninitialized clusters.
-	if !clusterInitialized {
+	if isPrimary {
 		// Determine if we are performing a remote restore.
 		if err := n.handleRemoteRestore(ctx, store); err != nil {
 			return fmt.Errorf("failed to handle remote restore: %s", err)
@@ -176,7 +178,7 @@ func (n *Node) Init(ctx context.Context) error {
 	}
 
 	if !n.PGConfig.isInitialized() {
-		if clusterInitialized {
+		if !isPrimary {
 			if n.RepMgr.Witness {
 				log.Println("Provisioning witness")
 				if err := n.PGConfig.writePasswordFile(n.OperatorCredentials.Password); err != nil {
@@ -346,19 +348,21 @@ func (n *Node) PostInit(ctx context.Context) error {
 	} else {
 		// New member
 
-		// Check with consul to see if the cluster has already been initialized
+		// Check with consul to see if this node is the cluster's primary. This
+		// is the same durable claim made in Init - calling it again here is
+		// idempotent (same machineID, same stored owner) and correctly
+		// resumes as primary across a crash/restart between Init and here.
 		store, err := state.NewStore()
 		if err != nil {
 			return fmt.Errorf("failed initialize cluster state store. %v", err)
 		}
 
-		// The initialization flag is set after the primary is registered.
-		clusterInitialized, err := store.IsInitializationFlagSet()
+		isPrimary, err := store.TryClaimPrimary(n.MachineID)
 		if err != nil {
 			return fmt.Errorf("failed to verify cluster state: %s", err)
 		}
 
-		if !clusterInitialized {
+		if isPrimary {
 			// Configure as primary
 			log.Println("Registering primary")
 
@@ -383,12 +387,6 @@ func (n *Node) PostInit(ctx context.Context) error {
 			// Register ourself as the primary
 			if err := n.RepMgr.registerPrimary(false); err != nil {
 				return fmt.Errorf("failed to register repmgr primary: %s", err)
-			}
-
-			// Set initialization flag within consul so future members know they are joining
-			// an existing cluster.
-			if err := store.SetInitializationFlag(); err != nil {
-				return fmt.Errorf("failed to register cluster with consul")
 			}
 
 			// Let the boot process know that we've already been configured.

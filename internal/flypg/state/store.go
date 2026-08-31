@@ -36,23 +36,41 @@ func NewStore() (*Store, error) {
 	}, nil
 }
 
-func (c *Store) SetInitializationFlag() error {
-	kv := &api.KVPair{Key: c.targetKey("INITIALIZED"), Value: []byte("true")}
-	_, err := c.Client.KV().Put(kv, nil)
-	return err
-}
+// TryClaimPrimary attempts to atomically claim this cluster for the given
+// machine. It replaces the old check-then-act pattern (read the flag, then
+// separately decide to become primary), which raced whenever more than one
+// node's Init/PostInit ran the check before the eventual primary had gotten
+// around to setting the flag - both would see it unset and both would try
+// to become primary.
+//
+// Consul's CAS with ModifyIndex: 0 only succeeds if the key does not already
+// exist, so when multiple nodes call this concurrently, exactly one write
+// wins across the whole cluster - Consul's Raft log serializes it, so there
+// is no window between "check" and "act" for another node to slip through.
+//
+// Returns true if this machine is the primary: either it just won the
+// claim, or it already won an earlier attempt (e.g. retrying after its own
+// crash), recognized by the stored value matching its own machineID rather
+// than someone else's.
+func (c *Store) TryClaimPrimary(machineID string) (bool, error) {
+	key := c.targetKey("INITIALIZED")
 
-func (c *Store) IsInitializationFlagSet() (bool, error) {
-	result, _, err := c.Client.KV().Get(c.targetKey("INITIALIZED"), nil)
+	ok, _, err := c.Client.KV().CAS(&api.KVPair{
+		Key:         key,
+		Value:       []byte(machineID),
+		ModifyIndex: 0,
+	}, nil)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to claim primary: %s", err)
 	}
-
-	if result == nil {
-		return false, nil
+	if ok {
+		return true, nil
 	}
-
-	return true, nil
+	pair, _, err := c.Client.KV().Get(key, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to verify primary claim: %s", err)
+	}
+	return pair != nil && string(pair.Value) == machineID, nil
 }
 
 func (c *Store) PushUserConfig(key string, config []byte) error {
