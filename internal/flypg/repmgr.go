@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fly-apps/postgres-flex/internal/privnet"
 	"github.com/fly-apps/postgres-flex/internal/utils"
@@ -26,6 +27,9 @@ const (
 	UnknownRoleName = ""
 
 	repmgrConsulKey = "repmgr"
+
+	primaryResolutionRetryInterval = time.Second
+	primaryResolutionTimeout       = time.Minute
 )
 
 type RepMgr struct {
@@ -510,6 +514,31 @@ func (r *RepMgr) ResolvePrimaryOverDNS(ctx context.Context) (*Member, error) {
 	}
 
 	return target, nil
+}
+
+// WaitForPrimaryOverDNS waits for the elected primary to finish initializing
+// and become available for cloning.
+func (r *RepMgr) WaitForPrimaryOverDNS(ctx context.Context) (*Member, error) {
+	waitCtx, cancel := context.WithTimeout(ctx, primaryResolutionTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(primaryResolutionRetryInterval)
+	defer ticker.Stop()
+
+	var lastErr error
+	for {
+		primary, err := r.ResolvePrimaryOverDNS(waitCtx)
+		if err == nil {
+			return primary, nil
+		}
+		lastErr = err
+
+		select {
+		case <-waitCtx.Done():
+			return nil, fmt.Errorf("waiting for cloneable primary: %w (last error: %v)", waitCtx.Err(), lastErr)
+		case <-ticker.C:
+		}
+	}
 }
 
 func (r *RepMgr) InRegionPeerIPs(ctx context.Context) ([]net.IPAddr, error) {
