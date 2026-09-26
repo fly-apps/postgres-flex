@@ -1,11 +1,11 @@
 module github.com/fly-apps/postgres-flex
 
-go 1.26
+go 1.26.7
 
 require (
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul/api v1.34.4
+	github.com/hashicorp/consul/api v1.34.5
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/olekukonko/tablewriter v1.1.5
@@ -48,6 +48,6 @@ require (
 	github.com/olekukonko/ll v0.1.6 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 )
