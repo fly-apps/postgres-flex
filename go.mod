@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/consul/api v1.34.4
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/olekukonko/tablewriter v1.1.4
+	github.com/olekukonko/tablewriter v1.1.5
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/term v1.1.0
 	github.com/spf13/cobra v1.10.2
